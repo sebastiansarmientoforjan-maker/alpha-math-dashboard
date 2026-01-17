@@ -14,29 +14,23 @@ export async function fetchStudent(studentId: string) {
     });
     return response.data.student;
   } catch (error) {
-    console.error(`Error fetching student ${studentId}:`, error);
     return null;
   }
 }
 
-export async function fetchStudentActivity(
-  studentId: string,
-  startDate: string,
-  endDate: string
-) {
+export async function fetchStudentActivity(studentId: string, start: string, end: string) {
   try {
     const response = await axios.get(`${API_BASE_URL}/students/${studentId}/activity`, {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Public-API-Key': API_KEY,
-        'Start-Date': startDate,
-        'End-Date': endDate,
+        'Start-Date': start,
+        'End-Date': end,
       },
     });
     return response.data.activity.totals;
   } catch (error) {
-    console.error(`Error fetching activity for student ${studentId}:`, error);
     return null;
   }
 }
@@ -46,14 +40,9 @@ export async function getStudentData(studentId: string) {
   if (!student) return null;
 
   const endDate = new Date().toISOString().split('T')[0];
-  const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split('T')[0];
+  const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
   const activity = await fetchStudentActivity(studentId, startDate, endDate);
 
-  return {
-    ...student,
-    activity,
-  };
+  return { ...student, activity };
 }
