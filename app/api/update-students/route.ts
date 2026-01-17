@@ -13,6 +13,7 @@ export async function GET() {
     const stateSnap = await getDoc(stateRef);
     let startIndex = stateSnap.exists() ? stateSnap.data().lastIndex || 0 : 0;
 
+    // Si llegamos al final, reiniciamos el ciclo
     if (startIndex >= studentIds.length) startIndex = 0;
 
     const endIndex = Math.min(startIndex + BATCH_SIZE, studentIds.length);
