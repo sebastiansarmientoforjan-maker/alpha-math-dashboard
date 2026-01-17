@@ -24,6 +24,8 @@ export async function GET(request: Request) {
     if (startIndex >= studentIds.length) startIndex = 0;
 
     // Procesamos lote de 50 estudiantes
+    // Nota: Ahora haremos 2 escrituras por estudiante (Perfil + Historial),
+    // así que el batch de 50 genera 100 escrituras. El límite de Firestore es 500, así que estamos seguros.
     const endIndex = Math.min(startIndex + 50, studentIds.length);
     const currentBatchIds = studentIds.slice(startIndex, endIndex);
 
@@ -32,30 +34,21 @@ export async function GET(request: Request) {
     const updates = await Promise.all(
       currentBatchIds.map(async (id) => {
         try {
-          // 1. OBTENER DATOS (Tier 3 Source: API con Tasks)
           const rawData = await getStudentData(id.toString());
           if (!rawData) return null;
 
-          // 2. CALCULAR MÉTRICAS (Tier 4 Brain: Nemesis & Zombies)
-          // Al usar la nueva función metrics.ts, esto devuelve nemesisTopic y riskStatus
           const metrics = calculateTier1Metrics(rawData, rawData.activity);
 
-          // 3. LOG DE CONFIRMACIÓN (Solo para ver que funciona en consola)
+          // LOGS DE CONFIRMACIÓN
           if (metrics.nemesisTopic) {
-            console.log(`   👹 NEMESIS DETECTED for ID ${id}: "${metrics.nemesisTopic}"`);
-          }
-          if (metrics.riskStatus === 'Dormant') {
-            // console.log(`   💤 DORMANT: ID ${id}`); // Opcional
+            console.log(`   👹 NEMESIS: ID ${id} -> "${metrics.nemesisTopic}"`);
           }
 
-          // 4. PREPARAR PAYLOAD PARA FIRESTORE
-          // Guardamos 'metrics' completo. Esto persiste el Nemesis Topic en la DB.
-          // Si la API falla mañana, el dashboard leerá este dato desde Firebase.
           return { 
             id: id.toString(), 
             data: { 
               ...rawData, 
-              metrics, // <--- Aquí va la joya (Tier 4 data)
+              metrics, 
               lastUpdated: new Date().toISOString() 
             } 
           };
@@ -67,14 +60,38 @@ export async function GET(request: Request) {
       })
     );
 
-    // 5. COMMIT A LA BASE DE DATOS
+    // --- FASE DE ESCRITURA (BATCH) ---
     const batch = writeBatch(db);
     let updateCount = 0;
+    const todayStr = new Date().toISOString().split('T')[0]; // Formato YYYY-MM-DD
 
     updates.forEach((item) => {
       if (item) {
+        // 1. Actualizar Estado Actual (Para el Dashboard en tiempo real)
         const studentRef = doc(db, 'students', item.id);
-        batch.set(studentRef, item.data, { merge: true }); // Merge asegura no borrar datos ajenos
+        batch.set(studentRef, item.data, { merge: true });
+
+        // 2. Guardar Snapshot Histórico (Para "Trend Sparklines") [NUEVO]
+        // Guardamos en la sub-colección 'history' usando la fecha como ID.
+        // Esto asegura que solo haya un registro por día (idempotencia).
+        const historyRef = doc(db, 'students', item.id, 'history', todayStr);
+        
+        // Guardamos solo lo vital para tendencias (ahorrar espacio)
+        const historySnapshot = {
+          date: todayStr,
+          timestamp: new Date().toISOString(),
+          metrics: {
+             velocityScore: item.data.metrics.velocityScore,
+             accuracyRate: item.data.metrics.accuracyRate,
+             riskStatus: item.data.metrics.riskStatus,
+             efficiencyRatio: item.data.metrics.efficiencyRatio,
+             contentGap: item.data.metrics.contentGap
+          },
+          courseName: item.data.currentCourse?.name || 'Unknown'
+        };
+
+        batch.set(historyRef, historySnapshot, { merge: true });
+
         updateCount++;
       }
     });
@@ -84,7 +101,7 @@ export async function GET(request: Request) {
     // Guardar estado del scheduler
     await setDoc(stateRef, { lastIndex: endIndex, total: studentIds.length }, { merge: true });
 
-    console.log(`✅ BATCH COMPLETE: Updated ${updateCount} students.`);
+    console.log(`✅ BATCH COMPLETE: Updated ${updateCount} profiles + history entries.`);
 
     return NextResponse.json({ 
       success: true, 
