@@ -4,7 +4,7 @@ export interface Metrics {
   consistencyIndex: number;
   stuckScore: number;
   dropoutProbability: number;
-  accuracyRate: number | null; // AHORA PUEDE SER NULL
+  accuracyRate: number | null;
   efficiencyRatio: number;
   coldStartDays: number;
   momentumScore: number;
@@ -14,44 +14,39 @@ export interface Metrics {
   burnoutRisk: boolean;
   sessionQuality: number;
   
-  // TIER 4
+  // TIER 4 (Base)
   focusIntegrity: number;
   nemesisTopic: string;
   reviewAccuracy: number;
   microStalls: number;
   
-  // NUEVO ESTADO DE RIESGO
+  // TIER 4 (AVANZADO - NUEVO)
+  archetype: 'Zombie' | 'Grinder' | 'Guesser' | 'Flow Master' | 'Neutral'; // <--- NUEVO
+  
   riskStatus: 'Critical' | 'Attention' | 'On Track' | 'Dormant'; 
 }
 
 export function calculateTier1Metrics(student: any, activity: any): Metrics {
   const schedule = student?.schedule || {};
-  
-  // Extraemos Totals y Tasks
   const totals = activity?.totals || activity || {}; 
   const tasks = activity?.tasks || [];   
 
-  // Datos base
   const weeklyGoal = (schedule.monGoal || 0) * 5; 
   const weeklyXP = totals.xpAwarded || 0;
   
-  // Tiempos (En minutos)
   const timeEngaged = Math.round((totals.timeEngaged || totals.time || 0) / 60);
   const timeProductive = Math.round((totals.timeProductive || 0) / 60);
   const timeElapsed = Math.round((totals.timeElapsed || 0) / 60);
   
   const questions = totals.questions || 0;
   const questionsCorrect = totals.questionsCorrect || 0;
-  
-  // --- CORRECCIÓN 1: ACCURACY NULL ---
-  // Si no hay preguntas, es null (no 0%)
   const accuracyRate = questions > 0 
     ? Math.round((questionsCorrect / questions) * 100) 
     : null;
     
   const numTasks = totals.numTasks || 0;
 
-  // --- TIER 4 CÁLCULOS ---
+  // --- TIER 4 BASE ---
   const focusIntegrity = timeEngaged > 0 
     ? Math.round((timeProductive / timeEngaged) * 100) 
     : 0;
@@ -85,31 +80,40 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
   const totalWastedMin = timeElapsed - timeEngaged;
   const microStalls = numTasks > 0 ? Math.round(totalWastedMin / numTasks) : 0;
 
-  // --- RETORNO Y CLASIFICACIÓN ---
+  // --- RETORNO BASE ---
   const velocityScore = weeklyGoal > 0 ? Math.min(Math.round((weeklyXP / weeklyGoal) * 100), 100) : 0;
   const efficiencyRatio = timeEngaged > 0 ? parseFloat((weeklyXP / timeEngaged).toFixed(2)) : 0;
   const timePerQuestion = questions > 0 ? parseFloat((timeEngaged / questions).toFixed(1)) : 0;
-  
   const contentGap = nemesisTopic !== "" ? 10 : (timePerQuestion > 5 ? 5 : 0);
 
-  // --- CORRECCIÓN 2: LÓGICA DE RIESGO (DORMANT) ---
+  // --- CLASIFICACIÓN DE ARQUETIPOS (TIER 4 AVANZADO) ---
+  let archetype: Metrics['archetype'] = 'Neutral';
+
+  if (timeEngaged > 10) { // Solo clasificamos si hay actividad mínima
+      if (focusIntegrity < 40) {
+          archetype = 'Zombie'; // Bajo foco, mucha distracción
+      } else if (timePerQuestion < 0.3 && (accuracyRate || 0) < 50) {
+          archetype = 'Guesser'; // Muy rápido (<20s por pregunta) y falla mucho
+      } else if (focusIntegrity > 70 && (accuracyRate || 0) < 60) {
+          archetype = 'Grinder'; // Se esfuerza mucho (Productivo) pero no entiende (Baja nota)
+      } else if (focusIntegrity > 70 && (accuracyRate || 0) > 85) {
+          archetype = 'Flow Master'; // La máquina perfecta
+      }
+  }
+
+  // --- RIESGO ---
   let riskStatus: Metrics['riskStatus'] = 'On Track';
   let dropoutRisk = 0;
 
-  // 1. Si está INACTIVO (0 XP o 0 Tiempo) -> DORMANT (Gris)
   if (weeklyXP === 0 || timeEngaged === 0) {
       riskStatus = 'Dormant';
-      dropoutRisk = 0; // No lo marcamos como riesgo de deserción académica, sino inactividad
-  } 
-  // 2. Si está ACTIVO, aplicamos lógica académica
-  else {
-      // Cálculo de riesgo normal
+  } else {
       if (velocityScore < 30) dropoutRisk += 30;
-      if (velocityScore > 50) dropoutRisk = 0; // Reset si va bien
+      if (velocityScore > 50) dropoutRisk = 0;
       if ((accuracyRate || 100) < 55) dropoutRisk += 20;
       if (nemesisTopic !== "") dropoutRisk += 20;
+      if (archetype === 'Grinder') dropoutRisk += 15; // El esfuerzo sin fruto es riesgo de burnout
 
-      // Clasificación
       if (velocityScore < 30 || contentGap > 5 || dropoutRisk > 50) {
           riskStatus = 'Critical';
       } else if (velocityScore < 60) {
@@ -122,7 +126,7 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
     consistencyIndex: velocityScore > 50 ? 0.9 : 0.3,
     stuckScore: nemesisTopic !== "" ? 90 : 0,
     dropoutProbability: Math.min(dropoutRisk, 100),
-    accuracyRate, // Ahora puede ser null
+    accuracyRate,
     efficiencyRatio,
     coldStartDays: weeklyXP === 0 ? 7 : 0,
     momentumScore: 1.0,
@@ -135,6 +139,7 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
     nemesisTopic,
     reviewAccuracy,
     microStalls,
-    riskStatus // Nueva propiedad
+    archetype, // <--- EXPORTAMOS EL ARQUETIPO
+    riskStatus
   };
 }
