@@ -3,7 +3,6 @@ import axios from 'axios';
 const API_BASE_URL = 'https://mathacademy.com/api/beta6';
 const API_KEY = process.env.NEXT_PUBLIC_MATH_ACADEMY_API_KEY;
 
-// Interfaces para que TypeScript no se queje
 interface Student {
   id: number;
   firstName: string;
@@ -41,7 +40,6 @@ interface Activity {
   questionsCorrect: number;
 }
 
-// 1. Función para obtener datos básicos del estudiante
 export async function fetchStudent(studentId: string): Promise<Student | null> {
   try {
     const response = await axios.get(`${API_BASE_URL}/students/${studentId}`, {
@@ -58,7 +56,6 @@ export async function fetchStudent(studentId: string): Promise<Student | null> {
   }
 }
 
-// 2. Función para obtener actividad
 export async function fetchStudentActivity(
   studentId: string,
   startDate: string,
@@ -81,8 +78,7 @@ export async function fetchStudentActivity(
   }
 }
 
-// 3. ESTA ES LA FUNCIÓN CLAVE QUE NECESITA EL ROUTE.TS
-// Combina los datos básicos con la actividad de los últimos 7 días
+// ESTA ES LA FUNCIÓN QUE VERCEL BUSCA
 export async function getStudentData(studentId: string) {
   const student = await fetchStudent(studentId);
   if (!student) return null;
@@ -96,6 +92,6 @@ export async function getStudentData(studentId: string) {
 
   return {
     ...student,
-    activity
+    activity,
   };
 }
