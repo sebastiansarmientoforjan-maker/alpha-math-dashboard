@@ -3,44 +3,7 @@ import axios from 'axios';
 const API_BASE_URL = 'https://mathacademy.com/api/beta6';
 const API_KEY = process.env.NEXT_PUBLIC_MATH_ACADEMY_API_KEY;
 
-interface Student {
-  id: number;
-  firstName: string;
-  lastName: string;
-  createdLocal: string;
-  deactivated: boolean;
-  currentCourse: {
-    name: string;
-    startDate: string;
-    progress: number;
-    xpRemaining: number;
-    grade: number;
-    letterGrade: string;
-  };
-  schedule: {
-    monGoal: number;
-    tueGoal: number;
-    wedGoal: number;
-    thuGoal: number;
-    friGoal: number;
-    satGoal: number;
-    sunGoal: number;
-  };
-  league: {
-    name: string;
-    level: number;
-  } | null;
-}
-
-interface Activity {
-  time: number;
-  numTasks: number;
-  xpAwarded: number;
-  questions: number;
-  questionsCorrect: number;
-}
-
-export async function fetchStudent(studentId: string): Promise<Student | null> {
+export async function fetchStudent(studentId: string) {
   try {
     const response = await axios.get(`${API_BASE_URL}/students/${studentId}`, {
       headers: {
@@ -60,7 +23,7 @@ export async function fetchStudentActivity(
   studentId: string,
   startDate: string,
   endDate: string
-): Promise<Activity | null> {
+) {
   try {
     const response = await axios.get(`${API_BASE_URL}/students/${studentId}/activity`, {
       headers: {
@@ -78,7 +41,6 @@ export async function fetchStudentActivity(
   }
 }
 
-// ESTA ES LA FUNCIÓN QUE VERCEL BUSCA
 export async function getStudentData(studentId: string) {
   const student = await fetchStudent(studentId);
   if (!student) return null;
