@@ -1,19 +1,22 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react'; // Importa useMemo
+import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { 
   BarChart, Bar, XAxis, ResponsiveContainer, Cell, LabelList,
   PieChart, Pie
 } from 'recharts';
+// Importamos el nuevo componente (Asegúrate de haberlo creado en src/components/StudentModal.tsx)
+import StudentModal from '@/components/StudentModal';
 
 export default function PanelPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [autoSync, setAutoSync] = useState(false);
   const [search, setSearch] = useState('');
-  const [selectedCourse, setSelectedCourse] = useState('ALL'); // <--- NUEVO ESTADO
+  const [selectedCourse, setSelectedCourse] = useState('ALL'); 
+  const [selectedStudent, setSelectedStudent] = useState<any>(null); // <--- ESTADO PARA EL MODAL
   const [syncStatus, setSyncStatus] = useState({ current: 0, total: 1613 });
 
   // --- DATA LOADING ---
@@ -49,39 +52,30 @@ export default function PanelPage() {
     if (autoSync) runUpdateBatch(true);
   }, [autoSync]);
 
-  // --- EXTRAER CURSOS ÚNICOS (NUEVO) ---
+  // --- EXTRAER CURSOS ÚNICOS ---
   const uniqueCourses = useMemo(() => {
     const courses = new Set(students.map(s => s.currentCourse?.name).filter(Boolean));
     return Array.from(courses).sort();
   }, [students]);
 
-  // --- FILTRADO AVANZADO (ACTUALIZADO) ---
+  // --- FILTRADO AVANZADO ---
   const filtered = students.filter(s => {
     const rawName = `${s.firstName} ${s.lastName}`;
     const searchTerm = search.toLowerCase();
     
     const matchesSearch = rawName.toLowerCase().includes(searchTerm) || (s.id || '').toString().includes(searchTerm);
-    const matchesCourse = selectedCourse === 'ALL' || s.currentCourse?.name === selectedCourse; // <--- FILTRO DE CURSO
+    const matchesCourse = selectedCourse === 'ALL' || s.currentCourse?.name === selectedCourse;
 
     return matchesSearch && matchesCourse;
   });
 
-  // --- RECALCULAR CHARTS EN BASE AL FILTRO (Para que los gráficos reaccionen al curso) ---
-  // Nota: Antes usábamos 'students', ahora usaremos 'filtered' para los gráficos
-  const velocityData = [
-    { name: 'Critical', count: filtered.filter(s => s.metrics?.riskStatus === 'Critical').length, fill: '#ef4444' },
-    { name: 'Low', count: filtered.filter(s => s.metrics?.riskStatus === 'Attention').length, fill: '#f59e0b' },
-    { name: 'On Track', count: filtered.filter(s => s.metrics?.riskStatus === 'On Track').length, fill: '#10b981' },
-    { name: 'Dormant', count: filtered.filter(s => s.metrics?.riskStatus === 'Dormant').length, fill: '#475569' }, 
-  ];
-
+  // --- CHART DATA PREPARATION ---
   const riskData = [
     { name: 'Crit', value: filtered.filter(s => s.metrics?.riskStatus === 'Critical').length, color: '#ef4444' }, 
     { name: 'Attn', value: filtered.filter(s => s.metrics?.riskStatus === 'Attention').length, color: '#f59e0b' },
     { name: 'OK', value: filtered.filter(s => s.metrics?.riskStatus === 'On Track').length, color: '#10b981' }, 
     { name: 'Zzz', value: filtered.filter(s => s.metrics?.riskStatus === 'Dormant').length, color: '#475569' }, 
   ];
-
 
   if (loading) return <div className="p-8 bg-slate-950 min-h-screen text-emerald-500 font-mono italic animate-pulse">RECALIBRATING ALPHA CORE...</div>;
 
@@ -92,12 +86,12 @@ export default function PanelPage() {
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-6">
         <div>
           <h1 className="text-2xl font-black uppercase tracking-tighter text-white italic">Alpha Command Center V2</h1>
-          <p className="text-[10px] text-slate-500 tracking-widest uppercase mt-1">Phase 1.2: Context Awareness</p>
+          <p className="text-[10px] text-slate-500 tracking-widest uppercase mt-1">Phase 2: Deep Dive Intelligence</p>
         </div>
         
         <div className="flex gap-4 items-center flex-wrap justify-end">
             
-            {/* SELECTOR DE CURSO (NUEVO) */}
+            {/* SELECTOR DE CURSO */}
             <select 
               value={selectedCourse}
               onChange={(e) => setSelectedCourse(e.target.value)}
@@ -129,7 +123,7 @@ export default function PanelPage() {
         {/* LEFT COLUMN (TABLE + KPI) */}
         <div className="lg:col-span-3 space-y-6">
           
-          {/* KPI CARDS (Usan data filtrada) */}
+          {/* KPI CARDS */}
           <div className="grid grid-cols-4 gap-4">
             <div className="bg-red-500/5 border border-red-500/20 p-4 rounded-xl">
               <p className="text-[9px] font-black text-red-500 uppercase tracking-widest">Critical</p>
@@ -182,7 +176,11 @@ export default function PanelPage() {
                     const isDormant = m.riskStatus === 'Dormant';
                     
                     return (
-                      <tr key={s.id} className={`hover:bg-slate-800/30 transition-colors group ${isDormant ? 'opacity-50 grayscale' : ''}`}>
+                      <tr 
+                        key={s.id} 
+                        onClick={() => setSelectedStudent(s)} // <--- CLICK INTERACTIVO
+                        className={`hover:bg-slate-800/50 transition-colors group cursor-pointer ${isDormant ? 'opacity-50 grayscale' : ''}`}
+                      >
                         <td className="p-3">
                           <div className={`font-bold text-[11px] ${isDormant ? 'text-slate-500' : 'text-white'} group-hover:text-emerald-400 transition-colors`}>
                             {displayName}
@@ -297,6 +295,15 @@ export default function PanelPage() {
 
         </div>
       </div>
+
+      {/* --- MODAL LAYER (STUDENT DOSSIER) --- */}
+      {selectedStudent && (
+        <StudentModal 
+          student={selectedStudent} 
+          onClose={() => setSelectedStudent(null)} 
+        />
+      )}
+
     </div>
   );
 }
