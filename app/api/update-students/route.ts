@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { 
-  doc, 
-  writeBatch, 
-  getDoc, 
-  setDoc 
-} from 'firebase/firestore';
+import { doc, writeBatch, getDoc, setDoc } from 'firebase/firestore';
 import { getStudentData } from '@/lib/mathAcademyAPI';
 import studentIds from '@/lib/student_ids.json'; 
 
