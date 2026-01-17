@@ -5,7 +5,7 @@ import { getStudentData } from '@/lib/mathAcademyAPI';
 import { calculateTier1Metrics } from '@/lib/metrics';
 import studentIds from '@/lib/student_ids.json'; 
 
-const BATCH_SIZE = 100; 
+export const dynamic = 'force-dynamic'; // Evita caché de Vercel
 
 export async function GET() {
   try {
@@ -13,10 +13,9 @@ export async function GET() {
     const stateSnap = await getDoc(stateRef);
     let startIndex = stateSnap.exists() ? stateSnap.data().lastIndex || 0 : 0;
 
-    // Si llegamos al final, reiniciamos el ciclo
     if (startIndex >= studentIds.length) startIndex = 0;
 
-    const endIndex = Math.min(startIndex + BATCH_SIZE, studentIds.length);
+    const endIndex = Math.min(startIndex + 50, studentIds.length);
     const currentBatchIds = studentIds.slice(startIndex, endIndex);
 
     const updates = await Promise.all(
@@ -26,34 +25,32 @@ export async function GET() {
           if (!rawData) return null;
           const metrics = calculateTier1Metrics(rawData, rawData.activity);
           return { id: id.toString(), data: { ...rawData, metrics, lastUpdated: new Date().toISOString() } };
-        } catch (error) { return null; }
+        } catch (e) { return null; }
       })
     );
 
     const batch = writeBatch(db);
+    let count = 0;
     updates.forEach((item) => {
       if (item) {
         const studentRef = doc(db, 'students', item.id);
         batch.set(studentRef, item.data, { merge: true });
+        count++;
       }
     });
 
     await batch.commit();
     const nextIndex = endIndex >= studentIds.length ? 0 : endIndex;
-    
-    await setDoc(stateRef, { 
-      lastIndex: nextIndex, 
-      lastRun: new Date().toISOString(),
-      totalStudents: studentIds.length 
-    }, { merge: true });
+    await setDoc(stateRef, { lastIndex: nextIndex, total: studentIds.length }, { merge: true });
 
     return NextResponse.json({ 
       success: true, 
-      currentIndex: endIndex,
-      totalStudents: studentIds.length,
-      progress: Math.round((endIndex / studentIds.length) * 100)
+      processed: count, 
+      currentIndex: endIndex, 
+      total: studentIds.length 
     });
   } catch (error) {
-    return NextResponse.json({ success: false }, { status: 500 });
+    console.error("API Error:", error);
+    return NextResponse.json({ success: false, error: "Internal Error" }, { status: 500 });
   }
 }
