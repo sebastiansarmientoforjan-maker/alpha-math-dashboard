@@ -9,17 +9,19 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [autoSync, setAutoSync] = useState(false);
   const [search, setSearch] = useState('');
+  const [courseFilter, setCourseFilter] = useState('ALL');
 
   useEffect(() => {
     const q = query(collection(db, 'students'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setStudents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setStudents(data);
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // Función de Auto-Sync
+  // Auto-Sync function
   const runSync = async () => {
     if (!autoSync) return;
     try {
@@ -30,127 +32,241 @@ export default function DashboardPage() {
       } else {
         setAutoSync(false);
       }
-    } catch (e) { setAutoSync(false); }
+    } catch (e) { 
+      setAutoSync(false); 
+    }
   };
 
-  useEffect(() => { if (autoSync) runSync(); }, [autoSync]);
+  useEffect(() => { 
+    if (autoSync) runSync(); 
+  }, [autoSync]);
 
-  // Indicadores TIER 1
+  // TIER 1 Statistics
   const stats = {
+    total: students.length,
     atRisk: students.filter(s => (s.metrics?.dropoutProbability || 0) > 60).length,
     attention: students.filter(s => (s.metrics?.stuckScore || 0) > 40).length,
     onTrack: students.filter(s => (s.metrics?.velocityScore || 0) > 70).length,
+    avgVelocity: Math.round(students.reduce((sum, s) => sum + (s.metrics?.velocityScore || 0), 0) / (students.length || 1)),
+    avgAccuracy: Math.round(students.reduce((sum, s) => sum + (s.metrics?.accuracyRate || 0), 0) / (students.length || 1)),
   };
 
-  const filtered = students.filter(s => 
-    `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase())
-  );
+  // Get unique courses
+  const courses = Array.from(new Set(students.map(s => s.currentCourse?.name).filter(Boolean)));
 
-  if (loading) return <div className="p-8 bg-slate-950 min-h-screen text-emerald-500 font-mono italic">LOADING ALPHA COMMAND CENTER...</div>;
+  // Filter students
+  const filtered = students.filter(s => {
+    const matchesSearch = `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
+                         s.id.toString().includes(search);
+    const matchesCourse = courseFilter === 'ALL' || s.currentCourse?.name === courseFilter;
+    return matchesSearch && matchesCourse;
+  });
+
+  if (loading) {
+    return (
+      <div className="p-8 bg-slate-950 min-h-screen text-emerald-500 font-mono italic flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4">🦅</div>
+          <div className="text-xl">LOADING ALPHA COMMAND CENTER...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 bg-slate-950 min-h-screen text-slate-300 font-sans">
-      
-      {/* 1. TIER 1 ALERTS - TOP BAR */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-red-500/5 border border-red-500/20 p-5 rounded-2xl flex items-center justify-between">
+    <div className="bg-slate-950 min-h-screen">
+      {/* Header */}
+      <div className="bg-slate-900/40 border-b border-slate-800 p-6">
+        <div className="flex justify-between items-center">
           <div>
-            <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-1">Critical At Risk</p>
-            <h2 className="text-4xl font-black text-white">{stats.atRisk}</h2>
+            <h1 className="text-2xl font-black text-white mb-1">🦅 ALPHA COMMAND CENTER</h1>
+            <p className="text-xs text-slate-500 font-mono">Math Academy Real-Time Analytics • Senior Section</p>
           </div>
-          <span className="text-4xl">🔴</span>
-        </div>
-        <div className="bg-amber-500/5 border border-amber-500/20 p-5 rounded-2xl flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">Need Attention</p>
-            <h2 className="text-4xl font-black text-white">{stats.attention}</h2>
-          </div>
-          <span className="text-4xl">🟡</span>
-        </div>
-        <div className="bg-emerald-500/5 border border-emerald-500/20 p-5 rounded-2xl flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">On Track</p>
-            <h2 className="text-4xl font-black text-white">{stats.onTrack}</h2>
-          </div>
-          <span className="text-4xl">🟢</span>
+          <button 
+            onClick={() => setAutoSync(!autoSync)}
+            className={`px-6 py-3 rounded-lg font-black text-xs tracking-widest transition-all ${
+              autoSync 
+                ? 'bg-red-900 text-white animate-pulse' 
+                : 'bg-emerald-600 text-white hover:bg-emerald-500'
+            }`}
+          >
+            {autoSync ? '⏸ STOP SYNC' : '▶ START SYNC'}
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        
-        {/* 2. TABLA PRINCIPAL (3/4) */}
-        <div className="lg:col-span-3 space-y-6">
-          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-md">
-            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/60">
-              <button 
-                onClick={() => setAutoSync(!autoSync)}
-                className={`px-4 py-2 rounded-lg font-black text-[10px] tracking-widest transition-all ${
-                  autoSync ? 'bg-red-900 text-white animate-pulse' : 'bg-emerald-600 text-white hover:bg-emerald-500'
-                }`}
-              >
-                {autoSync ? 'STOP AUTO-SYNC' : 'START SYNC (1613 IDS)'}
-              </button>
+      {/* TIER 1 Metrics Cards */}
+      <div className="p-6">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+          <MetricCard title="Total Students" value={stats.total} color="blue" />
+          <MetricCard title="🔴 At Risk" value={stats.atRisk} color="red" />
+          <MetricCard title="🟡 Attention" value={stats.attention} color="amber" />
+          <MetricCard title="🟢 On Track" value={stats.onTrack} color="emerald" />
+          <MetricCard title="Avg Velocity" value={`${stats.avgVelocity}%`} color="blue" />
+          <MetricCard title="Avg Accuracy" value={`${stats.avgAccuracy}%`} color="purple" />
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Left Panel - Main Table (3/4) */}
+          <div className="lg:col-span-3 space-y-4">
+            {/* Filters */}
+            <div className="flex gap-4">
               <input 
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search Identity..." 
-                className="bg-slate-950 border border-slate-700 px-4 py-2 rounded-xl text-xs w-64 outline-none focus:border-emerald-500"
+                placeholder="🔍 Search student..." 
+                className="flex-1 bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg text-sm text-white outline-none focus:border-emerald-500"
               />
+              <select
+                value={courseFilter}
+                onChange={(e) => setCourseFilter(e.target.value)}
+                className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg text-sm text-white outline-none focus:border-emerald-500"
+              >
+                <option value="ALL">All Courses</option>
+                {courses.map(course => (
+                  <option key={course} value={course}>{course}</option>
+                ))}
+              </select>
             </div>
 
-            <div className="overflow-x-auto max-h-[700px]">
-              <table className="w-full text-left text-xs">
-                <thead className="sticky top-0 bg-slate-900/95 z-10 text-slate-500 font-bold border-b border-slate-800">
-                  <tr>
-                    <th className="p-5 uppercase tracking-widest">Student Identity</th>
-                    <th className="p-5 text-center">Velocity Score</th>
-                    <th className="p-5 text-center">Consistency</th>
-                    <th className="p-5 text-center">Accuracy</th>
-                    <th className="p-5 text-center">Stuck Score</th>
-                    <th className="p-5 text-right">Dropout Risk</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/50">
-                  {filtered.map((s) => (
-                    <tr key={s.id} className="hover:bg-slate-800/30 transition-colors group">
-                      <td className="p-5">
-                        <div className="font-bold text-slate-100">{s.firstName} {s.lastName}</div>
-                        <div className="text-[10px] text-slate-600 font-mono">{s.id}</div>
-                      </td>
-                      <td className="p-5 text-center font-mono text-emerald-500">{s.metrics?.velocityScore}%</td>
-                      <td className="p-5 text-center font-mono">{s.metrics?.consistencyIndex > 0.8 ? '🟢 HIGH' : '🟡 MID'}</td>
-                      <td className={`p-5 text-center font-black ${s.metrics?.accuracyRate < 65 ? 'text-red-400' : 'text-slate-300'}`}>{s.metrics?.accuracyRate}%</td>
-                      <td className="p-5 text-center"><span className="bg-slate-800 px-3 py-1 rounded-lg text-slate-500 font-mono">{s.metrics?.stuckScore}</span></td>
-                      <td className="p-5 text-right font-black text-red-500/70">{s.metrics?.dropoutProbability}%</td>
+            {/* Table */}
+            <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto max-h-[700px]">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-slate-900 z-10 text-slate-500 font-bold border-b border-slate-800">
+                    <tr>
+                      <th className="p-4 uppercase tracking-wider">Student</th>
+                      <th className="p-4 uppercase tracking-wider">Course</th>
+                      <th className="p-4 text-center uppercase tracking-wider">Progress</th>
+                      <th className="p-4 text-center uppercase tracking-wider">XP Week</th>
+                      <th className="p-4 text-center uppercase tracking-wider">Velocity</th>
+                      <th className="p-4 text-center uppercase tracking-wider">Accuracy</th>
+                      <th className="p-4 text-center uppercase tracking-wider">Stuck</th>
+                      <th className="p-4 text-center uppercase tracking-wider">Risk</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        {/* 3. PANEL DERECHO (1/4) */}
-        <div className="space-y-6">
-          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl backdrop-blur-md">
-            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Top 5 Stuck Score</h3>
-            {students.sort((a,b) => (b.metrics?.stuckScore || 0) - (a.metrics?.stuckScore || 0)).slice(0,5).map(s => (
-              <div key={s.id} className="text-[11px] flex justify-between mb-3 border-l-2 border-red-500 pl-3">
-                <span className="font-bold text-slate-300">{s.firstName}</span>
-                <span className="text-red-500 font-mono">{s.metrics?.stuckScore}</span>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50">
+                    {filtered.map((s) => {
+                      const metrics = s.metrics || {};
+                      const course = s.currentCourse || {};
+                      const activity = s.activity || {};
+                      
+                      return (
+                        <tr key={s.id} className="hover:bg-slate-800/30 transition-colors">
+                          <td className="p-4">
+                            <div className="font-semibold text-slate-200">{s.firstName} {s.lastName}</div>
+                            <div className="text-[10px] text-slate-600 font-mono">ID: {s.id}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className="text-slate-300 font-medium">{course.name || 'N/A'}</div>
+                            <div className="text-[10px] text-slate-600">Grade: {course.grade || 'N/A'}</div>
+                          </td>
+                          <td className="p-4 text-center">
+                            <div className="text-white font-mono">
+                              {Math.round((course.progress || 0) * 100)}%
+                            </div>
+                            <div className="text-[10px] text-slate-600">
+                              {course.xpRemaining || 0} XP left
+                            </div>
+                          </td>
+                          <td className="p-4 text-center">
+                            <div className="font-mono text-emerald-400">
+                              {activity.xpAwarded || 0}
+                            </div>
+                          </td>
+                          <td className="p-4 text-center">
+                            <VelocityBadge score={metrics.velocityScore} />
+                          </td>
+                          <td className="p-4 text-center">
+                            <AccuracyBadge score={metrics.accuracyRate} />
+                          </td>
+                          <td className="p-4 text-center">
+                            <StuckBadge score={metrics.stuckScore} />
+                          </td>
+                          <td className="p-4 text-center">
+                            <RiskBadge score={metrics.dropoutProbability} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            ))}
+              <div className="p-4 border-t border-slate-800 bg-slate-900/60 text-xs text-slate-500">
+                Showing {filtered.length} of {students.length} students
+              </div>
+            </div>
           </div>
 
-          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl backdrop-blur-md">
-            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Pattern Recognition</h3>
-            <div className="text-[11px] space-y-4 text-slate-400 italic">
-              <p>⚠️ System detected {stats.attention} students with low accuracy patterns.</p>
-              <p>🔥 Weekend Sync recommended for high-velocity students.</p>
+          {/* Right Panel - Alerts & Analytics (1/4) */}
+          <div className="space-y-4">
+            {/* Top Stuck Students */}
+            <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-lg">
+              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">
+                🚨 Top Stuck Students
+              </h3>
+              {students
+                .filter(s => (s.metrics?.stuckScore || 0) > 0)
+                .sort((a, b) => (b.metrics?.stuckScore || 0) - (a.metrics?.stuckScore || 0))
+                .slice(0, 5)
+                .map(s => (
+                  <div key={s.id} className="mb-3 pb-3 border-b border-slate-800 last:border-0">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-bold text-slate-300 text-xs">
+                        {s.firstName} {s.lastName}
+                      </span>
+                      <span className="text-red-500 font-mono text-sm font-black">
+                        {s.metrics?.stuckScore}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-600">
+                      {s.currentCourse?.name || 'N/A'}
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            {/* High Dropout Risk */}
+            <div className="bg-red-900/10 border border-red-900/30 p-5 rounded-lg">
+              <h3 className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-4">
+                ⚠️ High Dropout Risk
+              </h3>
+              {students
+                .filter(s => (s.metrics?.dropoutProbability || 0) > 60)
+                .slice(0, 5)
+                .map(s => (
+                  <div key={s.id} className="mb-3 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-300 font-semibold">
+                        {s.firstName}
+                      </span>
+                      <span className="text-red-400 font-mono font-bold">
+                        {s.metrics?.dropoutProbability}%
+                      </span>
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            {/* Pattern Recognition */}
+            <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-lg">
+              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">
+                🎯 Pattern Recognition
+              </h3>
+              <div className="text-[11px] space-y-3 text-slate-400">
+                <p>⚠️ {stats.attention} students showing stuck patterns</p>
+                <p>🔥 {stats.atRisk} students at critical risk level</p>
+                <p>✅ {stats.onTrack} students on track with goals</p>
+              </div>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
 }
+
+// Helper Components
+function MetricCard({ title, value, color }: any) {
+  const colors: any = {
+    blue: 'bg-blue-500/10 border-blue-500/30
