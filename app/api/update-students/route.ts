@@ -7,14 +7,24 @@ import studentIds from '@/lib/student_ids.json';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) { // Añadimos request
   try {
-    const stateRef = doc(db, 'system', 'scheduler_state');
-    const stateSnap = await getDoc(stateRef);
-    let startIndex = stateSnap.exists() ? stateSnap.data().lastIndex || 0 : 0;
+    const { searchParams } = new URL(request.url);
+    const shouldReset = searchParams.get('reset') === 'true';
 
+    const stateRef = doc(db, 'system', 'scheduler_state');
+    
+    let startIndex = 0;
+    
+    if (!shouldReset) {
+       const stateSnap = await getDoc(stateRef);
+       startIndex = stateSnap.exists() ? stateSnap.data().lastIndex || 0 : 0;
+    }
+
+    // Si ya terminamos y no es reset, o si el índice se pasó, reiniciamos visualmente a 0
     if (startIndex >= studentIds.length) startIndex = 0;
 
+    // Procesamos 50 estudiantes
     const endIndex = Math.min(startIndex + 50, studentIds.length);
     const currentBatchIds = studentIds.slice(startIndex, endIndex);
 
@@ -23,7 +33,6 @@ export async function GET() {
         try {
           const rawData = await getStudentData(id.toString());
           if (!rawData) return null;
-          // Aplicamos el cerebro Tier 1
           const metrics = calculateTier1Metrics(rawData, rawData.activity);
           return { id: id.toString(), data: { ...rawData, metrics, lastUpdated: new Date().toISOString() } };
         } catch (e) { return null; }
@@ -39,11 +48,18 @@ export async function GET() {
     });
 
     await batch.commit();
-    const nextIndex = endIndex >= studentIds.length ? 0 : endIndex;
-    await setDoc(stateRef, { lastIndex: nextIndex, total: studentIds.length }, { merge: true });
+    
+    // Guardamos dónde quedamos. Si llegamos al final, guardamos el final.
+    // El frontend decidirá detenerse cuando vea que currentIndex == total.
+    await setDoc(stateRef, { lastIndex: endIndex, total: studentIds.length }, { merge: true });
 
-    return NextResponse.json({ success: true, currentIndex: endIndex, total: studentIds.length });
+    return NextResponse.json({ 
+      success: true, 
+      currentIndex: endIndex, // Retornamos dónde quedamos (ej: 50, 100... 1613)
+      total: studentIds.length,
+      progress: Math.round((endIndex / studentIds.length) * 100)
+    });
   } catch (error) {
-    return NextResponse.json({ success: false }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Internal Error" }, { status: 500 });
   }
 }
