@@ -4,7 +4,7 @@ export interface Metrics {
   consistencyIndex: number;
   stuckScore: number;
   dropoutProbability: number;
-  accuracyRate: number;
+  accuracyRate: number | null; // AHORA PUEDE SER NULL
   efficiencyRatio: number;
   coldStartDays: number;
   momentumScore: number;
@@ -14,18 +14,20 @@ export interface Metrics {
   burnoutRisk: boolean;
   sessionQuality: number;
   
-  // TIER 4 (NUEVOS)
+  // TIER 4
   focusIntegrity: number;
   nemesisTopic: string;
   reviewAccuracy: number;
   microStalls: number;
+  
+  // NUEVO ESTADO DE RIESGO
+  riskStatus: 'Critical' | 'Attention' | 'On Track' | 'Dormant'; 
 }
 
 export function calculateTier1Metrics(student: any, activity: any): Metrics {
   const schedule = student?.schedule || {};
-  const currentCourse = student?.currentCourse || {};
   
-  // Extraemos Totals y Tasks (Ahora sí vienen de tu nueva API)
+  // Extraemos Totals y Tasks
   const totals = activity?.totals || activity || {}; 
   const tasks = activity?.tasks || [];   
 
@@ -34,34 +36,33 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
   const weeklyXP = totals.xpAwarded || 0;
   
   // Tiempos (En minutos)
-  // Usamos timeEngaged si existe, sino time (fallback)
   const timeEngaged = Math.round((totals.timeEngaged || totals.time || 0) / 60);
   const timeProductive = Math.round((totals.timeProductive || 0) / 60);
   const timeElapsed = Math.round((totals.timeElapsed || 0) / 60);
   
   const questions = totals.questions || 0;
   const questionsCorrect = totals.questionsCorrect || 0;
-  const accuracyRate = questions > 0 ? Math.round((questionsCorrect / questions) * 100) : 0;
+  
+  // --- CORRECCIÓN 1: ACCURACY NULL ---
+  // Si no hay preguntas, es null (no 0%)
+  const accuracyRate = questions > 0 
+    ? Math.round((questionsCorrect / questions) * 100) 
+    : null;
+    
   const numTasks = totals.numTasks || 0;
 
-  // --- TIER 4: CÁLCULOS PSICOMÉTRICOS ---
-
-  // 1. FOCUS INTEGRITY (Zombies)
+  // --- TIER 4 CÁLCULOS ---
   const focusIntegrity = timeEngaged > 0 
     ? Math.round((timeProductive / timeEngaged) * 100) 
     : 0;
 
-  // 2. NEMESIS TOPIC (Bloqueos)
   let nemesisTopic = "";
   let lowestAcc = 100;
   
-  // Recorremos las tareas reales
   if (tasks && tasks.length > 0) {
       tasks.forEach((t: any) => {
-        // Solo tareas con suficientes preguntas para ser válidas
         if (t.questions > 2) {
           const taskAcc = (t.questionsCorrect / t.questions) * 100;
-          // Si falló mucho (< 60%) es candidato a Nemesis
           if (taskAcc < 60 && taskAcc < lowestAcc) {
             lowestAcc = taskAcc;
             nemesisTopic = t.topic?.name || "Unknown Topic";
@@ -70,7 +71,6 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
       });
   }
 
-  // 3. REVIEW ACCURACY
   const reviewTasks = tasks.filter((t: any) => t.type === 'Review');
   let reviewCorrect = 0;
   let reviewTotal = 0;
@@ -82,27 +82,47 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
     ? Math.round((reviewCorrect / reviewTotal) * 100) 
     : -1;
 
-  // 4. MICRO STALLS
   const totalWastedMin = timeElapsed - timeEngaged;
-  const microStalls = numTasks > 0 
-    ? Math.round(totalWastedMin / numTasks) 
-    : 0;
+  const microStalls = numTasks > 0 ? Math.round(totalWastedMin / numTasks) : 0;
 
-  // --- RETORNO COMPLETO ---
+  // --- RETORNO Y CLASIFICACIÓN ---
   const velocityScore = weeklyGoal > 0 ? Math.min(Math.round((weeklyXP / weeklyGoal) * 100), 100) : 0;
-  // Eficiencia usando timeEngaged (más preciso)
   const efficiencyRatio = timeEngaged > 0 ? parseFloat((weeklyXP / timeEngaged).toFixed(2)) : 0;
   const timePerQuestion = questions > 0 ? parseFloat((timeEngaged / questions).toFixed(1)) : 0;
   
-  // Content Gap Ahora depende del Nemesis (10 = Crítico, 5 = Alerta, 0 = Bien)
   const contentGap = nemesisTopic !== "" ? 10 : (timePerQuestion > 5 ? 5 : 0);
+
+  // --- CORRECCIÓN 2: LÓGICA DE RIESGO (DORMANT) ---
+  let riskStatus: Metrics['riskStatus'] = 'On Track';
+  let dropoutRisk = 0;
+
+  // 1. Si está INACTIVO (0 XP o 0 Tiempo) -> DORMANT (Gris)
+  if (weeklyXP === 0 || timeEngaged === 0) {
+      riskStatus = 'Dormant';
+      dropoutRisk = 0; // No lo marcamos como riesgo de deserción académica, sino inactividad
+  } 
+  // 2. Si está ACTIVO, aplicamos lógica académica
+  else {
+      // Cálculo de riesgo normal
+      if (velocityScore < 30) dropoutRisk += 30;
+      if (velocityScore > 50) dropoutRisk = 0; // Reset si va bien
+      if ((accuracyRate || 100) < 55) dropoutRisk += 20;
+      if (nemesisTopic !== "") dropoutRisk += 20;
+
+      // Clasificación
+      if (velocityScore < 30 || contentGap > 5 || dropoutRisk > 50) {
+          riskStatus = 'Critical';
+      } else if (velocityScore < 60) {
+          riskStatus = 'Attention';
+      }
+  }
 
   return {
     velocityScore,
     consistencyIndex: velocityScore > 50 ? 0.9 : 0.3,
     stuckScore: nemesisTopic !== "" ? 90 : 0,
-    dropoutProbability: accuracyRate < 50 ? 80 : 20,
-    accuracyRate,
+    dropoutProbability: Math.min(dropoutRisk, 100),
+    accuracyRate, // Ahora puede ser null
     efficiencyRatio,
     coldStartDays: weeklyXP === 0 ? 7 : 0,
     momentumScore: 1.0,
@@ -111,11 +131,10 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
     balanceScore: 0,
     burnoutRisk: timeEngaged > 120 && focusIntegrity < 40,
     sessionQuality: 0,
-    
-    // TIER 4
     focusIntegrity,
     nemesisTopic,
     reviewAccuracy,
-    microStalls
+    microStalls,
+    riskStatus // Nueva propiedad
   };
 }
