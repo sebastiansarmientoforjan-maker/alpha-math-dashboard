@@ -1,26 +1,24 @@
 'use client';
 
-// Si no tienes iconos, puedes quitar los imports y usar texto (ej: "X" en vez de <X />)
-import { X, Brain, Activity, Clock, AlertTriangle } from 'lucide-react'; 
-
 export default function StudentModal({ student, onClose }: { student: any; onClose: () => void }) {
   if (!student) return null;
 
   const m = student.metrics || {};
-  // Aquí accedemos a la lista COMPLETA de tareas de este estudiante
-  const tasks = student.activity?.tasks || []; 
+  const tasks = student.activity?.tasks || [];
 
-  // Las ordenamos para ver lo último que hizo primero
-  const sortedTasks = [...tasks].sort((a: any, b: any) => 
-    new Date(b.completedLocal || 0).getTime() - new Date(a.completedLocal || 0).getTime()
-  );
+  // Ordenar tareas por fecha de manera segura
+  const sortedTasks = [...tasks].sort((a: any, b: any) => {
+    const dateA = new Date(a.completedLocal || 0).getTime();
+    const dateB = new Date(b.completedLocal || 0).getTime();
+    return dateB - dateA;
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       {/* Fondo clickeable para cerrar */}
-      <div className="absolute inset-0" onClick={onClose}></div>
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
-      <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl shadow-2xl relative flex flex-col">
+      <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl shadow-2xl relative flex flex-col z-10">
         
         {/* HEADER */}
         <div className="p-6 border-b border-slate-800 bg-slate-900 flex justify-between items-center shrink-0">
@@ -41,7 +39,10 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
             </div>
           </div>
           
-          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
+          <button 
+            onClick={onClose} 
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-800 transition-colors text-slate-400 hover:text-white"
+          >
              <span className="text-xl font-bold">✕</span>
           </button>
         </div>
@@ -83,7 +84,7 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                 <h3 className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-2">Primary Nemesis</h3>
                 <p className="text-white font-bold text-sm leading-snug mb-3">"{m.nemesisTopic}"</p>
                 <div className="text-[10px] text-red-300 font-mono bg-red-900/20 p-2 rounded">
-                  System detected repeated failures (< 60% acc) on this specific topic.
+                  System detected repeated failures on this specific topic.
                 </div>
               </div>
             ) : (
