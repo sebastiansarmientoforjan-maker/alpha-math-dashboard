@@ -1,43 +1,92 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { fetchAllStudents } from '@/lib/mathAcademyAPI';
-import { calculateMetrics, calculateCohortMetrics } from '@/lib/metrics';
+import { NextResponse } from 'next/server';
+import { db } from '@/lib/firebase';
+import { 
+  collection, 
+  doc, 
+  writeBatch, 
+  getDoc, 
+  setDoc 
+} from 'firebase/firestore';
+import { getStudentData } from '@/lib/mathAcademyAPI';
+import studentIds from '@/lib/student_ids.json'; // Tu lista de 1614 IDs
 
-const STUDENT_IDS = [
-  '22710', '29509', '29437', '29441', '29442', '29494', '20848', '10866', '21931', '22729',
-  '21936', '21949', '21958', '30668', '30679', '21799', '21833', '21971', '21972', '21961',
-  '21962', '21947', '22237', '17191', '17330', '18215', '22260', '22177', '21921', '21856',
-  '21844', '24293', '22195', '22162', '22267', '22196', '22122', '22154', '22126', '22200',
-  '21929', '22038', '22043', '22044', '26605', '22318', '25677', '29038', '5436', '22893',
-  '22733', '22732', '29035', '17331', '22740', '22731', '22730'
-];
+// CONFIGURACIÓN
+const BATCH_SIZE = 50; // Procesamos 50 estudiantes por llamada (seguro para Vercel)
 
-export async function POST(request: NextRequest) {
+export async function GET() {
   try {
-    console.log('Fetching student data from Math Academy API...');
+    // 1. Averiguar dónde nos quedamos la última vez
+    const stateRef = doc(db, 'system', 'scheduler_state');
+    const stateSnap = await getDoc(stateRef);
     
-    // Fetch all student data
-    const rawData = await fetchAllStudents(STUDENT_IDS);
-    
-    // Calculate metrics
-    const studentsWithMetrics = rawData.map(student => calculateMetrics(student));
-    
-    // Calculate cohort metrics
-    const cohortMetrics = calculateCohortMetrics(studentsWithMetrics);
-    
-    // TODO: Save to Firestore (will implement after deployment)
-    // For now, return data directly
-    
+    let startIndex = 0;
+    if (stateSnap.exists()) {
+      startIndex = stateSnap.data().lastIndex || 0;
+    }
+
+    // 2. Calcular el siguiente lote
+    // Si llegamos al final, volvemos a empezar (Carrusel infinito)
+    if (startIndex >= studentIds.length) {
+      startIndex = 0;
+    }
+
+    const endIndex = Math.min(startIndex + BATCH_SIZE, studentIds.length);
+    const currentBatchIds = studentIds.slice(startIndex, endIndex);
+
+    console.log(`🔄 Procesando lote: ${startIndex} a ${endIndex} (${currentBatchIds.length} estudiantes)`);
+
+    // 3. Obtener datos de Math Academy en PARALELO (Mucho más rápido)
+    const updates = await Promise.all(
+      currentBatchIds.map(async (id) => {
+        try {
+          const data = await getStudentData(id.toString());
+          return { id: id.toString(), data }; // Guardamos ID y Data
+        } catch (error) {
+          console.error(`Error con estudiante ${id}:`, error);
+          return null; // Si falla uno, no detenemos a los demás
+        }
+      })
+    );
+
+    // 4. Guardar en Firebase (Usando Batch Write para eficiencia)
+    const batch = writeBatch(db);
+    let successCount = 0;
+
+    updates.forEach((item) => {
+      if (item && item.data) {
+        const studentRef = doc(db, 'students', item.id);
+        
+        // Agregamos timestamp de actualización
+        const studentData = {
+          ...item.data,
+          lastUpdated: new Date().toISOString()
+        };
+
+        batch.set(studentRef, studentData, { merge: true });
+        successCount++;
+      }
+    });
+
+    await batch.commit();
+
+    // 5. Guardar el nuevo marcador para la próxima vez
+    const nextIndex = endIndex >= studentIds.length ? 0 : endIndex;
+    await setDoc(stateRef, { 
+      lastIndex: nextIndex,
+      lastRun: new Date().toISOString(),
+      totalStudents: studentIds.length
+    });
+
     return NextResponse.json({
       success: true,
-      students: studentsWithMetrics,
-      cohortMetrics,
-      timestamp: new Date().toISOString(),
+      processed: successCount,
+      range: { start: startIndex, end: endIndex },
+      nextIndex: nextIndex,
+      totalStudents: studentIds.length
     });
-  } catch (error: any) {
-    console.error('Error updating students:', error);
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    );
+
+  } catch (error) {
+    console.error('🔥 Error crítico en actualización:', error);
+    return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
   }
 }
