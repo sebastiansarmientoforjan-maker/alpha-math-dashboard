@@ -48,7 +48,7 @@ export default function PanelPage() {
     if (autoSync) runUpdateBatch(true);
   }, [autoSync]);
 
-  // --- CHART DATA ---
+  // --- CHART DATA PREPARATION ---
   const velocityData = [
     { name: 'Critical', count: students.filter(s => (s.metrics?.velocityScore || 0) <= 20).length, fill: '#ef4444' },
     { name: 'Low', count: students.filter(s => (s.metrics?.velocityScore || 0) > 20 && (s.metrics?.velocityScore || 0) <= 50).length, fill: '#f59e0b' },
@@ -68,7 +68,7 @@ export default function PanelPage() {
     return rawName.toLowerCase().includes(searchTerm) || (s.id || '').toString().includes(searchTerm);
   });
 
-  if (loading) return <div className="p-8 bg-slate-950 min-h-screen text-emerald-500 font-mono italic animate-pulse">INITIALIZING TIER 3 INTELLIGENCE...</div>;
+  if (loading) return <div className="p-8 bg-slate-950 min-h-screen text-emerald-500 font-mono italic animate-pulse">INITIALIZING ALPHA INTELLIGENCE v4...</div>;
 
   return (
     <div className="p-6 bg-slate-950 min-h-screen text-slate-300 font-sans">
@@ -77,7 +77,7 @@ export default function PanelPage() {
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-6">
         <div>
           <h1 className="text-2xl font-black uppercase tracking-tighter text-white italic">Alpha Command Center V2</h1>
-          <p className="text-[10px] text-slate-500 tracking-widest uppercase mt-1">Full Spectrum Intelligence (Tier 1-3)</p>
+          <p className="text-[10px] text-slate-500 tracking-widest uppercase mt-1">Tier 4 Intelligence: God Mode Active</p>
         </div>
         
         <div className="flex gap-4 items-center">
@@ -117,7 +117,7 @@ export default function PanelPage() {
             </div>
           </div>
 
-          {/* TABLE - AHORA CON MÉTRICAS TIER 3 */}
+          {/* TABLE - TIER 1, 2, 3 METRICS */}
           <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-md min-h-[600px]">
             <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/80">
               <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">Active Registry</h3>
@@ -133,10 +133,11 @@ export default function PanelPage() {
                 <thead className="sticky top-0 bg-slate-900 z-10 text-slate-500 font-bold border-b border-slate-800 uppercase tracking-tighter">
                   <tr>
                     <th className="p-3">Student</th>
-                    <th className="p-3 text-center">XP/min</th> {/* TIER 2 */}
+                    <th className="p-3">Course</th>
+                    <th className="p-3 text-center">XP/min</th>
                     <th className="p-3 text-center">Velocity</th>
-                    <th className="p-3 text-center">Time/Q</th> {/* TIER 3 */}
-                    <th className="p-3 text-center">Gap</th>    {/* TIER 3 */}
+                    <th className="p-3 text-center">Time/Q</th>
+                    <th className="p-3 text-center">Gap</th>
                     <th className="p-3 text-center">Acc</th>
                     <th className="p-3 text-center">Risk</th>
                   </tr>
@@ -153,7 +154,12 @@ export default function PanelPage() {
                           <div className="font-bold text-[11px] text-white group-hover:text-emerald-400 transition-colors">
                             {displayName}
                           </div>
-                          <div className="text-[9px] text-slate-600 font-mono truncate w-32">{s.currentCourse?.name}</div>
+                          <div className="text-[9px] text-slate-600 font-mono">{s.id}</div>
+                        </td>
+
+                        <td className="p-3 text-slate-400">
+                           <div className="font-bold truncate w-28">{s.currentCourse?.name || 'No Course'}</div>
+                           <div className="text-[8px] text-slate-600">Grade {s.currentCourse?.grade || '?'}</div>
                         </td>
 
                         {/* EFFICIENCY (XP/min) */}
@@ -171,12 +177,12 @@ export default function PanelPage() {
                           <span className="text-[9px]">{m.velocityScore}%</span>
                         </td>
 
-                        {/* TIER 3: TIME PER QUESTION */}
+                        {/* TIME PER QUESTION */}
                         <td className="p-3 text-center text-slate-400">
-                           {hasData ? `${m.timePerQuestion}m` : '-'}
+                           {hasData && m.timePerQuestion > 0 ? `${m.timePerQuestion}m` : '-'}
                         </td>
 
-                        {/* TIER 3: CONTENT GAP */}
+                        {/* CONTENT GAP */}
                         <td className="p-3 text-center">
                            {m.contentGap > 5 ? (
                              <span className="bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded font-bold">HIGH</span>
@@ -237,11 +243,11 @@ export default function PanelPage() {
             </div>
           </div>
 
-          {/* PATTERN RECOGNITION (NUEVO) */}
+          {/* 🧠 PATTERN RECOGNITION (Tier 3) */}
           <div className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl backdrop-blur-md">
             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">🧠 Pattern Recognition</h3>
             
-            {/* BURNOUT LIST */}
+            {/* BURNOUT */}
             <div className="mb-4">
                <div className="text-[9px] text-red-400 font-bold mb-2 flex items-center gap-2">
                  🔥 BURNOUT RISK ({students.filter(s => s.metrics?.burnoutRisk).length})
@@ -255,7 +261,7 @@ export default function PanelPage() {
                </div>
             </div>
 
-            {/* CONTENT GAPS */}
+            {/* GAPS */}
             <div>
                <div className="text-[9px] text-amber-400 font-bold mb-2 flex items-center gap-2">
                  🧩 CONTENT GAPS ({students.filter(s => (s.metrics?.contentGap || 0) > 5).length})
@@ -269,7 +275,47 @@ export default function PanelPage() {
                  ))}
                </div>
             </div>
+          </div>
 
+          {/* 🦸‍♂️ GOD MODE DIAGNOSTICS (Tier 4) */}
+          <div className="bg-slate-900/50 border border-indigo-500/30 p-5 rounded-2xl backdrop-blur-md relative overflow-hidden">
+            <div className="absolute top-0 right-0 bg-indigo-500/20 px-2 py-1 text-[8px] font-bold text-indigo-300 rounded-bl-lg">TIER 4 ACTIVE</div>
+            <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">Psychometric Profiling</h3>
+
+            <div className="space-y-3">
+              {/* ZOMBIE MODE DETECTOR */}
+              <div className="flex justify-between items-center text-[9px] border-b border-slate-800 pb-2">
+                 <div className="flex flex-col">
+                   <span className="text-slate-400 font-bold">Low Focus Integrity ("Zombies")</span>
+                   <span className="text-[8px] text-slate-600">Engaged but unproductive</span>
+                 </div>
+                 <span className="text-white font-bold bg-slate-800 px-2 py-1 rounded">
+                   {students.filter(s => s.metrics?.focusIntegrity < 40 && s.metrics?.efficiencyRatio > 0).length}
+                 </span>
+              </div>
+
+              {/* NEMESIS LIST (Lo más valioso) */}
+              <div>
+                 <div className="text-[9px] text-slate-400 mb-2">Top Nemesis Topics (Blockers):</div>
+                 <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
+                   {students
+                      .filter(s => s.metrics?.nemesisTopic)
+                      .slice(0, 5) // Top 5 bloqueados
+                      .map(s => (
+                     <div key={s.id} className="text-[9px] bg-slate-800 p-2 rounded border-l-2 border-indigo-500 flex flex-col gap-1 hover:bg-slate-700 transition-colors">
+                       <div className="flex justify-between items-center">
+                          <span className="text-white font-bold truncate w-24">{s.firstName} {s.lastName}</span>
+                          <span className="text-red-400 font-mono text-[8px] bg-red-900/20 px-1 rounded">ACC: {Math.round(s.metrics?.accuracyRate)}%</span>
+                       </div>
+                       <span className="text-indigo-300 truncate italic">"{s.metrics?.nemesisTopic}"</span>
+                     </div>
+                   ))}
+                   {students.filter(s => s.metrics?.nemesisTopic).length === 0 && (
+                     <div className="text-[9px] text-slate-600 italic text-center py-2">No active blockers detected</div>
+                   )}
+                 </div>
+              </div>
+            </div>
           </div>
 
         </div>
