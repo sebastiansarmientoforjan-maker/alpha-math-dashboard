@@ -21,8 +21,7 @@ export async function getStudentData(studentId: string) {
     });
     
     if (!profileRes.ok) {
-      // Intentamos fallback con x-api-key si Public-API-Key falla en este endpoint
-      console.warn(`Profile ${studentId} failed with Public-API-Key, trying generic...`);
+      console.warn(`Profile ${studentId} failed`);
       return null; 
     }
     
@@ -30,7 +29,7 @@ export async function getStudentData(studentId: string) {
     const student = profileData.student;
 
     // ---------------------------------------------------------
-    // 2. LLAMADA DE ACTIVIDAD (Ajustada al JSON Real)
+    // 2. LLAMADA DE ACTIVIDAD
     // ---------------------------------------------------------
     const endDate = new Date();
     const startDate = new Date();
@@ -43,37 +42,40 @@ export async function getStudentData(studentId: string) {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Public-API-Key': API_KEY, // Header correcto según tu prueba
-        'Start-Date': startStr,    // Header correcto según tu prueba
-        'End-Date': endStr         // Header correcto según tu prueba
+        'Public-API-Key': API_KEY,
+        'Start-Date': startStr,
+        'End-Date': endStr
       }
     });
 
+    // Inicializamos con array de tasks vacío para evitar errores
     let activityMetrics = {
       xpAwarded: 0,
       time: 0, // Minutos
       questions: 0,
       questionsCorrect: 0,
-      numTasks: 0
+      numTasks: 0,
+      tasks: [] as any[] // <--- AQUÍ ESTÁ LA CLAVE PARA TIER 4
     };
 
     if (activityRes.ok) {
       const activityData = await activityRes.json();
       
-      // Mapeo exacto basado en tu JSON Beta 6
-      if (activityData.result && activityData.activity && activityData.activity.totals) {
-        const t = activityData.activity.totals;
+      if (activityData.result && activityData.activity) {
+        const act = activityData.activity;
+        const t = act.totals || {}; // Totales generales
         
-        // DECISIÓN CRÍTICA: Usamos 'timeEngaged' (tiempo activo)
-        // Si es null, usamos 'timeProductive'. Viene en SEGUNDOS.
+        // Usamos timeEngaged (tiempo real activo)
         const seconds = t.timeEngaged || t.timeProductive || t.timeElapsed || 0;
 
         activityMetrics = {
           xpAwarded: t.xpAwarded || 0,
-          time: Math.round(seconds / 60), // Convertimos Segundos -> Minutos
+          time: Math.round(seconds / 60), 
           questions: t.questions || 0,
           questionsCorrect: t.questionsCorrect || 0,
-          numTasks: t.numTasks || 0
+          numTasks: t.numTasks || 0,
+          // GUARDAMOS LA LISTA DE TAREAS CRUDA 👇
+          tasks: act.tasks || [] 
         };
       }
     } else {
