@@ -3,21 +3,35 @@
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query } from 'firebase/firestore';
-// Importamos LabelList para poner números sobre las barras
 import { 
   BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList,
   PieChart, Pie
 } from 'recharts';
 
-// FUNCIÓN: Extraer nombre real del email
+// --- LOGICA DE NOMBRES REFORZADA ---
 function getNameFromEmail(email: string): string {
-  if (!email) return '';
-  const localPart = email.split('@')[0];
-  const parts = localPart.split(/[._-]/);
-  const capitalizedParts = parts.map(part => 
-    part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
-  );
-  return capitalizedParts.join(' ');
+  // 1. Si no hay email válido, devolvemos vacío para usar el fallback
+  if (!email || !email.includes('@')) return '';
+
+  try {
+    // 2. Tomamos lo que está antes del @ (ej: "kavin.lopez")
+    const localPart = email.split('@')[0];
+    
+    // 3. Separamos por puntos, guiones o guiones bajos
+    const parts = localPart.split(/[._-]/);
+
+    // 4. Si solo hay una parte (ej: "admin"), la devolvemos capitalizada
+    if (parts.length === 1) {
+       return parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+    }
+
+    // 5. Capitalizamos cada parte (Kavin Lopez)
+    return parts.map(part => 
+      part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+    ).join(' ');
+  } catch (e) {
+    return '';
+  }
 }
 
 export default function PanelPage() {
@@ -27,7 +41,7 @@ export default function PanelPage() {
   const [search, setSearch] = useState('');
   const [syncStatus, setSyncStatus] = useState({ current: 0, total: 1613 });
 
-  // --- DATA LOADING & SYNC ---
+  // --- DATA LOADING ---
   useEffect(() => {
     const q = query(collection(db, 'students'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -38,6 +52,7 @@ export default function PanelPage() {
     return () => unsubscribe();
   }, []);
 
+  // --- SYNC LOGIC ---
   const runUpdateBatch = async (isFirstRun = false) => {
     try {
       const url = isFirstRun ? '/api/update-students?reset=true' : '/api/update-students';
@@ -59,9 +74,7 @@ export default function PanelPage() {
     if (autoSync) runUpdateBatch(true);
   }, [autoSync]);
 
-  // --- INTELIGENCIA VISUAL (Cálculos) ---
-  
-  // 1. Velocity Distribution (Etiquetas más cortas para el gráfico)
+  // --- CHART DATA ---
   const velocityData = [
     { name: '0-20%', count: students.filter(s => (s.metrics?.velocityScore || 0) <= 20).length, fill: '#ef4444' },
     { name: '20-50%', count: students.filter(s => (s.metrics?.velocityScore || 0) > 20 && (s.metrics?.velocityScore || 0) <= 50).length, fill: '#f59e0b' },
@@ -69,7 +82,6 @@ export default function PanelPage() {
     { name: '80%+', count: students.filter(s => (s.metrics?.velocityScore || 0) > 80).length, fill: '#10b981' },
   ];
 
-  // 2. Risk Composition (Datos limpios)
   const riskData = [
     { name: 'Critical', value: students.filter(s => (s.metrics?.dropoutProbability || 0) > 60).length, color: '#ef4444' }, 
     { name: 'Attention', value: students.filter(s => (s.metrics?.dropoutProbability || 0) >= 40 && (s.metrics?.dropoutProbability || 0) <= 60).length, color: '#f59e0b' },
@@ -80,10 +92,13 @@ export default function PanelPage() {
     const realName = getNameFromEmail(s.email || '');
     const rawName = `${s.firstName} ${s.lastName}`;
     const searchTerm = search.toLowerCase();
-    return realName.toLowerCase().includes(searchTerm) || rawName.toLowerCase().includes(searchTerm);
+    // Buscamos por nombre real, nombre original O email
+    return realName.toLowerCase().includes(searchTerm) || 
+           rawName.toLowerCase().includes(searchTerm) ||
+           (s.email || '').toLowerCase().includes(searchTerm);
   });
 
-  if (loading) return <div className="p-8 bg-slate-950 min-h-screen text-emerald-500 font-mono italic animate-pulse">LOADING VISUAL INTELLIGENCE...</div>;
+  if (loading) return <div className="p-8 bg-slate-950 min-h-screen text-emerald-500 font-mono italic animate-pulse">LOADING ALPHA INTELLIGENCE...</div>;
 
   return (
     <div className="p-6 bg-slate-950 min-h-screen text-slate-300 font-sans">
@@ -92,7 +107,7 @@ export default function PanelPage() {
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-6">
         <div>
           <h1 className="text-2xl font-black uppercase tracking-tighter text-white italic">Alpha Command Center V2</h1>
-          <p className="text-[10px] text-slate-500 tracking-widest uppercase mt-1">Real-time Educational Intelligence</p>
+          <p className="text-[10px] text-slate-500 tracking-widest uppercase mt-1">Real-time Intelligence Unit</p>
         </div>
         
         <div className="flex gap-4 items-center">
@@ -113,7 +128,7 @@ export default function PanelPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         
-        {/* COLUMNA IZQUIERDA (TABLA) */}
+        {/* LEFT COLUMN */}
         <div className="lg:col-span-3 space-y-6">
           
           {/* KPI CARDS */}
@@ -132,13 +147,13 @@ export default function PanelPage() {
             </div>
           </div>
 
-          {/* TABLA PRINCIPAL */}
+          {/* TABLE */}
           <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-md min-h-[600px]">
             <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/80">
               <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">Active Registry</h3>
               <input 
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search Identity..." 
+                placeholder="Search Student..." 
                 className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs w-64 focus:border-emerald-500 outline-none transition-colors"
               />
             </div>
@@ -147,7 +162,7 @@ export default function PanelPage() {
               <table className="w-full text-left text-[10px]">
                 <thead className="sticky top-0 bg-slate-900 z-10 text-slate-500 font-bold border-b border-slate-800 uppercase tracking-tighter">
                   <tr>
-                    <th className="p-3">Student</th>
+                    <th className="p-3">Student / Email</th>
                     <th className="p-3">Course</th>
                     <th className="p-3 text-center">Progress</th>
                     <th className="p-3 text-center">XP</th>
@@ -160,15 +175,30 @@ export default function PanelPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-800/40">
                   {filtered.map((s) => {
-                    const realName = getNameFromEmail(s.email || '');
-                    const displayName = realName || `${s.firstName} ${s.lastName}`;
+                    // Calculamos el nombre real
+                    const derivedName = getNameFromEmail(s.email);
+                    // Si logramos derivarlo, lo usamos. Si no, usamos el fallback.
+                    const displayName = derivedName || `${s.firstName} ${s.lastName}`;
                     const m = s.metrics || {};
+                    
                     return (
                       <tr key={s.id} className="hover:bg-slate-800/30 transition-colors group">
+                        
+                        {/* 1. STUDENT IDENTITY (MEJORADA) */}
                         <td className="p-3">
-                          <div className="font-bold text-slate-200 group-hover:text-emerald-400">{displayName}</div>
-                          <div className="text-[9px] text-slate-600 font-mono">{s.email?.split('@')[0]}</div>
+                          <div className={`font-bold text-[11px] ${derivedName ? 'text-white' : 'text-slate-400'}`}>
+                            {displayName}
+                          </div>
+                          {/* Aquí mostramos el EMAIL real para verificar por qué falla si falla */}
+                          <div className="text-[9px] font-mono mt-0.5">
+                            {s.email ? (
+                               <span className="text-emerald-500/50">{s.email}</span>
+                            ) : (
+                               <span className="text-red-500/50 italic">MISSING EMAIL (ID: {s.id})</span>
+                            )}
+                          </div>
                         </td>
+
                         <td className="p-3 text-slate-400">
                           <div className="font-bold truncate w-24">{s.currentCourse?.name}</div>
                         </td>
@@ -203,16 +233,15 @@ export default function PanelPage() {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA (INTELIGENCIA VISUAL) */}
+        {/* RIGHT COLUMN */}
         <div className="space-y-6">
           
-          {/* 1. CHART: RISK DISTRIBUTION (DONA LIMPIA) */}
+          {/* RISK CHART */}
           <div className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl backdrop-blur-md">
             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Risk Composition</h3>
             <div className="h-40 w-full relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  {/* Quitamos el Tooltip para que no estorbe */}
                   <Pie
                     data={riskData}
                     cx="50%"
@@ -235,7 +264,6 @@ export default function PanelPage() {
                 </div>
               </div>
             </div>
-            {/* Leyenda manual clara */}
             <div className="flex justify-between text-[9px] text-slate-400 mt-2 px-2">
               <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div> Crit ({riskData[0].value})</span>
               <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-500"></div> Attn ({riskData[1].value})</span>
@@ -243,7 +271,7 @@ export default function PanelPage() {
             </div>
           </div>
 
-          {/* 2. CHART: VELOCITY CURVE (CON ETIQUETAS) */}
+          {/* VELOCITY CHART */}
           <div className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl backdrop-blur-md">
             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Velocity Curve</h3>
             <div className="h-40 w-full">
@@ -260,16 +288,15 @@ export default function PanelPage() {
                     {velocityData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
-                    {/* Números sobre las barras */}
                     <LabelList dataKey="count" position="top" fill="#94a3b8" fontSize={10} fontWeight="bold" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <p className="text-[9px] text-slate-500 mt-2 italic text-center">Students grouped by weekly velocity percentage.</p>
+            <p className="text-[9px] text-slate-500 mt-2 italic text-center">Distribution of student velocity.</p>
           </div>
 
-          {/* 3. LIST: TOP STUCK */}
+          {/* TOP STUCK */}
           <div className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl backdrop-blur-md">
             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">🚨 Stuck Alert (Top 5)</h3>
             <div className="space-y-3">
@@ -279,7 +306,10 @@ export default function PanelPage() {
                 .map((s) => (
                   <div key={s.id} className="flex justify-between items-center text-[10px] border-l-2 border-red-500 pl-3 bg-red-500/5 p-2 rounded">
                     <div>
-                        <div className="text-slate-300 font-bold truncate w-24">{getNameFromEmail(s.email || '')}</div>
+                        {/* Usamos el mismo nombre derivado */}
+                        <div className="text-slate-300 font-bold truncate w-24">
+                          {getNameFromEmail(s.email) || `${s.firstName} ${s.lastName}`}
+                        </div>
                         <div className="text-[8px] text-slate-500">{s.currentCourse?.name}</div>
                     </div>
                     <span className="text-red-400 font-black text-lg">{s.metrics?.stuckScore}</span>
