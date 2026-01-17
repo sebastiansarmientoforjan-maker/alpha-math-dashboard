@@ -4,23 +4,23 @@ import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 
-// Función para extraer nombre real del email
+// FUNCIÓN CLAVE: Extraer nombre real del email
 function getNameFromEmail(email: string): string {
   if (!email) return '';
-  const localPart = email.split('@')[0];
-  const parts = localPart.split(/[._-]/);
+  const localPart = email.split('@')[0]; // "kavin.lopez"
+  const parts = localPart.split(/[._-]/); // ["kavin", "lopez"]
   const capitalizedParts = parts.map(part => 
     part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
   );
-  return capitalizedParts.join(' ');
+  return capitalizedParts.join(' '); // "Kavin Lopez"
 }
 
 export default function DashboardPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
   const [autoSync, setAutoSync] = useState(false);
   const [search, setSearch] = useState('');
-  const [courseFilter, setCourseFilter] = useState('ALL');
 
   useEffect(() => {
     const q = query(collection(db, 'students'));
@@ -32,306 +32,239 @@ export default function DashboardPage() {
     return () => unsubscribe();
   }, []);
 
-  const runSync = async () => {
-    if (!autoSync) return;
+  const runUpdateBatch = async () => {
+    setUpdating(true);
     try {
       const res = await fetch('/api/update-students');
       const data = await res.json();
-      if (data.success && data.currentIndex < data.total && data.currentIndex !== 0) {
-        setTimeout(runSync, 2000);
-      } else {
+      if (data.success && autoSync && data.progress < 100) {
+        setTimeout(runUpdateBatch, 1500); 
+      } else if (data.progress >= 100) {
         setAutoSync(false);
       }
-    } catch (e) { 
-      setAutoSync(false); 
-    }
+    } catch (err) { setAutoSync(false); }
+    setUpdating(false);
   };
 
-  useEffect(() => { 
-    if (autoSync) runSync(); 
+  useEffect(() => {
+    if (autoSync && !updating) runUpdateBatch();
   }, [autoSync]);
 
+  // Cálculos Globales
   const stats = {
-    total: students.length,
     atRisk: students.filter(s => (s.metrics?.dropoutProbability || 0) > 60).length,
-    attention: students.filter(s => (s.metrics?.stuckScore || 0) > 40).length,
-    onTrack: students.filter(s => (s.metrics?.velocityScore || 0) > 70).length,
-    avgVelocity: Math.round(students.reduce((sum, s) => sum + (s.metrics?.velocityScore || 0), 0) / (students.length || 1)),
-    avgAccuracy: Math.round(students.reduce((sum, s) => sum + (s.metrics?.accuracyRate || 0), 0) / (students.length || 1)),
+    attention: students.filter(s => (s.metrics?.dropoutProbability || 0) >= 40 && (s.metrics?.dropoutProbability || 0) <= 60).length,
+    onTrack: students.filter(s => (s.metrics?.dropoutProbability || 0) < 40).length,
+    total: students.length
   };
-
-  const courses = Array.from(new Set(students.map(s => s.currentCourse?.name).filter(Boolean)));
 
   const filtered = students.filter(s => {
     const realName = getNameFromEmail(s.email || '');
-    const displayName = realName || `${s.firstName} ${s.lastName}`;
-    const matchesSearch = displayName.toLowerCase().includes(search.toLowerCase()) ||
-                         s.id.toString().includes(search) ||
-                         (s.email || '').toLowerCase().includes(search.toLowerCase());
-    const matchesCourse = courseFilter === 'ALL' || s.currentCourse?.name === courseFilter;
-    return matchesSearch && matchesCourse;
+    const rawName = `${s.firstName} ${s.lastName}`;
+    const searchTerm = search.toLowerCase();
+    return realName.toLowerCase().includes(searchTerm) || rawName.toLowerCase().includes(searchTerm);
   });
 
-  if (loading) {
-    return (
-      <div className="p-8 bg-slate-950 min-h-screen text-emerald-500 font-mono italic flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-4">🦅</div>
-          <div className="text-xl">LOADING ALPHA COMMAND CENTER...</div>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="p-8 bg-slate-950 min-h-screen text-emerald-500 font-mono italic animate-pulse">CONNECTING TO ALPHA COMMAND CENTER...</div>;
 
   return (
-    <div className="bg-slate-950 min-h-screen">
-      <div className="bg-slate-900/40 border-b border-slate-800 p-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-black text-white mb-1">🦅 ALPHA COMMAND CENTER</h1>
-            <p className="text-xs text-slate-500 font-mono">Math Academy Real-Time Analytics • Senior Section</p>
-          </div>
-          <button 
+    <div className="p-6 bg-slate-950 min-h-screen text-slate-300 font-sans">
+      
+      {/* HEADER & SYNC */}
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <h1 className="text-2xl font-black uppercase tracking-tighter text-white italic">Alpha Command Center</h1>
+        <div className="flex gap-4 items-center">
+            <div className="text-right">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Database Sync</div>
+                <div className="text-emerald-500 font-mono font-bold">{stats.total} / 1613</div>
+            </div>
+            <button 
             onClick={() => setAutoSync(!autoSync)}
-            className={`px-6 py-3 rounded-lg font-black text-xs tracking-widest transition-all ${
-              autoSync 
-                ? 'bg-red-900 text-white animate-pulse' 
-                : 'bg-emerald-600 text-white hover:bg-emerald-500'
+            className={`px-6 py-2 rounded-lg font-black text-[10px] tracking-widest transition-all ${
+                autoSync ? 'bg-red-900/50 text-red-500 animate-pulse border border-red-500' : 'bg-emerald-600 text-white hover:bg-emerald-500'
             }`}
-          >
-            {autoSync ? '⏸ STOP SYNC' : '▶ START SYNC'}
-          </button>
+            >
+            {autoSync ? '🛑 STOP SYNC' : '⚡ AUTO SYNC'}
+            </button>
         </div>
       </div>
 
-      <div className="p-6">
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
-          <MetricCard title="Total Students" value={stats.total} color="blue" />
-          <MetricCard title="🔴 At Risk" value={stats.atRisk} color="red" />
-          <MetricCard title="🟡 Attention" value={stats.attention} color="amber" />
-          <MetricCard title="🟢 On Track" value={stats.onTrack} color="emerald" />
-          <MetricCard title="Avg Velocity" value={`${stats.avgVelocity}%`} color="blue" />
-          <MetricCard title="Avg Accuracy" value={`${stats.avgAccuracy}%`} color="purple" />
+      {/* METRIC CARDS (Panel Superior) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="bg-red-500/5 border border-red-500/20 p-4 rounded-xl flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-1">Critical: At Risk</p>
+            <h2 className="text-4xl font-black text-white">{stats.atRisk}</h2>
+          </div>
+          <div className="text-right text-xs text-red-400/50">High Dropout<br/>Probability</div>
+        </div>
+        <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">Attention Needed</p>
+            <h2 className="text-4xl font-black text-white">{stats.attention}</h2>
+          </div>
+          <div className="text-right text-xs text-amber-400/50">Stuck or<br/>Inconsistent</div>
+        </div>
+        <div className="bg-emerald-500/5 border border-emerald-500/20 p-4 rounded-xl flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">On Track</p>
+            <h2 className="text-4xl font-black text-white">{stats.onTrack}</h2>
+          </div>
+          <div className="text-right text-xs text-emerald-400/50">Optimal<br/>Performance</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        {/* TABLA PRINCIPAL - 9 COLUMNAS */}
+        <div className="lg:col-span-3 bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-md">
+          <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/80">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">Student Registry</h3>
+            <input 
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search Name..." 
+              className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs w-64 focus:border-emerald-500 outline-none transition-colors"
+            />
+          </div>
+          
+          <div className="overflow-x-auto max-h-[700px]">
+            <table className="w-full text-left text-[11px]">
+              <thead className="sticky top-0 bg-slate-900 z-10 text-slate-500 font-bold border-b border-slate-800 uppercase tracking-tighter">
+                <tr>
+                  <th className="p-3">Student</th>
+                  <th className="p-3">Course</th>
+                  <th className="p-3 text-center">Progress</th>
+                  <th className="p-3 text-center">XP Week</th>
+                  <th className="p-3 text-center">Velocity</th>
+                  <th className="p-3 text-center">Consistency</th>
+                  <th className="p-3 text-center">Accuracy</th>
+                  <th className="p-3 text-center">Stuck</th>
+                  <th className="p-3 text-center">Risk</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/40">
+                {filtered.map((s) => {
+                  const realName = getNameFromEmail(s.email || '');
+                  const displayName = realName || `${s.firstName} ${s.lastName}`;
+                  const m = s.metrics || {};
+                  
+                  return (
+                    <tr key={s.id} className="hover:bg-slate-800/30 transition-colors group">
+                      {/* 1. STUDENT */}
+                      <td className="p-3">
+                        <div className="font-bold text-slate-200 group-hover:text-emerald-400 transition-colors">{displayName}</div>
+                        <div className="text-[9px] text-slate-600 font-mono">{s.email || s.id}</div>
+                      </td>
+                      
+                      {/* 2. COURSE */}
+                      <td className="p-3 text-slate-400">
+                        <div className="font-bold">{s.currentCourse?.name || 'N/A'}</div>
+                        <div className="text-[9px]">Grade {s.currentCourse?.grade || '?'}</div>
+                      </td>
+
+                      {/* 3. PROGRESS */}
+                      <td className="p-3 text-center">
+                        <div className="font-bold text-slate-200">{Math.round((s.currentCourse?.progress || 0) * 100)}%</div>
+                        <div className="text-[9px] text-slate-600">{s.currentCourse?.xpRemaining || 0} XP left</div>
+                      </td>
+
+                      {/* 4. XP WEEK */}
+                      <td className="p-3 text-center font-mono text-slate-300">
+                        {s.activity?.xpAwarded || 0}
+                      </td>
+
+                      {/* 5. VELOCITY */}
+                      <td className="p-3 text-center">
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold ${
+                          m.velocityScore >= 80 ? 'bg-emerald-500/10 text-emerald-400' :
+                          m.velocityScore >= 50 ? 'bg-amber-500/10 text-amber-400' :
+                          'bg-red-500/10 text-red-400'
+                        }`}>
+                          {m.velocityScore}%
+                        </span>
+                      </td>
+
+                      {/* 6. CONSISTENCY */}
+                      <td className="p-3 text-center text-[10px] font-bold">
+                         <span className={
+                          m.consistencyIndex > 0.8 ? 'text-emerald-400' :
+                          m.consistencyIndex > 0.5 ? 'text-amber-400' : 'text-red-400'
+                         }>
+                           {m.consistencyIndex > 0.8 ? 'HIGH' : m.consistencyIndex > 0.5 ? 'MED' : 'LOW'}
+                         </span>
+                      </td>
+
+                      {/* 7. ACCURACY */}
+                      <td className="p-3 text-center">
+                         <span className={`font-bold ${
+                          m.accuracyRate >= 70 ? 'text-emerald-400' :
+                          m.accuracyRate >= 55 ? 'text-amber-400' : 'text-red-400'
+                         }`}>
+                           {m.accuracyRate}%
+                         </span>
+                      </td>
+
+                      {/* 8. STUCK */}
+                      <td className="p-3 text-center">
+                         {m.stuckScore > 30 ? (
+                           <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-[10px] font-bold">{m.stuckScore}</span>
+                         ) : (
+                           <span className="text-slate-600 text-[10px]">-</span>
+                         )}
+                      </td>
+
+                      {/* 9. RISK */}
+                      <td className="p-3 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${
+                          m.dropoutProbability > 60 ? 'bg-red-900/40 text-red-400 border-red-500/30' :
+                          m.dropoutProbability > 40 ? 'bg-amber-900/40 text-amber-400 border-amber-500/30' :
+                          'text-slate-600 border-transparent'
+                        }`}>
+                          {m.dropoutProbability}%
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3 space-y-4">
-            <div className="flex gap-4">
-              <input 
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="🔍 Search student by name or email..." 
-                className="flex-1 bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg text-sm text-white outline-none focus:border-emerald-500"
-              />
-              <select
-                value={courseFilter}
-                onChange={(e) => setCourseFilter(e.target.value)}
-                className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg text-sm text-white outline-none focus:border-emerald-500"
-              >
-                <option value="ALL">All Courses</option>
-                {courses.map(course => (
-                  <option key={course} value={course}>{course}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden">
-              <div className="overflow-x-auto max-h-[700px]">
-                <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-slate-900 z-10 text-slate-500 font-bold border-b border-slate-800">
-                    <tr>
-                      <th className="p-3 uppercase tracking-wider">Student</th>
-                      <th className="p-3 uppercase tracking-wider">Course</th>
-                      <th className="p-3 text-center uppercase tracking-wider">Progress</th>
-                      <th className="p-3 text-center uppercase tracking-wider">XP Week</th>
-                      <th className="p-3 text-center uppercase tracking-wider">Velocity</th>
-                      <th className="p-3 text-center uppercase tracking-wider">Consistency</th>
-                      <th className="p-3 text-center uppercase tracking-wider">Accuracy</th>
-                      <th className="p-3 text-center uppercase tracking-wider">Stuck</th>
-                      <th className="p-3 text-center uppercase tracking-wider">Risk</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/50">
-                    {filtered.map((s) => {
-                      const metrics = s.metrics || {};
-                      const course = s.currentCourse || {};
-                      const activity = s.activity || {};
-                      const realName = getNameFromEmail(s.email || '');
-                      const displayName = realName || `${s.firstName} ${s.lastName}`;
-                      
-                      return (
-                        <tr key={s.id} className="hover:bg-slate-800/30 transition-colors">
-                          <td className="p-3">
-                            <div className="font-semibold text-slate-200">{displayName}</div>
-                            <div className="text-[10px] text-slate-600 font-mono">
-                              {s.email || `ID: ${s.id}`}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="text-slate-300 font-medium text-[11px]">
-                              {course.name || 'N/A'}
-                            </div>
-                            <div className="text-[10px] text-slate-600">
-                              Grade {course.grade || 'N/A'}
-                            </div>
-                          </td>
-                          <td className="p-3 text-center">
-                            <div className="text-white font-mono font-bold">
-                              {Math.round((course.progress || 0) * 100)}%
-                            </div>
-                            <div className="text-[9px] text-slate-600">
-                              {course.xpRemaining || 0} left
-                            </div>
-                          </td>
-                          <td className="p-3 text-center">
-                            <div className="font-mono text-emerald-400 font-bold">
-                              {activity.xpAwarded || 0}
-                            </div>
-                          </td>
-                          <td className="p-3 text-center">
-                            <VelocityBadge score={metrics.velocityScore || 0} />
-                          </td>
-                          <td className="p-3 text-center">
-                            <ConsistencyBadge score={metrics.consistencyIndex || 0} />
-                          </td>
-                          <td className="p-3 text-center">
-                            <AccuracyBadge score={metrics.accuracyRate || 0} />
-                          </td>
-                          <td className="p-3 text-center">
-                            <StuckBadge score={metrics.stuckScore || 0} />
-                          </td>
-                          <td className="p-3 text-center">
-                            <RiskBadge score={metrics.dropoutProbability || 0} />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div className="p-4 border-t border-slate-800 bg-slate-900/60 text-xs text-slate-500">
-                Showing {filtered.length} of {students.length} students
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-lg">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">
-                🚨 Top Stuck Students
-              </h3>
+        {/* PANEL DERECHO (Side Analysis) */}
+        <div className="space-y-6">
+          <div className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl backdrop-blur-md">
+            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">🚨 Top Stuck Students</h3>
+            <div className="space-y-3">
               {students
-                .filter(s => (s.metrics?.stuckScore || 0) > 0)
                 .sort((a, b) => (b.metrics?.stuckScore || 0) - (a.metrics?.stuckScore || 0))
                 .slice(0, 5)
-                .map(s => {
-                  const realName = getNameFromEmail(s.email || '');
-                  const displayName = realName || `${s.firstName} ${s.lastName}`;
-                  return (
-                    <div key={s.id} className="mb-3 pb-3 border-b border-slate-800 last:border-0">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="font-bold text-slate-300 text-xs">
-                          {displayName}
-                        </span>
-                        <span className="text-red-500 font-mono text-sm font-black">
-                          {s.metrics?.stuckScore}
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-slate-600">
-                        {s.currentCourse?.name || 'N/A'}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-
-            <div className="bg-red-900/10 border border-red-900/30 p-5 rounded-lg">
-              <h3 className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-4">
-                ⚠️ High Dropout Risk
-              </h3>
-              {students
-                .filter(s => (s.metrics?.dropoutProbability || 0) > 60)
-                .slice(0, 5)
-                .map(s => {
-                  const realName = getNameFromEmail(s.email || '');
-                  const displayName = realName || `${s.firstName} ${s.lastName}`;
-                  return (
-                    <div key={s.id} className="mb-3 text-xs">
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-300 font-semibold">
-                          {displayName}
-                        </span>
-                        <span className="text-red-400 font-mono font-bold">
-                          {s.metrics?.dropoutProbability}%
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-
-            <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-lg">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">
-                🎯 Pattern Recognition
-              </h3>
-              <div className="text-[11px] space-y-3 text-slate-400">
-                <p>⚠️ {stats.attention} students showing stuck patterns</p>
-                <p>🔥 {stats.atRisk} students at critical risk level</p>
-                <p>✅ {stats.onTrack} students on track with goals</p>
-              </div>
+                .map((s) => (
+                  <div key={s.id} className="flex justify-between items-center text-[10px] border-l-2 border-red-500 pl-3">
+                    <span className="text-slate-300 font-bold truncate w-24">{getNameFromEmail(s.email || '')}</span>
+                    <span className="text-red-400 font-black">{s.metrics?.stuckScore}</span>
+                  </div>
+                ))}
             </div>
           </div>
+
+          <div className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl backdrop-blur-md">
+            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">⚠️ High Dropout Risk</h3>
+             <div className="space-y-2">
+              {students
+                .filter(s => (s.metrics?.dropoutProbability || 0) > 80)
+                .slice(0, 5)
+                .map((s) => (
+                   <div key={s.id} className="flex justify-between items-center p-2 bg-red-500/10 rounded border border-red-500/20">
+                     <span className="text-[10px] text-red-200 font-bold truncate">{getNameFromEmail(s.email || '')}</span>
+                     <span className="text-xs text-red-500 font-black">{s.metrics?.dropoutProbability}%</span>
+                   </div>
+                ))}
+             </div>
+          </div>
         </div>
+
       </div>
     </div>
   );
-}
-
-function MetricCard({ title, value, color }: any) {
-  const colors: any = {
-    blue: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
-    red: 'bg-red-500/10 border-red-500/30 text-red-400',
-    amber: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-    emerald: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
-    purple: 'bg-purple-500/10 border-purple-500/30 text-purple-400',
-  };
-
-  return (
-    <div className={`border p-4 rounded-lg ${colors[color]}`}>
-      <div className="text-[10px] font-bold uppercase tracking-wider opacity-70 mb-1">
-        {title}
-      </div>
-      <div className="text-2xl font-black">{value}</div>
-    </div>
-  );
-}
-
-function VelocityBadge({ score }: { score: number }) {
-  if (score >= 80) return <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded font-mono font-bold text-[11px]">{score}%</span>;
-  if (score >= 50) return <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded font-mono font-bold text-[11px]">{score}%</span>;
-  return <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded font-mono font-bold text-[11px]">{score}%</span>;
-}
-
-function ConsistencyBadge({ score }: { score: number }) {
-  const displayScore = Math.round(score * 100);
-  if (score >= 0.8) return <span className="text-emerald-400 font-mono font-bold text-[11px]">{displayScore}%</span>;
-  if (score >= 0.5) return <span className="text-amber-400 font-mono font-bold text-[11px]">{displayScore}%</span>;
-  return <span className="text-red-400 font-mono font-bold text-[11px]">{displayScore}%</span>;
-}
-
-function AccuracyBadge({ score }: { score: number }) {
-  if (score >= 70) return <span className="text-emerald-400 font-mono font-bold text-[11px]">{score}%</span>;
-  if (score >= 55) return <span className="text-amber-400 font-mono font-bold text-[11px]">{score}%</span>;
-  return <span className="text-red-400 font-mono font-bold text-[11px]">{score}%</span>;
-}
-
-function StuckBadge({ score }: { score: number }) {
-  if (score > 60) return <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded font-mono font-bold text-[11px]">{score}</span>;
-  if (score > 30) return <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded font-mono font-bold text-[11px]">{score}</span>;
-  return <span className="text-slate-600 font-mono text-[11px]">{score}</span>;
-}
-
-function RiskBadge({ score }: { score: number }) {
-  if (score > 60) return <span className="px-2 py-1 bg-red-900/40 text-red-400 rounded font-mono font-black text-[11px]">{score}%</span>;
-  if (score > 40) return <span className="px-2 py-1 bg-amber-900/40 text-amber-400 rounded font-mono font-bold text-[11px]">{score}%</span>;
-  return <span className="text-slate-600 font-mono text-[11px]">{score}%</span>;
 }
