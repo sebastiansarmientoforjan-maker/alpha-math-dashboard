@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import { doc, writeBatch, getDoc, setDoc } from 'firebase/firestore';
 import { getStudentData } from '@/lib/mathAcademyAPI';
-import { calculateTier1Metrics } from '@/lib/metrics'; // IMPORTACIÓN MANUAL
+import { calculateTier1Metrics } from '@/lib/metrics';
 import studentIds from '@/lib/student_ids.json'; 
 
-const BATCH_SIZE = 50; 
+const BATCH_SIZE = 100; // Actualiza 100 por cada clic
 
 export async function GET() {
   try {
@@ -23,14 +23,8 @@ export async function GET() {
         try {
           const rawData = await getStudentData(id.toString());
           if (!rawData) return null;
-
-          // LLAMADA A LA LÓGICA DE MÉTRICAS
           const metrics = calculateTier1Metrics(rawData, rawData.activity);
-          
-          return { 
-            id: id.toString(), 
-            data: { ...rawData, metrics, lastUpdated: new Date().toISOString() } 
-          };
+          return { id: id.toString(), data: { ...rawData, metrics, lastUpdated: new Date().toISOString() } };
         } catch (error) { return null; }
       })
     );
@@ -47,7 +41,11 @@ export async function GET() {
     const nextIndex = endIndex >= studentIds.length ? 0 : endIndex;
     await setDoc(stateRef, { lastIndex: nextIndex, lastRun: new Date().toISOString() }, { merge: true });
 
-    return NextResponse.json({ success: true, progress: `${Math.round((endIndex / studentIds.length) * 100)}%` });
+    return NextResponse.json({ 
+      success: true, 
+      progress: `${Math.round((endIndex / studentIds.length) * 100)}%`,
+      nextIndex 
+    });
   } catch (error) {
     return NextResponse.json({ success: false }, { status: 500 });
   }
