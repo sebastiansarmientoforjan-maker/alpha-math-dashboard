@@ -5,7 +5,7 @@ import { getStudentData } from '@/lib/mathAcademyAPI';
 import { calculateTier1Metrics } from '@/lib/metrics';
 import studentIds from '@/lib/student_ids.json'; 
 
-const BATCH_SIZE = 100; // Actualiza 100 por cada clic
+const BATCH_SIZE = 100; 
 
 export async function GET() {
   try {
@@ -39,12 +39,18 @@ export async function GET() {
 
     await batch.commit();
     const nextIndex = endIndex >= studentIds.length ? 0 : endIndex;
-    await setDoc(stateRef, { lastIndex: nextIndex, lastRun: new Date().toISOString() }, { merge: true });
+    
+    await setDoc(stateRef, { 
+      lastIndex: nextIndex, 
+      lastRun: new Date().toISOString(),
+      totalStudents: studentIds.length 
+    }, { merge: true });
 
     return NextResponse.json({ 
       success: true, 
-      progress: `${Math.round((endIndex / studentIds.length) * 100)}%`,
-      nextIndex 
+      currentIndex: endIndex,
+      totalStudents: studentIds.length,
+      progress: Math.round((endIndex / studentIds.length) * 100)
     });
   } catch (error) {
     return NextResponse.json({ success: false }, { status: 500 });
