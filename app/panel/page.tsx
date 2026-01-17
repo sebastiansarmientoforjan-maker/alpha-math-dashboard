@@ -15,12 +15,14 @@ function getNameFromEmail(email: string): string {
   return capitalizedParts.join(' ');
 }
 
-export default function PanelPage() { // Note el cambio de nombre
+export default function PanelPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
   const [autoSync, setAutoSync] = useState(false);
   const [search, setSearch] = useState('');
+  
+  // Nuevo estado para el contador visual exacto
+  const [syncStatus, setSyncStatus] = useState({ current: 0, total: 1613 });
 
   useEffect(() => {
     const q = query(collection(db, 'students'));
@@ -32,29 +34,43 @@ export default function PanelPage() { // Note el cambio de nombre
     return () => unsubscribe();
   }, []);
 
-  const runUpdateBatch = async () => {
-    setUpdating(true);
+  // Lógica modificada para RESETear al inicio
+  const runUpdateBatch = async (isFirstRun = false) => {
     try {
-      const res = await fetch('/api/update-students');
+      // Si es la primera vez que pulsamos, mandamos reset=true
+      const url = isFirstRun ? '/api/update-students?reset=true' : '/api/update-students';
+      
+      const res = await fetch(url);
       const data = await res.json();
-      if (data.success && autoSync && data.progress < 100) {
-        setTimeout(runUpdateBatch, 1500); 
-      } else if (data.progress >= 100) {
-        setAutoSync(false);
+      
+      if (data.success) {
+        // Actualizamos el contador visual con lo que dice el servidor
+        setSyncStatus({ current: data.currentIndex, total: data.total });
+
+        // Si NO ha terminado (currentIndex < total) y el autoSync sigue activo...
+        if (data.currentIndex < data.total && autoSync) {
+          // ...esperamos 1 segundo y pedimos el siguiente lote
+          setTimeout(() => runUpdateBatch(false), 1000);
+        } else {
+          // Si llegó al final, apagamos
+          setAutoSync(false);
+        }
       }
     } catch (err) { setAutoSync(false); }
-    setUpdating(false);
   };
 
+  // Efecto que dispara el proceso cuando activas el interruptor
   useEffect(() => {
-    if (autoSync && !updating) runUpdateBatch();
+    if (autoSync) {
+      // Iniciamos con reset=true para que empiece de 0
+      runUpdateBatch(true);
+    }
   }, [autoSync]);
 
   const stats = {
     atRisk: students.filter(s => (s.metrics?.dropoutProbability || 0) > 60).length,
     attention: students.filter(s => (s.metrics?.dropoutProbability || 0) >= 40 && (s.metrics?.dropoutProbability || 0) <= 60).length,
     onTrack: students.filter(s => (s.metrics?.dropoutProbability || 0) < 40).length,
-    total: students.length
   };
 
   const filtered = students.filter(s => {
@@ -64,18 +80,21 @@ export default function PanelPage() { // Note el cambio de nombre
     return realName.toLowerCase().includes(searchTerm) || rawName.toLowerCase().includes(searchTerm);
   });
 
-  if (loading) return <div className="p-8 bg-slate-950 min-h-screen text-emerald-500 font-mono italic animate-pulse">CONNECTING TO NEW PANEL v2...</div>;
+  if (loading) return <div className="p-8 bg-slate-950 min-h-screen text-emerald-500 font-mono italic animate-pulse">CONNECTING TO ALPHA COMMAND CENTER v2...</div>;
 
   return (
     <div className="p-6 bg-slate-950 min-h-screen text-slate-300 font-sans">
       
       {/* HEADER & SYNC */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <h1 className="text-2xl font-black uppercase tracking-tighter text-white italic">Alpha Command Center v2</h1>
+        <h1 className="text-2xl font-black uppercase tracking-tighter text-white italic">Alpha Command Center V2</h1>
         <div className="flex gap-4 items-center">
             <div className="text-right">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Database Sync</div>
-                <div className="text-emerald-500 font-mono font-bold">{stats.total} / 1613</div>
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Live Sync Progress</div>
+                {/* AQUI MOSTRAMOS EL PROGRESO DEL SERVIDOR, NO EL DE FIREBASE */}
+                <div className="text-emerald-500 font-mono font-bold transition-all">
+                  {syncStatus.current} / {syncStatus.total}
+                </div>
             </div>
             <button 
             onClick={() => setAutoSync(!autoSync)}
@@ -83,7 +102,7 @@ export default function PanelPage() { // Note el cambio de nombre
                 autoSync ? 'bg-red-900/50 text-red-500 animate-pulse border border-red-500' : 'bg-emerald-600 text-white hover:bg-emerald-500'
             }`}
             >
-            {autoSync ? '🛑 STOP SYNC' : '⚡ AUTO SYNC'}
+            {autoSync ? '🛑 STOP SYNC' : '⚡ START FULL SYNC (0%)'}
             </button>
         </div>
       </div>
