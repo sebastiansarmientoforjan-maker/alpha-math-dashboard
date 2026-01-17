@@ -4,6 +4,17 @@ import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 
+// Función para extraer nombre real del email
+function getNameFromEmail(email: string): string {
+  if (!email) return '';
+  const localPart = email.split('@')[0];
+  const parts = localPart.split(/[._-]/);
+  const capitalizedParts = parts.map(part => 
+    part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+  );
+  return capitalizedParts.join(' ');
+}
+
 export default function DashboardPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,8 +63,11 @@ export default function DashboardPage() {
   const courses = Array.from(new Set(students.map(s => s.currentCourse?.name).filter(Boolean)));
 
   const filtered = students.filter(s => {
-    const matchesSearch = `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
-                         s.id.toString().includes(search);
+    const realName = getNameFromEmail(s.email || '');
+    const displayName = realName || `${s.firstName} ${s.lastName}`;
+    const matchesSearch = displayName.toLowerCase().includes(search.toLowerCase()) ||
+                         s.id.toString().includes(search) ||
+                         (s.email || '').toLowerCase().includes(search.toLowerCase());
     const matchesCourse = courseFilter === 'ALL' || s.currentCourse?.name === courseFilter;
     return matchesSearch && matchesCourse;
   });
@@ -105,7 +119,7 @@ export default function DashboardPage() {
             <div className="flex gap-4">
               <input 
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="🔍 Search student..." 
+                placeholder="🔍 Search student by name or email..." 
                 className="flex-1 bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg text-sm text-white outline-none focus:border-emerald-500"
               />
               <select
@@ -125,14 +139,15 @@ export default function DashboardPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="sticky top-0 bg-slate-900 z-10 text-slate-500 font-bold border-b border-slate-800">
                     <tr>
-                      <th className="p-4 uppercase tracking-wider">Student</th>
-                      <th className="p-4 uppercase tracking-wider">Course</th>
-                      <th className="p-4 text-center uppercase tracking-wider">Progress</th>
-                      <th className="p-4 text-center uppercase tracking-wider">XP Week</th>
-                      <th className="p-4 text-center uppercase tracking-wider">Velocity</th>
-                      <th className="p-4 text-center uppercase tracking-wider">Accuracy</th>
-                      <th className="p-4 text-center uppercase tracking-wider">Stuck</th>
-                      <th className="p-4 text-center uppercase tracking-wider">Risk</th>
+                      <th className="p-3 uppercase tracking-wider">Student</th>
+                      <th className="p-3 uppercase tracking-wider">Course</th>
+                      <th className="p-3 text-center uppercase tracking-wider">Progress</th>
+                      <th className="p-3 text-center uppercase tracking-wider">XP Week</th>
+                      <th className="p-3 text-center uppercase tracking-wider">Velocity</th>
+                      <th className="p-3 text-center uppercase tracking-wider">Consistency</th>
+                      <th className="p-3 text-center uppercase tracking-wider">Accuracy</th>
+                      <th className="p-3 text-center uppercase tracking-wider">Stuck</th>
+                      <th className="p-3 text-center uppercase tracking-wider">Risk</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/50">
@@ -140,41 +155,52 @@ export default function DashboardPage() {
                       const metrics = s.metrics || {};
                       const course = s.currentCourse || {};
                       const activity = s.activity || {};
+                      const realName = getNameFromEmail(s.email || '');
+                      const displayName = realName || `${s.firstName} ${s.lastName}`;
                       
                       return (
                         <tr key={s.id} className="hover:bg-slate-800/30 transition-colors">
-                          <td className="p-4">
-                            <div className="font-semibold text-slate-200">{s.firstName} {s.lastName}</div>
-                            <div className="text-[10px] text-slate-600 font-mono">ID: {s.id}</div>
+                          <td className="p-3">
+                            <div className="font-semibold text-slate-200">{displayName}</div>
+                            <div className="text-[10px] text-slate-600 font-mono">
+                              {s.email || `ID: ${s.id}`}
+                            </div>
                           </td>
-                          <td className="p-4">
-                            <div className="text-slate-300 font-medium">{course.name || 'N/A'}</div>
-                            <div className="text-[10px] text-slate-600">Grade: {course.grade || 'N/A'}</div>
-                          </td>
-                          <td className="p-4 text-center">
-                            <div className="text-white font-mono">
-                              {Math.round((course.progress || 0) * 100)}%
+                          <td className="p-3">
+                            <div className="text-slate-300 font-medium text-[11px]">
+                              {course.name || 'N/A'}
                             </div>
                             <div className="text-[10px] text-slate-600">
-                              {course.xpRemaining || 0} XP left
+                              Grade {course.grade || 'N/A'}
                             </div>
                           </td>
-                          <td className="p-4 text-center">
-                            <div className="font-mono text-emerald-400">
+                          <td className="p-3 text-center">
+                            <div className="text-white font-mono font-bold">
+                              {Math.round((course.progress || 0) * 100)}%
+                            </div>
+                            <div className="text-[9px] text-slate-600">
+                              {course.xpRemaining || 0} left
+                            </div>
+                          </td>
+                          <td className="p-3 text-center">
+                            <div className="font-mono text-emerald-400 font-bold">
                               {activity.xpAwarded || 0}
                             </div>
                           </td>
-                          <td className="p-4 text-center">
-                            <VelocityBadge score={metrics.velocityScore} />
+                          <td className="p-3 text-center">
+                            <VelocityBadge score={metrics.velocityScore || 0} />
                           </td>
-                          <td className="p-4 text-center">
-                            <AccuracyBadge score={metrics.accuracyRate} />
+                          <td className="p-3 text-center">
+                            <ConsistencyBadge score={metrics.consistencyIndex || 0} />
                           </td>
-                          <td className="p-4 text-center">
-                            <StuckBadge score={metrics.stuckScore} />
+                          <td className="p-3 text-center">
+                            <AccuracyBadge score={metrics.accuracyRate || 0} />
                           </td>
-                          <td className="p-4 text-center">
-                            <RiskBadge score={metrics.dropoutProbability} />
+                          <td className="p-3 text-center">
+                            <StuckBadge score={metrics.stuckScore || 0} />
+                          </td>
+                          <td className="p-3 text-center">
+                            <RiskBadge score={metrics.dropoutProbability || 0} />
                           </td>
                         </tr>
                       );
@@ -197,21 +223,25 @@ export default function DashboardPage() {
                 .filter(s => (s.metrics?.stuckScore || 0) > 0)
                 .sort((a, b) => (b.metrics?.stuckScore || 0) - (a.metrics?.stuckScore || 0))
                 .slice(0, 5)
-                .map(s => (
-                  <div key={s.id} className="mb-3 pb-3 border-b border-slate-800 last:border-0">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-bold text-slate-300 text-xs">
-                        {s.firstName} {s.lastName}
-                      </span>
-                      <span className="text-red-500 font-mono text-sm font-black">
-                        {s.metrics?.stuckScore}
-                      </span>
+                .map(s => {
+                  const realName = getNameFromEmail(s.email || '');
+                  const displayName = realName || `${s.firstName} ${s.lastName}`;
+                  return (
+                    <div key={s.id} className="mb-3 pb-3 border-b border-slate-800 last:border-0">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-bold text-slate-300 text-xs">
+                          {displayName}
+                        </span>
+                        <span className="text-red-500 font-mono text-sm font-black">
+                          {s.metrics?.stuckScore}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-600">
+                        {s.currentCourse?.name || 'N/A'}
+                      </div>
                     </div>
-                    <div className="text-[10px] text-slate-600">
-                      {s.currentCourse?.name || 'N/A'}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
             </div>
 
             <div className="bg-red-900/10 border border-red-900/30 p-5 rounded-lg">
@@ -221,18 +251,22 @@ export default function DashboardPage() {
               {students
                 .filter(s => (s.metrics?.dropoutProbability || 0) > 60)
                 .slice(0, 5)
-                .map(s => (
-                  <div key={s.id} className="mb-3 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-300 font-semibold">
-                        {s.firstName}
-                      </span>
-                      <span className="text-red-400 font-mono font-bold">
-                        {s.metrics?.dropoutProbability}%
-                      </span>
+                .map(s => {
+                  const realName = getNameFromEmail(s.email || '');
+                  const displayName = realName || `${s.firstName} ${s.lastName}`;
+                  return (
+                    <div key={s.id} className="mb-3 text-xs">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-300 font-semibold">
+                          {displayName}
+                        </span>
+                        <span className="text-red-400 font-mono font-bold">
+                          {s.metrics?.dropoutProbability}%
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
             </div>
 
             <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-lg">
@@ -272,25 +306,32 @@ function MetricCard({ title, value, color }: any) {
 }
 
 function VelocityBadge({ score }: { score: number }) {
-  if (score >= 80) return <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded font-mono font-bold">{score}%</span>;
-  if (score >= 50) return <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded font-mono font-bold">{score}%</span>;
-  return <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded font-mono font-bold">{score}%</span>;
+  if (score >= 80) return <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded font-mono font-bold text-[11px]">{score}%</span>;
+  if (score >= 50) return <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded font-mono font-bold text-[11px]">{score}%</span>;
+  return <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded font-mono font-bold text-[11px]">{score}%</span>;
+}
+
+function ConsistencyBadge({ score }: { score: number }) {
+  const displayScore = Math.round(score * 100);
+  if (score >= 0.8) return <span className="text-emerald-400 font-mono font-bold text-[11px]">{displayScore}%</span>;
+  if (score >= 0.5) return <span className="text-amber-400 font-mono font-bold text-[11px]">{displayScore}%</span>;
+  return <span className="text-red-400 font-mono font-bold text-[11px]">{displayScore}%</span>;
 }
 
 function AccuracyBadge({ score }: { score: number }) {
-  if (score >= 70) return <span className="text-emerald-400 font-mono font-bold">{score}%</span>;
-  if (score >= 55) return <span className="text-amber-400 font-mono font-bold">{score}%</span>;
-  return <span className="text-red-400 font-mono font-bold">{score}%</span>;
+  if (score >= 70) return <span className="text-emerald-400 font-mono font-bold text-[11px]">{score}%</span>;
+  if (score >= 55) return <span className="text-amber-400 font-mono font-bold text-[11px]">{score}%</span>;
+  return <span className="text-red-400 font-mono font-bold text-[11px]">{score}%</span>;
 }
 
 function StuckBadge({ score }: { score: number }) {
-  if (score > 60) return <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded font-mono font-bold">{score}</span>;
-  if (score > 30) return <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded font-mono font-bold">{score}</span>;
-  return <span className="text-slate-600 font-mono">{score}</span>;
+  if (score > 60) return <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded font-mono font-bold text-[11px]">{score}</span>;
+  if (score > 30) return <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded font-mono font-bold text-[11px]">{score}</span>;
+  return <span className="text-slate-600 font-mono text-[11px]">{score}</span>;
 }
 
 function RiskBadge({ score }: { score: number }) {
-  if (score > 60) return <span className="px-2 py-1 bg-red-900/40 text-red-400 rounded font-mono font-black">{score}%</span>;
-  if (score > 40) return <span className="px-2 py-1 bg-amber-900/40 text-amber-400 rounded font-mono font-bold">{score}%</span>;
-  return <span className="text-slate-600 font-mono">{score}%</span>;
+  if (score > 60) return <span className="px-2 py-1 bg-red-900/40 text-red-400 rounded font-mono font-black text-[11px]">{score}%</span>;
+  if (score > 40) return <span className="px-2 py-1 bg-amber-900/40 text-amber-400 rounded font-mono font-bold text-[11px]">{score}%</span>;
+  return <span className="text-slate-600 font-mono text-[11px]">{score}%</span>;
 }
