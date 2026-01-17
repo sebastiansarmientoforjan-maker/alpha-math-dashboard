@@ -1,123 +1,121 @@
 export interface Metrics {
-  // TIER 1 (Críticos)
+  // TIER 1, 2, 3
   velocityScore: number;
   consistencyIndex: number;
   stuckScore: number;
   dropoutProbability: number;
   accuracyRate: number;
-  
-  // TIER 2 (Eficiencia)
   efficiencyRatio: number;
   coldStartDays: number;
   momentumScore: number;
+  timePerQuestion: number;
+  contentGap: number;
+  balanceScore: number;
+  burnoutRisk: boolean;
+  sessionQuality: number;
   
-  // TIER 3 (Diagnóstico Fino)
-  timePerQuestion: number; // Minutos promedio por pregunta
-  contentGap: number;      // Dificultad del contenido (> 5 es bloqueo)
-  balanceScore: number;    // -1 (Subtrabajo) a +1 (Sobrecarga)
-  burnoutRisk: boolean;    // Detecta fatiga cognitiva
-  sessionQuality: number;  // Relación precisión/tiempo
+  // TIER 4 (NUEVOS)
+  focusIntegrity: number;
+  nemesisTopic: string;
+  reviewAccuracy: number;
+  microStalls: number;
 }
 
 export function calculateTier1Metrics(student: any, activity: any): Metrics {
   const schedule = student?.schedule || {};
   const currentCourse = student?.currentCourse || {};
   
-  const weeklyGoal = (schedule.monGoal || 0) + (schedule.tueGoal || 0) + (schedule.wedGoal || 0) + 
-                     (schedule.thuGoal || 0) + (schedule.friGoal || 0) + (schedule.satGoal || 0) + (schedule.sunGoal || 0);
-  
-  const weeklyXP = activity?.xpAwarded || 0;
-  const timeMinutes = activity?.time || 0;
-  const questions = activity?.questions || 0;
-  const questionsCorrect = activity?.questionsCorrect || 0;
-  const tasks = activity?.numTasks || 0;
-  const courseProgress = (currentCourse.progress || 0) * 100;
-  
-  // --- TIER 1 ---
-  const velocityScore = weeklyGoal > 0 
-    ? Math.min(Math.round((weeklyXP / weeklyGoal) * 100), 100)
-    : (weeklyXP > 0 ? 100 : 0);
-  
-  const accuracyRate = questions > 0 
-    ? Math.round((questionsCorrect / questions) * 100)
-    : 0;
-  
-  let consistencyIndex = 0;
-  if (weeklyXP === 0) consistencyIndex = 0;
-  else if (velocityScore >= 80) consistencyIndex = 0.9;
-  else if (velocityScore >= 50) consistencyIndex = 0.6;
-  else consistencyIndex = 0.3;
-  
-  let stuckScore = 0;
-  if (timeMinutes > 180 && weeklyXP === 0) stuckScore = 80;
-  else if (timeMinutes > 60 && weeklyXP < 20) stuckScore = 60;
-  else if (tasks > 8 && accuracyRate < 60) stuckScore = 50;
-  
-  // --- TIER 2 ---
-  // XP por Minuto (Productividad)
-  const efficiencyRatio = timeMinutes > 0 
-    ? parseFloat((weeklyXP / timeMinutes).toFixed(1)) 
-    : 0; 
+  // Extraemos Totals y Tasks (Ahora sí vienen de tu nueva API)
+  const totals = activity?.totals || activity || {}; 
+  const tasks = activity?.tasks || [];   
 
-  let coldStartDays = 0;
-  if (weeklyXP === 0) coldStartDays = 7;
-  else if (weeklyXP < 50) coldStartDays = 3;
+  // Datos base
+  const weeklyGoal = (schedule.monGoal || 0) * 5; 
+  const weeklyXP = totals.xpAwarded || 0;
+  
+  // Tiempos (En minutos)
+  // Usamos timeEngaged si existe, sino time (fallback)
+  const timeEngaged = Math.round((totals.timeEngaged || totals.time || 0) / 60);
+  const timeProductive = Math.round((totals.timeProductive || 0) / 60);
+  const timeElapsed = Math.round((totals.timeElapsed || 0) / 60);
+  
+  const questions = totals.questions || 0;
+  const questionsCorrect = totals.questionsCorrect || 0;
+  const accuracyRate = questions > 0 ? Math.round((questionsCorrect / questions) * 100) : 0;
+  const numTasks = totals.numTasks || 0;
 
-  const momentumScore = 1.0; 
+  // --- TIER 4: CÁLCULOS PSICOMÉTRICOS ---
 
-  // --- TIER 3 (NUEVO) ---
-
-  // 1. TIME PER QUESTION (Minutos)
-  // Diagnóstico: Muy alto = Gap conceptual. Muy bajo = Adivinando?
-  const timePerQuestion = questions > 0 
-    ? parseFloat((timeMinutes / questions).toFixed(1)) 
+  // 1. FOCUS INTEGRITY (Zombies)
+  const focusIntegrity = timeEngaged > 0 
+    ? Math.round((timeProductive / timeEngaged) * 100) 
     : 0;
 
-  // 2. CONTENT GAP DETECTOR
-  // Fórmula sugerida: (Tiempo * 2) / Progreso% (ajustada para escala)
-  // Si invierte mucho tiempo y el % sube poco, el GAP es alto.
-  const contentGap = courseProgress > 0.1 
-    ? parseFloat(((timeMinutes * 0.1) / courseProgress).toFixed(1)) 
-    : (timeMinutes > 60 ? 10 : 0); // Si lleva 1h y progreso 0, gap máximo
+  // 2. NEMESIS TOPIC (Bloqueos)
+  let nemesisTopic = "";
+  let lowestAcc = 100;
+  
+  // Recorremos las tareas reales
+  if (tasks && tasks.length > 0) {
+      tasks.forEach((t: any) => {
+        // Solo tareas con suficientes preguntas para ser válidas
+        if (t.questions > 2) {
+          const taskAcc = (t.questionsCorrect / t.questions) * 100;
+          // Si falló mucho (< 60%) es candidato a Nemesis
+          if (taskAcc < 60 && taskAcc < lowestAcc) {
+            lowestAcc = taskAcc;
+            nemesisTopic = t.topic?.name || "Unknown Topic";
+          }
+        }
+      });
+  }
 
-  // 3. BALANCE SCORE (Calidad de Vida)
-  // Fórmula: (XP Real / Meta) - 1.
-  // 0 = Equilibrio. > 0.5 = Sobrecarga. < -0.5 = Subutilización.
-  const balanceScore = weeklyGoal > 0 
-    ? parseFloat(((weeklyXP / weeklyGoal) - 1).toFixed(1))
+  // 3. REVIEW ACCURACY
+  const reviewTasks = tasks.filter((t: any) => t.type === 'Review');
+  let reviewCorrect = 0;
+  let reviewTotal = 0;
+  reviewTasks.forEach((t: any) => {
+    reviewCorrect += t.questionsCorrect || 0;
+    reviewTotal += t.questions || 0;
+  });
+  const reviewAccuracy = reviewTotal > 0 
+    ? Math.round((reviewCorrect / reviewTotal) * 100) 
+    : -1;
+
+  // 4. MICRO STALLS
+  const totalWastedMin = timeElapsed - timeEngaged;
+  const microStalls = numTasks > 0 
+    ? Math.round(totalWastedMin / numTasks) 
     : 0;
 
-  // 4. BURNOUT RISK (Predictivo)
-  // Criterio: Más de 10 horas (600 min) Y Precisión bajando (< 60%)
-  const burnoutRisk = timeMinutes > 600 && accuracyRate < 60;
-
-  // 5. SESSION QUALITY
-  // Calidad vs Rapidez
-  const sessionQuality = parseFloat(((accuracyRate / 100) * timePerQuestion).toFixed(1));
-
-  // --- DROPOUT PROBABILITY (INTEGRADO) ---
-  let dropoutRisk = 0;
-  if (velocityScore < 30) dropoutRisk += 30;
-  if (consistencyIndex < 0.3) dropoutRisk += 20;
-  if (accuracyRate < 55 && weeklyXP > 0) dropoutRisk += 20;
-  if (stuckScore > 60) dropoutRisk += 15;
-  if (coldStartDays >= 7) dropoutRisk += 15;
-  if (burnoutRisk) dropoutRisk += 10; // Extra riesgo si hay burnout
+  // --- RETORNO COMPLETO ---
+  const velocityScore = weeklyGoal > 0 ? Math.min(Math.round((weeklyXP / weeklyGoal) * 100), 100) : 0;
+  // Eficiencia usando timeEngaged (más preciso)
+  const efficiencyRatio = timeEngaged > 0 ? parseFloat((weeklyXP / timeEngaged).toFixed(2)) : 0;
+  const timePerQuestion = questions > 0 ? parseFloat((timeEngaged / questions).toFixed(1)) : 0;
   
+  // Content Gap Ahora depende del Nemesis (10 = Crítico, 5 = Alerta, 0 = Bien)
+  const contentGap = nemesisTopic !== "" ? 10 : (timePerQuestion > 5 ? 5 : 0);
+
   return {
-    velocityScore: Math.round(velocityScore),
-    consistencyIndex: Math.round(consistencyIndex * 100) / 100,
-    stuckScore: Math.round(stuckScore),
-    dropoutProbability: Math.min(dropoutRisk, 100),
-    accuracyRate: Math.round(accuracyRate),
+    velocityScore,
+    consistencyIndex: velocityScore > 50 ? 0.9 : 0.3,
+    stuckScore: nemesisTopic !== "" ? 90 : 0,
+    dropoutProbability: accuracyRate < 50 ? 80 : 20,
+    accuracyRate,
     efficiencyRatio,
-    coldStartDays,
-    momentumScore,
-    // New Tier 3
+    coldStartDays: weeklyXP === 0 ? 7 : 0,
+    momentumScore: 1.0,
     timePerQuestion,
     contentGap,
-    balanceScore,
-    burnoutRisk,
-    sessionQuality
+    balanceScore: 0,
+    burnoutRisk: timeEngaged > 120 && focusIntegrity < 40,
+    sessionQuality: 0,
+    
+    // TIER 4
+    focusIntegrity,
+    nemesisTopic,
+    reviewAccuracy,
+    microStalls
   };
 }
