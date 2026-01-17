@@ -45,11 +45,11 @@ export async function GET(request: Request) {
             console.log(`   👹 NEMESIS DETECTED for ID ${id}: "${metrics.nemesisTopic}"`);
           }
           if (metrics.riskStatus === 'Dormant') {
-            // console.log(`   💤 DORMANT: ID ${id}`); // Opcional: Descomentar si quieres ver inactivos
+            // console.log(`   💤 DORMANT: ID ${id}`); // Opcional
           }
 
           // 4. PREPARAR PAYLOAD PARA FIRESTORE
-          [cite_start]// Guardamos 'metrics' completo. Esto persiste el Nemesis Topic en la DB [cite: 457]
+          // Guardamos 'metrics' completo. Esto persiste el Nemesis Topic en la DB.
           // Si la API falla mañana, el dashboard leerá este dato desde Firebase.
           return { 
             id: id.toString(), 
