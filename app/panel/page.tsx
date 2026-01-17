@@ -8,32 +8,6 @@ import {
   PieChart, Pie
 } from 'recharts';
 
-// --- LOGICA DE NOMBRES REFORZADA ---
-function getNameFromEmail(email: string): string {
-  // 1. Si no hay email válido, devolvemos vacío para usar el fallback
-  if (!email || !email.includes('@')) return '';
-
-  try {
-    // 2. Tomamos lo que está antes del @ (ej: "kavin.lopez")
-    const localPart = email.split('@')[0];
-    
-    // 3. Separamos por puntos, guiones o guiones bajos
-    const parts = localPart.split(/[._-]/);
-
-    // 4. Si solo hay una parte (ej: "admin"), la devolvemos capitalizada
-    if (parts.length === 1) {
-       return parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
-    }
-
-    // 5. Capitalizamos cada parte (Kavin Lopez)
-    return parts.map(part => 
-      part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
-    ).join(' ');
-  } catch (e) {
-    return '';
-  }
-}
-
 export default function PanelPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,6 +48,17 @@ export default function PanelPage() {
     if (autoSync) runUpdateBatch(true);
   }, [autoSync]);
 
+  // --- CALCULOS MASIVOS (PERCENTILES) ---
+  // Ordenamos por Velocity para calcular el percentil
+  const sortedByVel = [...students].sort((a, b) => (a.metrics?.velocityScore || 0) - (b.metrics?.velocityScore || 0));
+  
+  // Función helper para obtener el percentil de un alumno
+  const getPercentile = (id: string) => {
+    const index = sortedByVel.findIndex(s => s.id === id);
+    if (index === -1) return 0;
+    return Math.round(((index + 1) / sortedByVel.length) * 100);
+  };
+
   // --- CHART DATA ---
   const velocityData = [
     { name: '0-20%', count: students.filter(s => (s.metrics?.velocityScore || 0) <= 20).length, fill: '#ef4444' },
@@ -89,16 +74,12 @@ export default function PanelPage() {
   ];
 
   const filtered = students.filter(s => {
-    const realName = getNameFromEmail(s.email || '');
     const rawName = `${s.firstName} ${s.lastName}`;
     const searchTerm = search.toLowerCase();
-    // Buscamos por nombre real, nombre original O email
-    return realName.toLowerCase().includes(searchTerm) || 
-           rawName.toLowerCase().includes(searchTerm) ||
-           (s.email || '').toLowerCase().includes(searchTerm);
+    return rawName.toLowerCase().includes(searchTerm) || (s.id || '').toString().includes(searchTerm);
   });
 
-  if (loading) return <div className="p-8 bg-slate-950 min-h-screen text-emerald-500 font-mono italic animate-pulse">LOADING ALPHA INTELLIGENCE...</div>;
+  if (loading) return <div className="p-8 bg-slate-950 min-h-screen text-emerald-500 font-mono italic animate-pulse">LOADING ALPHA INTELLIGENCE v2...</div>;
 
   return (
     <div className="p-6 bg-slate-950 min-h-screen text-slate-300 font-sans">
@@ -107,7 +88,7 @@ export default function PanelPage() {
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-6">
         <div>
           <h1 className="text-2xl font-black uppercase tracking-tighter text-white italic">Alpha Command Center V2</h1>
-          <p className="text-[10px] text-slate-500 tracking-widest uppercase mt-1">Real-time Intelligence Unit</p>
+          <p className="text-[10px] text-slate-500 tracking-widest uppercase mt-1">Tier 2 Intelligence Activated</p>
         </div>
         
         <div className="flex gap-4 items-center">
@@ -162,63 +143,62 @@ export default function PanelPage() {
               <table className="w-full text-left text-[10px]">
                 <thead className="sticky top-0 bg-slate-900 z-10 text-slate-500 font-bold border-b border-slate-800 uppercase tracking-tighter">
                   <tr>
-                    <th className="p-3">Student / Email</th>
+                    <th className="p-3">Student</th>
                     <th className="p-3">Course</th>
                     <th className="p-3 text-center">Progress</th>
-                    <th className="p-3 text-center">XP</th>
                     <th className="p-3 text-center">Velocity</th>
-                    <th className="p-3 text-center">Consistency</th>
+                    <th className="p-3 text-center">Eff. Ratio</th> {/* NEW */}
+                    <th className="p-3 text-center">P. Rank</th>    {/* NEW */}
                     <th className="p-3 text-center">Acc</th>
-                    <th className="p-3 text-center">Stuck</th>
                     <th className="p-3 text-center">Risk</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/40">
                   {filtered.map((s) => {
-                    // Calculamos el nombre real
-                    const derivedName = getNameFromEmail(s.email);
-                    // Si logramos derivarlo, lo usamos. Si no, usamos el fallback.
-                    const displayName = derivedName || `${s.firstName} ${s.lastName}`;
+                    const displayName = `${s.firstName} ${s.lastName}`;
                     const m = s.metrics || {};
+                    const pRank = getPercentile(s.id);
                     
                     return (
                       <tr key={s.id} className="hover:bg-slate-800/30 transition-colors group">
                         
-                        {/* 1. STUDENT IDENTITY (MEJORADA) */}
+                        {/* 1. STUDENT (Nombre original) */}
                         <td className="p-3">
-                          <div className={`font-bold text-[11px] ${derivedName ? 'text-white' : 'text-slate-400'}`}>
+                          <div className="font-bold text-[11px] text-white group-hover:text-emerald-400 transition-colors">
                             {displayName}
                           </div>
-                          {/* Aquí mostramos el EMAIL real para verificar por qué falla si falla */}
-                          <div className="text-[9px] font-mono mt-0.5">
-                            {s.email ? (
-                               <span className="text-emerald-500/50">{s.email}</span>
-                            ) : (
-                               <span className="text-red-500/50 italic">MISSING EMAIL (ID: {s.id})</span>
-                            )}
-                          </div>
+                          <div className="text-[9px] text-slate-600 font-mono">{s.id}</div>
                         </td>
 
                         <td className="p-3 text-slate-400">
                           <div className="font-bold truncate w-24">{s.currentCourse?.name}</div>
                         </td>
                         <td className="p-3 text-center font-mono text-slate-300">{Math.round((s.currentCourse?.progress || 0) * 100)}%</td>
-                        <td className="p-3 text-center font-mono text-slate-500">{s.activity?.xpAwarded || 0}</td>
+                        
+                        {/* VELOCITY */}
                         <td className="p-3 text-center">
-                          <div className="w-16 bg-slate-800 h-1.5 rounded-full overflow-hidden mx-auto">
+                          <div className="w-16 bg-slate-800 h-1.5 rounded-full overflow-hidden mx-auto mb-1">
                             <div className={`h-full ${m.velocityScore >= 50 ? 'bg-emerald-500' : 'bg-red-500'}`} style={{ width: `${m.velocityScore}%` }}></div>
                           </div>
                           <span className="text-[9px]">{m.velocityScore}%</span>
                         </td>
+
+                        {/* TIER 2: EFFICIENCY */}
                         <td className="p-3 text-center">
-                           <span className={m.consistencyIndex > 0.8 ? 'text-emerald-500' : 'text-slate-600'}>
-                             {m.consistencyIndex > 0.8 ? '● HIGH' : '○ LOW'}
+                           <span className={`font-mono font-bold ${m.efficiencyRatio > 1.0 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                             {m.efficiencyRatio || '-'}
                            </span>
                         </td>
-                        <td className={`p-3 text-center font-bold ${m.accuracyRate < 60 ? 'text-red-400' : 'text-emerald-400'}`}>{m.accuracyRate}%</td>
+
+                        {/* TIER 2: PERCENTILE RANK */}
                         <td className="p-3 text-center">
-                           {m.stuckScore > 30 && <span className="bg-red-500 text-white px-1.5 py-0.5 rounded font-bold">{m.stuckScore}</span>}
+                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${pRank > 75 ? 'bg-emerald-900/50 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
+                             P{pRank}
+                           </span>
                         </td>
+
+                        <td className={`p-3 text-center font-bold ${m.accuracyRate < 60 ? 'text-red-400' : 'text-emerald-400'}`}>{m.accuracyRate}%</td>
+                        
                         <td className="p-3 text-center">
                           <span className={`px-2 py-0.5 rounded font-black ${m.dropoutProbability > 60 ? 'bg-red-900/40 text-red-500' : 'text-slate-600'}`}>
                             {m.dropoutProbability}%
@@ -306,9 +286,8 @@ export default function PanelPage() {
                 .map((s) => (
                   <div key={s.id} className="flex justify-between items-center text-[10px] border-l-2 border-red-500 pl-3 bg-red-500/5 p-2 rounded">
                     <div>
-                        {/* Usamos el mismo nombre derivado */}
                         <div className="text-slate-300 font-bold truncate w-24">
-                          {getNameFromEmail(s.email) || `${s.firstName} ${s.lastName}`}
+                          {`${s.firstName} ${s.lastName}`}
                         </div>
                         <div className="text-[8px] text-slate-500">{s.currentCourse?.name}</div>
                     </div>
