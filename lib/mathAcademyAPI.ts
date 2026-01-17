@@ -3,6 +3,7 @@ import axios from 'axios';
 const API_BASE_URL = 'https://mathacademy.com/api/beta6';
 const API_KEY = process.env.NEXT_PUBLIC_MATH_ACADEMY_API_KEY;
 
+// Interfaces para que TypeScript no se queje
 interface Student {
   id: number;
   firstName: string;
@@ -40,6 +41,7 @@ interface Activity {
   questionsCorrect: number;
 }
 
+// 1. Función para obtener datos básicos del estudiante
 export async function fetchStudent(studentId: string): Promise<Student | null> {
   try {
     const response = await axios.get(`${API_BASE_URL}/students/${studentId}`, {
@@ -56,6 +58,7 @@ export async function fetchStudent(studentId: string): Promise<Student | null> {
   }
 }
 
+// 2. Función para obtener actividad
 export async function fetchStudentActivity(
   studentId: string,
   startDate: string,
@@ -78,29 +81,21 @@ export async function fetchStudentActivity(
   }
 }
 
-export async function fetchAllStudents(studentIds: string[]): Promise<any[]> {
-  const results = [];
-  
-  for (const id of studentIds) {
-    const student = await fetchStudent(id);
-    if (student) {
-      // Get activity for last 7 days
-      const endDate = new Date().toISOString().split('T')[0];
-      const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split('T')[0];
-      
-      const activity = await fetchStudentActivity(id, startDate, endDate);
-      
-      results.push({
-        ...student,
-        activity,
-      });
-    }
-    
-    // Rate limiting
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  
-  return results;
+// 3. ESTA ES LA FUNCIÓN CLAVE QUE NECESITA EL ROUTE.TS
+// Combina los datos básicos con la actividad de los últimos 7 días
+export async function getStudentData(studentId: string) {
+  const student = await fetchStudent(studentId);
+  if (!student) return null;
+
+  const endDate = new Date().toISOString().split('T')[0];
+  const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split('T')[0];
+
+  const activity = await fetchStudentActivity(studentId, startDate, endDate);
+
+  return {
+    ...student,
+    activity
+  };
 }
