@@ -67,7 +67,6 @@ export async function GET() {
       success: true,
       processed: successCount,
       range: { start: startIndex, end: endIndex },
-      nextIndex: nextIndex,
       progress: `${Math.round((endIndex / studentIds.length) * 100)}%`
     });
 
