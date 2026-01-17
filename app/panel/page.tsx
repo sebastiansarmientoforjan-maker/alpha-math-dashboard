@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query } from 'firebase/firestore';
-// Importamos los gráficos
+// Importamos LabelList para poner números sobre las barras
 import { 
-  BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList,
   PieChart, Pie
 } from 'recharts';
 
@@ -61,15 +61,15 @@ export default function PanelPage() {
 
   // --- INTELIGENCIA VISUAL (Cálculos) ---
   
-  // 1. Velocity Distribution (Barras)
+  // 1. Velocity Distribution (Etiquetas más cortas para el gráfico)
   const velocityData = [
-    { name: 'Critical', count: students.filter(s => (s.metrics?.velocityScore || 0) <= 20).length },
-    { name: 'Low', count: students.filter(s => (s.metrics?.velocityScore || 0) > 20 && (s.metrics?.velocityScore || 0) <= 50).length },
-    { name: 'Medium', count: students.filter(s => (s.metrics?.velocityScore || 0) > 50 && (s.metrics?.velocityScore || 0) <= 80).length },
-    { name: 'High', count: students.filter(s => (s.metrics?.velocityScore || 0) > 80).length },
+    { name: '0-20%', count: students.filter(s => (s.metrics?.velocityScore || 0) <= 20).length, fill: '#ef4444' },
+    { name: '20-50%', count: students.filter(s => (s.metrics?.velocityScore || 0) > 20 && (s.metrics?.velocityScore || 0) <= 50).length, fill: '#f59e0b' },
+    { name: '50-80%', count: students.filter(s => (s.metrics?.velocityScore || 0) > 50 && (s.metrics?.velocityScore || 0) <= 80).length, fill: '#64748b' },
+    { name: '80%+', count: students.filter(s => (s.metrics?.velocityScore || 0) > 80).length, fill: '#10b981' },
   ];
 
-  // 2. Risk Composition (Dona)
+  // 2. Risk Composition (Datos limpios)
   const riskData = [
     { name: 'Critical', value: students.filter(s => (s.metrics?.dropoutProbability || 0) > 60).length, color: '#ef4444' }, 
     { name: 'Attention', value: students.filter(s => (s.metrics?.dropoutProbability || 0) >= 40 && (s.metrics?.dropoutProbability || 0) <= 60).length, color: '#f59e0b' },
@@ -206,12 +206,13 @@ export default function PanelPage() {
         {/* COLUMNA DERECHA (INTELIGENCIA VISUAL) */}
         <div className="space-y-6">
           
-          {/* 1. CHART: RISK DISTRIBUTION (DONA) */}
+          {/* 1. CHART: RISK DISTRIBUTION (DONA LIMPIA) */}
           <div className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl backdrop-blur-md">
             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Risk Composition</h3>
             <div className="h-40 w-full relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
+                  {/* Quitamos el Tooltip para que no estorbe */}
                   <Pie
                     data={riskData}
                     cx="50%"
@@ -225,10 +226,6 @@ export default function PanelPage() {
                       <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
                     ))}
                   </Pie>
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', fontSize: '10px' }}
-                    itemStyle={{ color: '#fff' }}
-                  />
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -238,32 +235,38 @@ export default function PanelPage() {
                 </div>
               </div>
             </div>
+            {/* Leyenda manual clara */}
             <div className="flex justify-between text-[9px] text-slate-400 mt-2 px-2">
-              <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div> Crit</span>
-              <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-500"></div> Attn</span>
-              <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> OK</span>
+              <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div> Crit ({riskData[0].value})</span>
+              <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-500"></div> Attn ({riskData[1].value})</span>
+              <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> OK ({riskData[2].value})</span>
             </div>
           </div>
 
-          {/* 2. CHART: VELOCITY CURVE (BARRAS) */}
+          {/* 2. CHART: VELOCITY CURVE (CON ETIQUETAS) */}
           <div className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl backdrop-blur-md">
             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Velocity Curve</h3>
-            <div className="h-32 w-full">
+            <div className="h-40 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={velocityData}>
-                  <XAxis dataKey="name" hide />
-                  <Tooltip 
-                    cursor={{fill: '#1e293b'}}
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', fontSize: '10px' }}
+                <BarChart data={velocityData} margin={{top: 15, right: 0, left: 0, bottom: 0}}>
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{fontSize: 9, fill: '#64748b'}} 
+                    interval={0} 
+                    axisLine={false} 
+                    tickLine={false} 
                   />
                   <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                     {velocityData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === 3 ? '#10b981' : index === 0 ? '#ef4444' : '#64748b'} />
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
+                    {/* Números sobre las barras */}
+                    <LabelList dataKey="count" position="top" fill="#94a3b8" fontSize={10} fontWeight="bold" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <p className="text-[9px] text-slate-500 mt-2 italic text-center">Students grouped by weekly velocity percentage.</p>
           </div>
 
           {/* 3. LIST: TOP STUCK */}
