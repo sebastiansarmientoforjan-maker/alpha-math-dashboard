@@ -21,7 +21,6 @@ export default function DashboardPage() {
     return () => unsubscribe();
   }, []);
 
-  // Auto-Sync function
   const runSync = async () => {
     if (!autoSync) return;
     try {
@@ -41,7 +40,6 @@ export default function DashboardPage() {
     if (autoSync) runSync(); 
   }, [autoSync]);
 
-  // TIER 1 Statistics
   const stats = {
     total: students.length,
     atRisk: students.filter(s => (s.metrics?.dropoutProbability || 0) > 60).length,
@@ -51,10 +49,8 @@ export default function DashboardPage() {
     avgAccuracy: Math.round(students.reduce((sum, s) => sum + (s.metrics?.accuracyRate || 0), 0) / (students.length || 1)),
   };
 
-  // Get unique courses
   const courses = Array.from(new Set(students.map(s => s.currentCourse?.name).filter(Boolean)));
 
-  // Filter students
   const filtered = students.filter(s => {
     const matchesSearch = `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
                          s.id.toString().includes(search);
@@ -75,7 +71,6 @@ export default function DashboardPage() {
 
   return (
     <div className="bg-slate-950 min-h-screen">
-      {/* Header */}
       <div className="bg-slate-900/40 border-b border-slate-800 p-6">
         <div className="flex justify-between items-center">
           <div>
@@ -95,7 +90,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* TIER 1 Metrics Cards */}
       <div className="p-6">
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
           <MetricCard title="Total Students" value={stats.total} color="blue" />
@@ -106,11 +100,8 @@ export default function DashboardPage() {
           <MetricCard title="Avg Accuracy" value={`${stats.avgAccuracy}%`} color="purple" />
         </div>
 
-        {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Left Panel - Main Table (3/4) */}
           <div className="lg:col-span-3 space-y-4">
-            {/* Filters */}
             <div className="flex gap-4">
               <input 
                 onChange={(e) => setSearch(e.target.value)}
@@ -129,7 +120,6 @@ export default function DashboardPage() {
               </select>
             </div>
 
-            {/* Table */}
             <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden">
               <div className="overflow-x-auto max-h-[700px]">
                 <table className="w-full text-left text-xs">
@@ -198,9 +188,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Right Panel - Alerts & Analytics (1/4) */}
           <div className="space-y-4">
-            {/* Top Stuck Students */}
             <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-lg">
               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">
                 🚨 Top Stuck Students
@@ -226,7 +214,6 @@ export default function DashboardPage() {
                 ))}
             </div>
 
-            {/* High Dropout Risk */}
             <div className="bg-red-900/10 border border-red-900/30 p-5 rounded-lg">
               <h3 className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-4">
                 ⚠️ High Dropout Risk
@@ -248,7 +235,6 @@ export default function DashboardPage() {
                 ))}
             </div>
 
-            {/* Pattern Recognition */}
             <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-lg">
               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">
                 🎯 Pattern Recognition
@@ -266,7 +252,45 @@ export default function DashboardPage() {
   );
 }
 
-// Helper Components
 function MetricCard({ title, value, color }: any) {
   const colors: any = {
-    blue: 'bg-blue-500/10 border-blue-500/30
+    blue: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
+    red: 'bg-red-500/10 border-red-500/30 text-red-400',
+    amber: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
+    emerald: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
+    purple: 'bg-purple-500/10 border-purple-500/30 text-purple-400',
+  };
+
+  return (
+    <div className={`border p-4 rounded-lg ${colors[color]}`}>
+      <div className="text-[10px] font-bold uppercase tracking-wider opacity-70 mb-1">
+        {title}
+      </div>
+      <div className="text-2xl font-black">{value}</div>
+    </div>
+  );
+}
+
+function VelocityBadge({ score }: { score: number }) {
+  if (score >= 80) return <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded font-mono font-bold">{score}%</span>;
+  if (score >= 50) return <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded font-mono font-bold">{score}%</span>;
+  return <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded font-mono font-bold">{score}%</span>;
+}
+
+function AccuracyBadge({ score }: { score: number }) {
+  if (score >= 70) return <span className="text-emerald-400 font-mono font-bold">{score}%</span>;
+  if (score >= 55) return <span className="text-amber-400 font-mono font-bold">{score}%</span>;
+  return <span className="text-red-400 font-mono font-bold">{score}%</span>;
+}
+
+function StuckBadge({ score }: { score: number }) {
+  if (score > 60) return <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded font-mono font-bold">{score}</span>;
+  if (score > 30) return <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded font-mono font-bold">{score}</span>;
+  return <span className="text-slate-600 font-mono">{score}</span>;
+}
+
+function RiskBadge({ score }: { score: number }) {
+  if (score > 60) return <span className="px-2 py-1 bg-red-900/40 text-red-400 rounded font-mono font-black">{score}%</span>;
+  if (score > 40) return <span className="px-2 py-1 bg-amber-900/40 text-amber-400 rounded font-mono font-bold">{score}%</span>;
+  return <span className="text-slate-600 font-mono">{score}%</span>;
+}
