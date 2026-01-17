@@ -49,10 +49,8 @@ export default function PanelPage() {
   }, [autoSync]);
 
   // --- CALCULOS MASIVOS (PERCENTILES) ---
-  // Ordenamos por Velocity para calcular el percentil
   const sortedByVel = [...students].sort((a, b) => (a.metrics?.velocityScore || 0) - (b.metrics?.velocityScore || 0));
   
-  // Función helper para obtener el percentil de un alumno
   const getPercentile = (id: string) => {
     const index = sortedByVel.findIndex(s => s.id === id);
     if (index === -1) return 0;
@@ -147,8 +145,8 @@ export default function PanelPage() {
                     <th className="p-3">Course</th>
                     <th className="p-3 text-center">Progress</th>
                     <th className="p-3 text-center">Velocity</th>
-                    <th className="p-3 text-center">Eff. Ratio</th> {/* NEW */}
-                    <th className="p-3 text-center">P. Rank</th>    {/* NEW */}
+                    <th className="p-3 text-center">Eff. Ratio</th> 
+                    <th className="p-3 text-center">P. Rank</th>    
                     <th className="p-3 text-center">Acc</th>
                     <th className="p-3 text-center">Risk</th>
                   </tr>
@@ -159,10 +157,12 @@ export default function PanelPage() {
                     const m = s.metrics || {};
                     const pRank = getPercentile(s.id);
                     
+                    // CORRECCIÓN CLAVE: Verificamos si existe el valor, incluso si es 0
+                    const hasEff = m.efficiencyRatio !== undefined && m.efficiencyRatio !== null;
+                    
                     return (
                       <tr key={s.id} className="hover:bg-slate-800/30 transition-colors group">
                         
-                        {/* 1. STUDENT (Nombre original) */}
                         <td className="p-3">
                           <div className="font-bold text-[11px] text-white group-hover:text-emerald-400 transition-colors">
                             {displayName}
@@ -175,7 +175,6 @@ export default function PanelPage() {
                         </td>
                         <td className="p-3 text-center font-mono text-slate-300">{Math.round((s.currentCourse?.progress || 0) * 100)}%</td>
                         
-                        {/* VELOCITY */}
                         <td className="p-3 text-center">
                           <div className="w-16 bg-slate-800 h-1.5 rounded-full overflow-hidden mx-auto mb-1">
                             <div className={`h-full ${m.velocityScore >= 50 ? 'bg-emerald-500' : 'bg-red-500'}`} style={{ width: `${m.velocityScore}%` }}></div>
@@ -183,10 +182,10 @@ export default function PanelPage() {
                           <span className="text-[9px]">{m.velocityScore}%</span>
                         </td>
 
-                        {/* TIER 2: EFFICIENCY */}
+                        {/* TIER 2: EFFICIENCY (CORREGIDO) */}
                         <td className="p-3 text-center">
-                           <span className={`font-mono font-bold ${m.efficiencyRatio > 1.0 ? 'text-emerald-400' : 'text-slate-500'}`}>
-                             {m.efficiencyRatio || '-'}
+                           <span className={`font-mono font-bold ${hasEff && m.efficiencyRatio > 1.0 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                             {hasEff ? m.efficiencyRatio : '-'}
                            </span>
                         </td>
 
