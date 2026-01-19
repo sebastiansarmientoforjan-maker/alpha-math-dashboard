@@ -1,32 +1,6 @@
-export interface Metrics {
-  // TIER 1, 2, 3
-  velocityScore: number;
-  consistencyIndex: number;
-  stuckScore: number;
-  dropoutProbability: number;
-  accuracyRate: number | null;
-  efficiencyRatio: number;
-  coldStartDays: number;
-  momentumScore: number;
-  timePerQuestion: number;
-  contentGap: number;
-  balanceScore: number;
-  burnoutRisk: boolean;
-  sessionQuality: number;
-  
-  // TIER 4 (Base)
-  focusIntegrity: number;
-  nemesisTopic: string;
-  reviewAccuracy: number;
-  microStalls: number;
-  
-  // TIER 4 (AVANZADO - NUEVO)
-  archetype: 'Zombie' | 'Grinder' | 'Guesser' | 'Flow Master' | 'Neutral'; // <--- NUEVO
-  
-  riskStatus: 'Critical' | 'Attention' | 'On Track' | 'Dormant'; 
-}
+import { Metrics, Student, StudentActivity } from '@/types';
 
-export function calculateTier1Metrics(student: any, activity: any): Metrics {
+export function calculateTier1Metrics(student: Student, activity: StudentActivity): Metrics {
   const schedule = student?.schedule || {};
   const totals = activity?.totals || activity || {}; 
   const tasks = activity?.tasks || [];   
@@ -46,7 +20,6 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
     
   const numTasks = totals.numTasks || 0;
 
-  // --- TIER 4 BASE ---
   const focusIntegrity = timeEngaged > 0 
     ? Math.round((timeProductive / timeEngaged) * 100) 
     : 0;
@@ -80,28 +53,25 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
   const totalWastedMin = timeElapsed - timeEngaged;
   const microStalls = numTasks > 0 ? Math.round(totalWastedMin / numTasks) : 0;
 
-  // --- RETORNO BASE ---
   const velocityScore = weeklyGoal > 0 ? Math.min(Math.round((weeklyXP / weeklyGoal) * 100), 100) : 0;
   const efficiencyRatio = timeEngaged > 0 ? parseFloat((weeklyXP / timeEngaged).toFixed(2)) : 0;
   const timePerQuestion = questions > 0 ? parseFloat((timeEngaged / questions).toFixed(1)) : 0;
   const contentGap = nemesisTopic !== "" ? 10 : (timePerQuestion > 5 ? 5 : 0);
 
-  // --- CLASIFICACIÓN DE ARQUETIPOS (TIER 4 AVANZADO) ---
   let archetype: Metrics['archetype'] = 'Neutral';
 
-  if (timeEngaged > 10) { // Solo clasificamos si hay actividad mínima
+  if (timeEngaged > 10) {
       if (focusIntegrity < 40) {
-          archetype = 'Zombie'; // Bajo foco, mucha distracción
+          archetype = 'Zombie';
       } else if (timePerQuestion < 0.3 && (accuracyRate || 0) < 50) {
-          archetype = 'Guesser'; // Muy rápido (<20s por pregunta) y falla mucho
+          archetype = 'Guesser';
       } else if (focusIntegrity > 70 && (accuracyRate || 0) < 60) {
-          archetype = 'Grinder'; // Se esfuerza mucho (Productivo) pero no entiende (Baja nota)
+          archetype = 'Grinder';
       } else if (focusIntegrity > 70 && (accuracyRate || 0) > 85) {
-          archetype = 'Flow Master'; // La máquina perfecta
+          archetype = 'Flow Master';
       }
   }
 
-  // --- RIESGO ---
   let riskStatus: Metrics['riskStatus'] = 'On Track';
   let dropoutRisk = 0;
 
@@ -112,7 +82,7 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
       if (velocityScore > 50) dropoutRisk = 0;
       if ((accuracyRate || 100) < 55) dropoutRisk += 20;
       if (nemesisTopic !== "") dropoutRisk += 20;
-      if (archetype === 'Grinder') dropoutRisk += 15; // El esfuerzo sin fruto es riesgo de burnout
+      if (archetype === 'Grinder') dropoutRisk += 15;
 
       if (velocityScore < 30 || contentGap > 5 || dropoutRisk > 50) {
           riskStatus = 'Critical';
@@ -139,7 +109,7 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
     nemesisTopic,
     reviewAccuracy,
     microStalls,
-    archetype, // <--- EXPORTAMOS EL ARQUETIPO
+    archetype,
     riskStatus
   };
 }
