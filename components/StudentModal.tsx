@@ -1,21 +1,45 @@
 'use client';
 
+import { useState } from 'react';
+
 export default function StudentModal({ student, onClose }: { student: any; onClose: () => void }) {
+  const [submitting, setSubmitting] = useState(false);
+  
   if (!student) return null;
 
   const m = student.metrics || {};
   const tasks = student.activity?.tasks || [];
 
-  // Ordenar tareas por fecha de manera segura
   const sortedTasks = [...tasks].sort((a: any, b: any) => {
     const dateA = new Date(a.completedLocal || 0).getTime();
     const dateB = new Date(b.completedLocal || 0).getTime();
     return dateB - dateA;
   });
 
+  const createIntervention = async (type: string) => {
+    setSubmitting(true);
+    try {
+      await fetch('/api/interventions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: student.id,
+          studentName: `${student.firstName} ${student.lastName}`,
+          type,
+          targetTopic: type === 'nemesis_intervention' ? m.nemesisTopic : undefined,
+          createdBy: 'DRI'
+        })
+      });
+      onClose();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      {/* Fondo clickeable para cerrar */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
       <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl shadow-2xl relative flex flex-col z-10">
@@ -23,7 +47,6 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
         {/* HEADER */}
         <div className="p-6 border-b border-slate-800 bg-slate-900 flex justify-between items-center shrink-0">
           <div className="flex gap-4 items-center">
-            {/* Velocity Circle */}
             <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-black border-4 
               ${m.velocityScore < 30 ? 'border-red-500 text-red-500' : 
                 m.velocityScore < 60 ? 'border-amber-500 text-amber-500' : 'border-emerald-500 text-emerald-500'}`}>
@@ -50,7 +73,7 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
         {/* SCROLLABLE CONTENT */}
         <div className="overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          {/* COLUMNA IZQUIERDA: DIAGNÓSTICO TIER 4 */}
+          {/* COLUMNA IZQUIERDA: DIAGNÓSTICO */}
           <div className="space-y-6">
             
             {/* ZOMBIE METER */}
@@ -110,7 +133,7 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
 
           </div>
 
-          {/* COLUMNA DERECHA: TIME TRAVEL (HISTORIAL) */}
+          {/* COLUMNA DERECHA: HISTORIAL */}
           <div className="md:col-span-2">
             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 flex justify-between items-center">
               <span>Activity Timeline (Last 7 Days)</span>
@@ -166,6 +189,41 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
             </div>
           </div>
 
+        </div>
+
+        {/* INTERVENTION PANEL */}
+        <div className="p-6 border-t border-slate-800 bg-slate-900/80">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">
+            Quick Actions
+          </h3>
+          
+          <div className="space-y-3">
+            <button
+              onClick={() => createIntervention('coaching')}
+              disabled={submitting}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:cursor-not-allowed px-4 py-3 rounded-lg text-sm font-bold text-white transition-all"
+            >
+              📚 General Coaching Note
+            </button>
+            
+            <button
+              onClick={() => createIntervention('focus_check')}
+              disabled={submitting}
+              className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed px-4 py-3 rounded-lg text-sm font-bold text-white transition-all"
+            >
+              🧠 Flag for Focus Check
+            </button>
+            
+            {m.nemesisTopic && (
+              <button
+                onClick={() => createIntervention('nemesis_intervention')}
+                disabled={submitting}
+                className="w-full bg-red-600/80 hover:bg-red-600 disabled:bg-slate-700 disabled:cursor-not-allowed border border-red-500/30 px-4 py-3 rounded-lg text-sm font-bold text-white transition-all"
+              >
+                👹 Remedial: "{m.nemesisTopic}"
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
