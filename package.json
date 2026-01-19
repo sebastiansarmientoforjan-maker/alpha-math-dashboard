@@ -17,7 +17,8 @@
     "axios": "^1.7.2",
     "recharts": "^2.12.7",
     "date-fns": "^3.6.0",
-    "lucide-react": "^0.428.0"
+    "lucide-react": "^0.428.0",
+    "@opentelemetry/api": "^1.9.0"
   },
   "devDependencies": {
     "@types/node": "^20",
