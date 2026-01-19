@@ -72,26 +72,13 @@ export interface Intervention {
   id: string;
   studentId: string;
   studentName: string;
-  coachId?: string;
-  coachName?: string;
   type: 'coaching' | 'remedial_task' | 'focus_check' | 'nemesis_intervention';
   targetTopic?: string;
-  description?: string;
-  createdBy: string;
+  notes?: string;
+  createdBy: string; // Siempre será "DRI"
   createdAt: string;
   updatedAt?: string;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  notes?: string;
-}
-
-export interface Coach {
-  id: string;
-  name: string;
-  email: string;
-  specialties: string[];
-  maxStudents: number;
-  currentStudents: number;
-  available: boolean;
 }
 
 export interface FilterState {
