@@ -1,6 +1,6 @@
-import { Metrics, Student, StudentActivity } from '@/types';
+import { Metrics } from '@/types';
 
-export function calculateTier1Metrics(student: Student, activity: StudentActivity): Metrics {
+export function calculateTier1Metrics(student: any, activity: any): Metrics {
   const schedule = student?.schedule || {};
   const totals = activity?.totals || activity || {}; 
   const tasks = activity?.tasks || [];   
