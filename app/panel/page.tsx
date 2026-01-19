@@ -7,30 +7,41 @@ import {
   BarChart, Bar, XAxis, ResponsiveContainer, Cell, LabelList,
   PieChart, Pie
 } from 'recharts';
-// Asegúrate de que este componente exista en src/components/StudentModal.tsx
 import StudentModal from '@/components/StudentModal';
+import { Student } from '@/types';
+
+interface FilterState {
+  search: string;
+  course: string;
+  archetype: string;
+  riskStatus: string;
+  hasNemesis: boolean;
+}
 
 export default function PanelPage() {
-  const [students, setStudents] = useState<any[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [autoSync, setAutoSync] = useState(false);
-  const [search, setSearch] = useState('');
-  const [selectedCourse, setSelectedCourse] = useState('ALL'); 
-  const [selectedStudent, setSelectedStudent] = useState<any>(null); // Estado para el Modal
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [syncStatus, setSyncStatus] = useState({ current: 0, total: 1613 });
+  const [filters, setFilters] = useState<FilterState>({
+    search: '',
+    course: 'ALL',
+    archetype: 'ALL',
+    riskStatus: 'ALL',
+    hasNemesis: false
+  });
 
-  // --- 1. CARGA DE DATOS (REALTIME) ---
   useEffect(() => {
     const q = query(collection(db, 'students'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Student[];
       setStudents(data);
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // --- 2. LÓGICA DE SINCRONIZACIÓN ---
   const runUpdateBatch = async (isFirstRun = false) => {
     try {
       const url = isFirstRun ? '/api/update-students?reset=true' : '/api/update-students';
@@ -52,7 +63,6 @@ export default function PanelPage() {
     if (autoSync) runUpdateBatch(true);
   }, [autoSync]);
 
-  // --- 3. FILTROS Y PROCESAMIENTO ---
   const uniqueCourses = useMemo(() => {
     const courses = new Set(students.map(s => s.currentCourse?.name).filter(Boolean));
     return Array.from(courses).sort();
@@ -60,12 +70,16 @@ export default function PanelPage() {
 
   const filtered = students.filter(s => {
     const rawName = `${s.firstName} ${s.lastName}`;
-    const searchTerm = search.toLowerCase();
+    const searchTerm = filters.search.toLowerCase();
     
-    const matchesSearch = rawName.toLowerCase().includes(searchTerm) || (s.id || '').toString().includes(searchTerm);
-    const matchesCourse = selectedCourse === 'ALL' || s.currentCourse?.name === selectedCourse;
+    const matchesSearch = rawName.toLowerCase().includes(searchTerm) || 
+                          (s.id || '').toString().includes(searchTerm);
+    const matchesCourse = filters.course === 'ALL' || s.currentCourse?.name === filters.course;
+    const matchesArchetype = filters.archetype === 'ALL' || s.metrics?.archetype === filters.archetype;
+    const matchesRisk = filters.riskStatus === 'ALL' || s.metrics?.riskStatus === filters.riskStatus;
+    const matchesNemesis = !filters.hasNemesis || !!s.metrics?.nemesisTopic;
 
-    return matchesSearch && matchesCourse;
+    return matchesSearch && matchesCourse && matchesArchetype && matchesRisk && matchesNemesis;
   });
 
   const riskData = [
@@ -80,7 +94,6 @@ export default function PanelPage() {
   return (
     <div className="p-6 bg-slate-950 min-h-screen text-slate-300 font-sans">
       
-      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-6">
         <div>
           <h1 className="text-2xl font-black uppercase tracking-tighter text-white italic">Alpha Command Center V2</h1>
@@ -89,10 +102,9 @@ export default function PanelPage() {
         
         <div className="flex gap-4 items-center flex-wrap justify-end">
             
-            {/* SELECTOR DE CURSO */}
             <select 
-              value={selectedCourse}
-              onChange={(e) => setSelectedCourse(e.target.value)}
+              value={filters.course}
+              onChange={(e) => setFilters({...filters, course: e.target.value})}
               className="bg-slate-900 border border-slate-700 text-xs rounded-lg px-3 py-2 outline-none focus:border-emerald-500 text-slate-300 font-bold"
             >
               <option value="ALL">ALL COURSES ({students.length})</option>
@@ -118,10 +130,8 @@ export default function PanelPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         
-        {/* LEFT COLUMN (TABLE + KPI) */}
         <div className="lg:col-span-3 space-y-6">
           
-          {/* KPI CARDS */}
           <div className="grid grid-cols-4 gap-4">
             <div className="bg-red-500/5 border border-red-500/20 p-4 rounded-xl">
               <p className="text-[9px] font-black text-red-500 uppercase tracking-widest">Critical</p>
@@ -141,17 +151,75 @@ export default function PanelPage() {
             </div>
           </div>
 
-          {/* TABLE */}
           <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-md min-h-[600px]">
             <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/80">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-3">
                 Active Registry ({filtered.length})
+                {filtered.length !== students.length && (
+                  <span className="bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded text-[9px]">
+                    Filtered from {students.length}
+                  </span>
+                )}
               </h3>
-              <input 
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search Student..." 
-                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs w-64 focus:border-emerald-500 outline-none transition-colors"
-              />
+              
+              <div className="flex gap-3 flex-wrap">
+                <input 
+                  value={filters.search}
+                  onChange={(e) => setFilters({...filters, search: e.target.value})}
+                  placeholder="🔍 Search name..." 
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs w-48 focus:border-emerald-500 outline-none transition-colors"
+                />
+                
+                <select 
+                  value={filters.archetype}
+                  onChange={(e) => setFilters({...filters, archetype: e.target.value})}
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:border-emerald-500 outline-none"
+                >
+                  <option value="ALL">All Archetypes</option>
+                  <option value="Zombie">🧟‍♂️ Zombies</option>
+                  <option value="Grinder">👷 Grinders</option>
+                  <option value="Guesser">🏎️ Guessers</option>
+                  <option value="Flow Master">🎯 Flow Masters</option>
+                </select>
+                
+                <select 
+                  value={filters.riskStatus}
+                  onChange={(e) => setFilters({...filters, riskStatus: e.target.value})}
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:border-emerald-500 outline-none"
+                >
+                  <option value="ALL">All Risk Levels</option>
+                  <option value="Critical">🔴 Critical</option>
+                  <option value="Attention">🟡 Attention</option>
+                  <option value="On Track">🟢 On Track</option>
+                  <option value="Dormant">⚫ Dormant</option>
+                </select>
+                
+                <button
+                  onClick={() => setFilters({...filters, hasNemesis: !filters.hasNemesis})}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    filters.hasNemesis 
+                      ? 'bg-red-500 text-white' 
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                  }`}
+                >
+                  👹 Nemesis Only
+                </button>
+                
+                {(filters.search || filters.archetype !== 'ALL' || filters.riskStatus !== 'ALL' || filters.hasNemesis) && (
+                  <button
+                    onClick={() => setFilters({
+                      search: '',
+                      course: 'ALL',
+                      archetype: 'ALL',
+                      riskStatus: 'ALL',
+                      hasNemesis: false
+                    })}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300 hover:bg-slate-600"
+                  >
+                    ✕ Clear
+                  </button>
+                )}
+              </div>
             </div>
             
             <div className="overflow-x-auto max-h-[600px]">
@@ -176,7 +244,7 @@ export default function PanelPage() {
                     return (
                       <tr 
                         key={s.id} 
-                        onClick={() => setSelectedStudent(s)} // CLICK PARA ABRIR MODAL
+                        onClick={() => setSelectedStudent(s)}
                         className={`hover:bg-slate-800/50 transition-colors group cursor-pointer ${isDormant ? 'opacity-50 grayscale' : ''}`}
                       >
                         <td className="p-3">
@@ -232,12 +300,10 @@ export default function PanelPage() {
           </div>
         </div>
 
-        {/* RIGHT COLUMN (VISUAL INTELLIGENCE) */}
         <div className="space-y-6">
           
-          {/* RISK CHART */}
           <div className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl backdrop-blur-md">
-            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Risk Composition ({selectedCourse === 'ALL' ? 'ALL' : 'Filtered'})</h3>
+            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Risk Composition ({filters.course === 'ALL' ? 'ALL' : 'Filtered'})</h3>
             <div className="h-32 w-full relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -253,14 +319,12 @@ export default function PanelPage() {
             </div>
           </div>
           
-          {/* 🦸‍♂️ GOD MODE DIAGNOSTICS (Updated with Archetypes) */}
           <div className="bg-slate-900/50 border border-indigo-500/30 p-5 rounded-2xl backdrop-blur-md relative overflow-hidden">
             <div className="absolute top-0 right-0 bg-indigo-500/20 px-2 py-1 text-[8px] font-bold text-indigo-300 rounded-bl-lg">TIER 4 ACTIVE</div>
             <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">Behavioral Archetypes</h3>
 
             <div className="space-y-4">
               
-              {/* 1. THE GRINDERS (Prioridad Empática: Se esfuerzan pero fallan) */}
               {filtered.filter(s => s.metrics?.archetype === 'Grinder').length > 0 && (
                 <div className="border-l-2 border-amber-500 pl-3">
                    <div className="text-[9px] font-bold text-amber-500 uppercase flex justify-between">
@@ -278,7 +342,6 @@ export default function PanelPage() {
                 </div>
               )}
 
-              {/* 2. THE ZOMBIES (Prioridad Disciplinaria: No se enfocan) */}
               <div className="border-l-2 border-red-500 pl-3">
                    <div className="text-[9px] font-bold text-red-500 uppercase flex justify-between">
                       <span>🧟‍♂️ The Zombies</span>
@@ -294,7 +357,6 @@ export default function PanelPage() {
                    </div>
               </div>
 
-              {/* 3. THE GUESSERS (Prioridad Velocidad) */}
               {filtered.filter(s => s.metrics?.archetype === 'Guesser').length > 0 && (
                 <div className="border-l-2 border-purple-500 pl-3">
                    <div className="text-[9px] font-bold text-purple-400 uppercase flex justify-between">
@@ -312,7 +374,6 @@ export default function PanelPage() {
                 </div>
               )}
 
-              {/* NEMESIS LIST (Lo mantenemos porque es valioso) */}
               <div className="pt-2 border-t border-slate-800">
                  <div className="text-[9px] text-slate-400 mb-2">Top Active Blockers:</div>
                  <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
@@ -337,7 +398,6 @@ export default function PanelPage() {
         </div>
       </div>
 
-      {/* --- MODAL LAYER (STUDENT DOSSIER) --- */}
       {selectedStudent && (
         <StudentModal 
           student={selectedStudent} 
