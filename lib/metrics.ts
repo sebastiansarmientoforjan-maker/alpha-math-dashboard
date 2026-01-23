@@ -4,11 +4,7 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
   const tasks = activity?.tasks || [];
   const totals = activity?.totals || activity || {}; 
 
-  // --- Normalización y Base ---
-  const schedule = student?.schedule || {};
-  const weeklyGoal = (schedule.monGoal || 0) * 5;
-  const weeklyXP = totals.xpAwarded || 0;
-  
+  // --- Normalización de Escala Temporal (Auditoría Técnica) ---
   const timeEngaged = Math.round((totals.timeEngaged || totals.time || 0) / 60);
   const timeProductive = Math.round((totals.timeProductive || 0) / 60);
   const timeElapsed = Math.round((totals.timeElapsed || 0) / 60);
@@ -23,21 +19,28 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
   const lmp = correctRecent / Math.max(1, recentTasks.length); // [cite: 41]
 
   const accuracies: number[] = tasks.map((t: any) => (t.questionsCorrect / t.questions) * 100);
-  const meanAcc = accuracies.length > 0 ? (accuracies.reduce((a: number, b: number) => a + b, 0) / accuracies.length) : 0;
-  const variance = accuracies.length > 0 ? (accuracies.reduce((a: number, b: number) => a + Math.pow(b - meanAcc, 2), 0) / accuracies.length) : 0;
-  const ksi = Math.max(0, 100 - Math.sqrt(variance)); // [cite: 30]
+  const meanAcc = accuracies.length > 0 
+    ? (accuracies.reduce((a: number, b: number) => a + b, 0) / accuracies.length) 
+    : 0;
+  const variance = accuracies.length > 0 
+    ? (accuracies.reduce((a: number, b: number) => a + Math.pow(b - meanAcc, 2), 0) / accuracies.length) 
+    : 0;
+  const ksi = Math.max(0, 100 - Math.sqrt(variance)); // [cite: 30, 35]
 
-  // --- Detección de Stall (Pseudocódigo DRI) ---
+  // --- Detección de Stall (Frustrated Stall vs Productive Struggle) ---
   const idleRatio = timeElapsed > 0 ? (timeElapsed - timeEngaged) / timeElapsed : 0; // [cite: 93]
-  const challengeZoneFailure = tasks.some((t: any) => (t.smartScore || 0) > 80 && (t.questionsCorrect / t.questions) < 0.2);
+  const challengeZoneFailure = tasks.some((t: any) => (t.smartScore || 0) > 80 && (t.questionsCorrect / t.questions) < 0.2); // [cite: 85]
   
   let stallStatus: Metrics['stallStatus'] = 'Optimal';
   if (challengeZoneFailure && idleRatio > 0.4) {
-    stallStatus = 'Frustrated Stall'; // [cite: 102]
+    stallStatus = 'Frustrated Stall'; // [cite: 85, 102]
   } else if (accuracyRate !== null && accuracyRate < 60 && idleRatio < 0.2) {
     stallStatus = 'Productive Struggle'; // [cite: 84]
   }
 
+  const schedule = student?.schedule || {};
+  const weeklyGoal = (schedule.monGoal || 0) * 5;
+  const weeklyXP = totals.xpAwarded || 0;
   const velocityScore = weeklyGoal > 0 ? Math.min(Math.round((weeklyXP / weeklyGoal) * 100), 100) : 0;
 
   return {
