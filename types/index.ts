@@ -11,13 +11,13 @@ export interface Student {
   };
   activity: StudentActivity;
   metrics: Metrics;
-  dri: DRIMetrics; // Tier 5
+  dri: DRIMetrics;
   lastUpdated: string;
 }
 
 export interface StudentActivity {
   xpAwarded: number;
-  time: number; // Minutos
+  time: number;
   questions: number;
   questionsCorrect: number;
   numTasks: number;
@@ -36,8 +36,7 @@ export interface Task {
   questions: number;
   questionsCorrect: number;
   completedLocal: string;
-  smartScore?: number; // Para lógica IXL/KeenKT
-  analysis?: { timeEngaged: number };
+  smartScore?: number;
 }
 
 export interface Metrics {
@@ -45,17 +44,23 @@ export interface Metrics {
   accuracyRate: number | null;
   focusIntegrity: number;
   nemesisTopic: string;
-  // --- Psicomotricidad V3.0 ---
-  lmp: number; // Latent Mastery Probability [cite: 41]
-  ksi: number; // Knowledge Stability Index [cite: 35]
+  // --- Psicomotricidad V3.5 (Investigación KeenKT) ---
+  lmp: number; // Probabilidad de Maestría Latente [cite: 41]
+  ksi: number; // Índice de Estabilidad (Incertidumbre NIG) [cite: 30, 35]
   stallStatus: 'Optimal' | 'Productive Struggle' | 'Frustrated Stall'; // [cite: 83]
   idleRatio: number; // [cite: 93]
+  // --- Campos de Compatibilidad Requeridos ---
+  consistencyIndex: number;
+  stuckScore: number;
+  dropoutProbability: number;
+  riskStatus: 'Critical' | 'Attention' | 'On Track' | 'Dormant';
+  archetype: 'Zombie' | 'Neutral' | 'Flow Master' | 'Grinder' | 'Guesser';
 }
 
 export interface DRIMetrics {
   iROI: number;
-  debtExposure: number; // DER
-  precisionDecay: number; // PDI
+  debtExposure: number;
+  precisionDecay: number;
   driTier: 'RED' | 'YELLOW' | 'GREEN';
   driSignal: string;
 }
