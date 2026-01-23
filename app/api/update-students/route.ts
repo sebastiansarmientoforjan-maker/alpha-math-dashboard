@@ -12,8 +12,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const shouldReset = searchParams.get('reset') === 'true';
 
+    // 1. GESTIÓN DE ESTADO DEL SCHEDULER (Para recorrer los 1613 IDs)
     const stateRef = doc(db, 'system', 'scheduler_state');
-    
     let startIndex = 0;
     
     if (!shouldReset) {
@@ -21,28 +21,24 @@ export async function GET(request: Request) {
        startIndex = stateSnap.exists() ? stateSnap.data().lastIndex || 0 : 0;
     }
 
+    // Reiniciar si llegamos al final de la lista
     if (startIndex >= studentIds.length) startIndex = 0;
 
-    // Procesamos lote de 50 estudiantes
-    // Nota: Ahora haremos 2 escrituras por estudiante (Perfil + Historial),
-    // así que el batch de 50 genera 100 escrituras. El límite de Firestore es 500, así que estamos seguros.
+    // 2. DEFINICIÓN DEL LOTE (50 alumnos = 100 escrituras en Firestore)
     const endIndex = Math.min(startIndex + 50, studentIds.length);
     const currentBatchIds = studentIds.slice(startIndex, endIndex);
 
-    console.log(`⚡ SYNC START: Processing ${startIndex} to ${endIndex}...`);
+    console.log(`⚡ SYNC START: Processing ${startIndex} to ${endIndex} of ${studentIds.length}...`);
 
+    // 3. OBTENCIÓN Y PROCESAMIENTO PSICOMÉTRICO
     const updates = await Promise.all(
       currentBatchIds.map(async (id) => {
         try {
           const rawData = await getStudentData(id.toString());
           if (!rawData) return null;
 
+          // Cálculo de métricas V4.1 (KSI, LMP, DER, etc.)
           const metrics = calculateTier1Metrics(rawData, rawData.activity);
-
-          // LOGS DE CONFIRMACIÓN
-          if (metrics.nemesisTopic) {
-            console.log(`   👹 NEMESIS: ID ${id} -> "${metrics.nemesisTopic}"`);
-          }
 
           return { 
             id: id.toString(), 
@@ -60,48 +56,49 @@ export async function GET(request: Request) {
       })
     );
 
-    // --- FASE DE ESCRITURA (BATCH) ---
+    // 4. FASE DE ESCRITURA ATÓMICA (BATCH)
     const batch = writeBatch(db);
     let updateCount = 0;
     const todayStr = new Date().toISOString().split('T')[0]; // Formato YYYY-MM-DD
 
     updates.forEach((item) => {
       if (item) {
-        // 1. Actualizar Estado Actual (Para el Dashboard en tiempo real)
+        // A. Actualizar Perfil Principal (Para el Triaje en tiempo real)
         const studentRef = doc(db, 'students', item.id);
         batch.set(studentRef, item.data, { merge: true });
 
-        // 2. Guardar Snapshot Histórico (Para "Trend Sparklines") [NUEVO]
-        // Guardamos en la sub-colección 'history' usando la fecha como ID.
-        // Esto asegura que solo haya un registro por día (idempotencia).
+        // B. Guardar Instantánea Histórica (Para análisis de tendencias/PDI)
         const historyRef = doc(db, 'students', item.id, 'history', todayStr);
         
-        // Guardamos solo lo vital para tendencias (ahorrar espacio)
         const historySnapshot = {
           date: todayStr,
           timestamp: new Date().toISOString(),
           metrics: {
-             velocityScore: item.data.metrics.velocityScore,
-             accuracyRate: item.data.metrics.accuracyRate,
-             riskStatus: item.data.metrics.riskStatus,
-             efficiencyRatio: item.data.metrics.efficiencyRatio,
-             contentGap: item.data.metrics.contentGap
+              velocityScore: item.data.metrics.velocityScore,
+              accuracyRate: item.data.metrics.accuracyRate,
+              riskStatus: item.data.metrics.riskStatus,
+              ksi: item.data.metrics.ksi,
+              lmp: item.data.metrics.lmp,
+              stallStatus: item.data.metrics.stallStatus
           },
           courseName: item.data.currentCourse?.name || 'Unknown'
         };
 
         batch.set(historyRef, historySnapshot, { merge: true });
-
         updateCount++;
       }
     });
 
     await batch.commit();
     
-    // Guardar estado del scheduler
-    await setDoc(stateRef, { lastIndex: endIndex, total: studentIds.length }, { merge: true });
+    // 5. ACTUALIZAR PUNTERO DEL SCHEDULER
+    await setDoc(stateRef, { 
+      lastIndex: endIndex, 
+      total: studentIds.length,
+      lastSync: new Date().toISOString() 
+    }, { merge: true });
 
-    console.log(`✅ BATCH COMPLETE: Updated ${updateCount} profiles + history entries.`);
+    console.log(`✅ BATCH COMPLETE: Updated ${updateCount} profiles.`);
 
     return NextResponse.json({ 
       success: true, 
