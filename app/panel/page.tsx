@@ -3,27 +3,17 @@
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query } from 'firebase/firestore';
-import { 
-  BarChart, Bar, XAxis, ResponsiveContainer, Cell, LabelList,
-  PieChart, Pie
-} from 'recharts';
 import StudentModal from '@/components/StudentModal';
-import { Student, FilterState } from '@/types';
+import { calculateDRIMetrics } from '@/lib/dri-calculus';
+import { Student } from '@/types';
 
 export default function PanelPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
-  const [autoSync, setAutoSync] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [syncStatus, setSyncStatus] = useState({ current: 0, total: 1613 });
-  const [filters, setFilters] = useState<FilterState>({
-    search: '',
-    course: 'ALL',
-    archetype: 'ALL',
-    riskStatus: 'ALL',
-    hasNemesis: false
-  });
+  const [search, setSearch] = useState('');
 
+  // --- DATA LOADING ---
   useEffect(() => {
     const q = query(collection(db, 'students'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -34,362 +24,143 @@ export default function PanelPage() {
     return () => unsubscribe();
   }, []);
 
-  const runUpdateBatch = async (isFirstRun = false) => {
-    try {
-      const url = isFirstRun ? '/api/update-students?reset=true' : '/api/update-students';
-      const res = await fetch(url);
-      const data = await res.json();
-      
-      if (data.success) {
-        setSyncStatus({ current: data.currentIndex, total: data.total });
-        if (data.currentIndex < data.total && autoSync) {
-          setTimeout(() => runUpdateBatch(false), 1000);
-        } else {
-          setAutoSync(false);
-        }
-      }
-    } catch (err) { setAutoSync(false); }
-  };
-
-  useEffect(() => {
-    if (autoSync) runUpdateBatch(true);
-  }, [autoSync]);
-
-  const uniqueCourses = useMemo(() => {
-    const courses = new Set(students.map(s => s.currentCourse?.name).filter(Boolean));
-    return Array.from(courses).sort();
+  // --- PROCESAMIENTO DRI EN TIEMPO REAL ---
+  const processedStudents = useMemo(() => {
+    return students.map(s => {
+       const dri = calculateDRIMetrics(s);
+       return { ...s, dri };
+    });
   }, [students]);
 
-  const filtered = students.filter(s => {
-    const rawName = `${s.firstName} ${s.lastName}`;
-    const searchTerm = filters.search.toLowerCase();
-    
-    const matchesSearch = rawName.toLowerCase().includes(searchTerm) || 
-                          (s.id || '').toString().includes(searchTerm);
-    const matchesCourse = filters.course === 'ALL' || s.currentCourse?.name === filters.course;
-    const matchesArchetype = filters.archetype === 'ALL' || s.metrics?.archetype === filters.archetype;
-    const matchesRisk = filters.riskStatus === 'ALL' || s.metrics?.riskStatus === filters.riskStatus;
-    const matchesNemesis = !filters.hasNemesis || !!s.metrics?.nemesisTopic;
-
-    return matchesSearch && matchesCourse && matchesArchetype && matchesRisk && matchesNemesis;
+  // --- FILTRADO POR BÚSQUEDA ---
+  const filtered = processedStudents.filter(s => {
+     const name = `${s.firstName} ${s.lastName}`.toLowerCase();
+     return name.includes(search.toLowerCase());
   });
 
-  const riskData = [
-    { name: 'Crit', value: filtered.filter(s => s.metrics?.riskStatus === 'Critical').length, color: '#ef4444' }, 
-    { name: 'Attn', value: filtered.filter(s => s.metrics?.riskStatus === 'Attention').length, color: '#f59e0b' },
-    { name: 'OK', value: filtered.filter(s => s.metrics?.riskStatus === 'On Track').length, color: '#10b981' }, 
-    { name: 'Zzz', value: filtered.filter(s => s.metrics?.riskStatus === 'Dormant').length, color: '#475569' }, 
-  ];
+  // --- SEPARACIÓN EN CUBETAS DE TRIAJE (BUCKETS) ---
+  const redZone = filtered.filter(s => s.dri.driTier === 'RED');
+  const yellowZone = filtered.filter(s => s.dri.driTier === 'YELLOW');
+  const greenZone = filtered.filter(s => s.dri.driTier === 'GREEN');
 
-  if (loading) return <div className="p-8 bg-slate-950 min-h-screen text-emerald-500 font-mono italic animate-pulse">RECALIBRATING ALPHA CORE...</div>;
+  if (loading) return <div className="p-10 bg-black min-h-screen text-emerald-500 font-mono italic animate-pulse">BOOTING DRI ENGINE...</div>;
 
   return (
-    <div className="p-6 bg-slate-950 min-h-screen text-slate-300 font-sans">
+    <div className="p-4 bg-[#050505] min-h-screen text-slate-300 font-sans">
       
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-6">
+      {/* HEADER TÁCTICO */}
+      <div className="flex justify-between items-end mb-8 border-b border-slate-800 pb-4">
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-tighter text-white italic">Alpha Command Center V2</h1>
-          <p className="text-[10px] text-slate-500 tracking-widest uppercase mt-1">Phase 2.1: Behavioral Intelligence</p>
+          <h1 className="text-3xl font-black uppercase tracking-tighter text-white italic">DRI COMMAND v2.1</h1>
+          <p className="text-[10px] text-slate-500 tracking-widest uppercase mt-1">Direct Instruction Triage Protocol</p>
         </div>
-        
-        <div className="flex gap-4 items-center flex-wrap justify-end">
-            
-            <select 
-              value={filters.course}
-              onChange={(e) => setFilters({...filters, course: e.target.value})}
-              className="bg-slate-900 border border-slate-700 text-xs rounded-lg px-3 py-2 outline-none focus:border-emerald-500 text-slate-300 font-bold"
-            >
-              <option value="ALL">ALL COURSES ({students.length})</option>
-              {uniqueCourses.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-
-            <div className="text-right">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Live Sync</div>
-                <div className="text-emerald-500 font-mono font-bold">{syncStatus.current} / {syncStatus.total}</div>
-            </div>
-            <button 
-            onClick={() => setAutoSync(!autoSync)}
-            className={`px-6 py-2 rounded-lg font-black text-[10px] tracking-widest transition-all ${
-                autoSync ? 'bg-red-900/50 text-red-500 animate-pulse border border-red-500' : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-900/20'
-            }`}
-            >
-            {autoSync ? '🛑 STOP' : '⚡ SYNC DATA'}
-            </button>
+        <div className="flex gap-4">
+           {/* STATS VITALES */}
+           <div className="text-right">
+              <div className="text-[9px] text-slate-600 uppercase font-bold">System Load</div>
+              <div className="text-xl font-mono font-bold text-white">{students.length} <span className="text-xs text-slate-500">Units</span></div>
+           </div>
+           <div className="text-right">
+              <div className="text-[9px] text-red-900 uppercase font-bold">Critical Load</div>
+              <div className="text-xl font-mono font-bold text-red-500">{redZone.length} <span className="text-xs text-red-900/50">Units</span></div>
+           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* BARRA DE BÚSQUEDA GLOBAL */}
+      <div className="mb-6">
+        <input 
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="🔎 Filter by ID or Name..." 
+          className="w-full bg-slate-900/50 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-indigo-500 outline-none transition-colors text-white font-mono"
+        />
+      </div>
+
+      {/* --- TRIAGE COLUMNS (THE NEW UX) --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
         
-        <div className="lg:col-span-3 space-y-6">
-          
-          <div className="grid grid-cols-4 gap-4">
-            <div className="bg-red-500/5 border border-red-500/20 p-4 rounded-xl">
-              <p className="text-[9px] font-black text-red-500 uppercase tracking-widest">Critical</p>
-              <h2 className="text-3xl font-black text-white">{riskData[0].value}</h2>
-            </div>
-            <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl">
-              <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Attention</p>
-              <h2 className="text-3xl font-black text-white">{riskData[1].value}</h2>
-            </div>
-             <div className="bg-emerald-500/5 border border-emerald-500/20 p-4 rounded-xl">
-              <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Active</p>
-              <h2 className="text-3xl font-black text-white">{riskData[2].value}</h2>
-            </div>
-            <div className="bg-slate-800/50 border border-slate-700 p-4 rounded-xl">
-              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Dormant</p>
-              <h2 className="text-3xl font-black text-slate-400">{riskData[3].value}</h2>
-            </div>
-          </div>
-
-          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-md min-h-[600px]">
-            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/80">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-3">
-                Active Registry ({filtered.length})
-                {filtered.length !== students.length && (
-                  <span className="bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded text-[9px]">
-                    Filtered from {students.length}
-                  </span>
-                )}
-              </h3>
-              
-              <div className="flex gap-3 flex-wrap">
-                <input 
-                  value={filters.search}
-                  onChange={(e) => setFilters({...filters, search: e.target.value})}
-                  placeholder="🔍 Search name..." 
-                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs w-48 focus:border-emerald-500 outline-none transition-colors"
-                />
-                
-                <select 
-                  value={filters.archetype}
-                  onChange={(e) => setFilters({...filters, archetype: e.target.value})}
-                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:border-emerald-500 outline-none"
-                >
-                  <option value="ALL">All Archetypes</option>
-                  <option value="Zombie">🧟‍♂️ Zombies</option>
-                  <option value="Grinder">👷 Grinders</option>
-                  <option value="Guesser">🏎️ Guessers</option>
-                  <option value="Flow Master">🎯 Flow Masters</option>
-                </select>
-                
-                <select 
-                  value={filters.riskStatus}
-                  onChange={(e) => setFilters({...filters, riskStatus: e.target.value})}
-                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:border-emerald-500 outline-none"
-                >
-                  <option value="ALL">All Risk Levels</option>
-                  <option value="Critical">🔴 Critical</option>
-                  <option value="Attention">🟡 Attention</option>
-                  <option value="On Track">🟢 On Track</option>
-                  <option value="Dormant">⚫ Dormant</option>
-                </select>
-                
-                <button
-                  onClick={() => setFilters({...filters, hasNemesis: !filters.hasNemesis})}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    filters.hasNemesis 
-                      ? 'bg-red-500 text-white' 
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                  }`}
-                >
-                  👹 Nemesis Only
-                </button>
-                
-                {(filters.search || filters.archetype !== 'ALL' || filters.riskStatus !== 'ALL' || filters.hasNemesis) && (
-                  <button
-                    onClick={() => setFilters({
-                      search: '',
-                      course: 'ALL',
-                      archetype: 'ALL',
-                      riskStatus: 'ALL',
-                      hasNemesis: false
-                    })}
-                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300 hover:bg-slate-600"
-                  >
-                    ✕ Clear
-                  </button>
-                )}
-              </div>
-            </div>
-            
-            <div className="overflow-x-auto max-h-[600px]">
-              <table className="w-full text-left text-[10px]">
-                <thead className="sticky top-0 bg-slate-900 z-10 text-slate-500 font-bold border-b border-slate-800 uppercase tracking-tighter">
-                  <tr>
-                    <th className="p-3">Student</th>
-                    <th className="p-3">Course</th>
-                    <th className="p-3 text-center">XP/min</th>
-                    <th className="p-3 text-center">Velocity</th>
-                    <th className="p-3 text-center">Gap</th>
-                    <th className="p-3 text-center">Acc</th>
-                    <th className="p-3 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/40">
-                  {filtered.map((s) => {
-                    const displayName = `${s.firstName} ${s.lastName}`;
-                    const m = s.metrics || {};
-                    const isDormant = m.riskStatus === 'Dormant';
-                    
-                    return (
-                      <tr 
-                        key={s.id} 
-                        onClick={() => setSelectedStudent(s)}
-                        className={`hover:bg-slate-800/50 transition-colors group cursor-pointer ${isDormant ? 'opacity-50 grayscale' : ''}`}
-                      >
-                        <td className="p-3">
-                          <div className={`font-bold text-[11px] ${isDormant ? 'text-slate-500' : 'text-white'} group-hover:text-emerald-400 transition-colors`}>
-                            {displayName}
-                          </div>
-                        </td>
-
-                        <td className="p-3 text-slate-400">
-                           <div className="font-bold truncate w-28">{s.currentCourse?.name || 'No Course'}</div>
-                        </td>
-
-                        <td className="p-3 text-center font-mono text-slate-500">
-                           {m.efficiencyRatio || '-'}
-                        </td>
-                        
-                        <td className="p-3 text-center">
-                           {isDormant ? (
-                             <span className="text-slate-700 font-bold">-</span>
-                           ) : (
-                             <div className="w-16 bg-slate-800 h-1.5 rounded-full overflow-hidden mx-auto">
-                               <div className={`h-full ${m.velocityScore >= 50 ? 'bg-emerald-500' : 'bg-red-500'}`} style={{ width: `${m.velocityScore}%` }}></div>
-                             </div>
-                           )}
-                        </td>
-
-                        <td className="p-3 text-center">
-                           {!isDormant && m.contentGap > 5 ? (
-                             <span className="bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded font-bold">HIGH</span>
-                           ) : (
-                             <span className="text-slate-700">-</span>
-                           )}
-                        </td>
-
-                        <td className={`p-3 text-center font-bold ${m.accuracyRate === null ? 'text-slate-700' : (m.accuracyRate < 60 ? 'text-red-400' : 'text-emerald-400')}`}>
-                            {m.accuracyRate === null ? '-' : `${m.accuracyRate}%`}
-                        </td>
-                        
-                        <td className="p-3 text-center">
-                          <span className={`px-2 py-0.5 rounded font-black text-[9px] uppercase 
-                            ${m.riskStatus === 'Critical' ? 'bg-red-900/40 text-red-500' : 
-                              m.riskStatus === 'Attention' ? 'bg-amber-900/40 text-amber-500' :
-                              m.riskStatus === 'Dormant' ? 'bg-slate-800 text-slate-500' : 'text-emerald-500'}`}>
-                            {m.riskStatus || 'OK'}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          
-          <div className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl backdrop-blur-md">
-            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Risk Composition ({filters.course === 'ALL' ? 'ALL' : 'Filtered'})</h3>
-            <div className="h-32 w-full relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={riskData} cx="50%" cy="50%" innerRadius={30} outerRadius={50} paddingAngle={2} dataKey="value">
-                    {riskData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />)}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none flex-col">
-                <span className="text-xl font-black text-white">{filtered.length}</span>
-                <span className="text-[8px] text-slate-500 uppercase">Students</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-slate-900/50 border border-indigo-500/30 p-5 rounded-2xl backdrop-blur-md relative overflow-hidden">
-            <div className="absolute top-0 right-0 bg-indigo-500/20 px-2 py-1 text-[8px] font-bold text-indigo-300 rounded-bl-lg">TIER 4 ACTIVE</div>
-            <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">Behavioral Archetypes</h3>
-
-            <div className="space-y-4">
-              
-              {filtered.filter(s => s.metrics?.archetype === 'Grinder').length > 0 && (
-                <div className="border-l-2 border-amber-500 pl-3">
-                   <div className="text-[9px] font-bold text-amber-500 uppercase flex justify-between">
-                      <span>👷 The Grinders</span>
-                      <span>{filtered.filter(s => s.metrics?.archetype === 'Grinder').length}</span>
-                   </div>
-                   <div className="text-[8px] text-slate-500 mb-1">High Effort, Low Acc. Risk of burnout.</div>
-                   <div className="flex flex-wrap gap-1">
-                     {filtered.filter(s => s.metrics?.archetype === 'Grinder').slice(0, 4).map(s => (
-                       <span key={s.id} onClick={() => setSelectedStudent(s)} className="cursor-pointer px-1.5 py-0.5 bg-amber-500/10 text-amber-200 text-[8px] rounded border border-amber-500/20 hover:bg-amber-500/20">
-                         {s.firstName} {s.lastName}
+        {/* COLUMNA 1: RED ZONE (ACCIÓN INMEDIATA) */}
+        <div className="flex flex-col bg-red-950/5 border border-red-900/20 rounded-2xl overflow-hidden">
+           <div className="p-4 bg-red-950/20 border-b border-red-900/20 flex justify-between items-center">
+              <h2 className="text-xs font-black text-red-500 uppercase tracking-widest flex items-center gap-2">
+                 🔴 Critical Ops
+              </h2>
+              <span className="bg-red-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">{redZone.length}</span>
+           </div>
+           <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {redZone.map(s => (
+                 <div key={s.id} onClick={() => setSelectedStudent(s)} className="bg-slate-900/80 p-3 rounded-xl border-l-4 border-red-500 cursor-pointer hover:bg-slate-800 transition-all group relative overflow-hidden">
+                    <div className="flex justify-between items-start mb-1">
+                       <h3 className="font-bold text-white text-sm group-hover:text-red-400">{s.firstName} {s.lastName}</h3>
+                       <span className="text-[10px] font-mono text-slate-500">{s.metrics?.velocityScore}% Vel</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                       <span className="text-[10px] uppercase font-bold text-red-400 bg-red-900/20 px-2 py-0.5 rounded">
+                         {s.dri.driSignal}
                        </span>
-                     ))}
-                   </div>
-                </div>
-              )}
-
-              <div className="border-l-2 border-red-500 pl-3">
-                   <div className="text-[9px] font-bold text-red-500 uppercase flex justify-between">
-                      <span>🧟‍♂️ The Zombies</span>
-                      <span>{filtered.filter(s => s.metrics?.archetype === 'Zombie').length}</span>
-                   </div>
-                   <div className="text-[8px] text-slate-500 mb-1">Low Focus. Distracted / Inefficient.</div>
-                   <div className="flex flex-wrap gap-1">
-                     {filtered.filter(s => s.metrics?.archetype === 'Zombie').slice(0, 5).map(s => (
-                       <span key={s.id} onClick={() => setSelectedStudent(s)} className="cursor-pointer px-1.5 py-0.5 bg-red-500/10 text-red-300 text-[8px] rounded border border-red-500/20 hover:bg-red-500/20">
-                         {s.firstName} ({s.metrics?.focusIntegrity}%)
-                       </span>
-                     ))}
-                   </div>
-              </div>
-
-              {filtered.filter(s => s.metrics?.archetype === 'Guesser').length > 0 && (
-                <div className="border-l-2 border-purple-500 pl-3">
-                   <div className="text-[9px] font-bold text-purple-400 uppercase flex justify-between">
-                      <span>🏎️ The Guessers</span>
-                      <span>{filtered.filter(s => s.metrics?.archetype === 'Guesser').length}</span>
-                   </div>
-                   <div className="text-[8px] text-slate-500 mb-1">Rushing through questions.</div>
-                   <div className="flex flex-wrap gap-1 mt-1">
-                     {filtered.filter(s => s.metrics?.archetype === 'Guesser').slice(0, 4).map(s => (
-                       <span key={s.id} onClick={() => setSelectedStudent(s)} className="cursor-pointer px-1.5 py-0.5 bg-purple-500/10 text-purple-300 text-[8px] rounded border border-purple-500/20 hover:bg-purple-500/20">
-                         {s.firstName}
-                       </span>
-                     ))}
-                   </div>
-                </div>
-              )}
-
-              <div className="pt-2 border-t border-slate-800">
-                 <div className="text-[9px] text-slate-400 mb-2">Top Active Blockers:</div>
-                 <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
-                   {filtered
-                      .filter(s => s.metrics?.nemesisTopic && s.metrics?.riskStatus !== 'Dormant')
-                      .slice(0, 3) 
-                      .map(s => (
-                     <div key={s.id} onClick={() => setSelectedStudent(s)} className="cursor-pointer text-[9px] bg-slate-800 p-2 rounded border-l-2 border-indigo-500 flex flex-col gap-1 hover:bg-slate-700 transition-colors">
-                       <div className="flex justify-between items-center">
-                          <span className="text-white font-bold truncate w-24">{s.firstName} {s.lastName}</span>
-                          <span className="text-red-400 font-mono text-[8px] bg-red-900/20 px-1 rounded">ACC: {Math.round(s.metrics?.accuracyRate || 0)}%</span>
-                       </div>
-                       <span className="text-indigo-300 truncate italic">"{s.metrics?.nemesisTopic}"</span>
-                     </div>
-                   ))}
+                       {s.metrics?.nemesisTopic && <span className="text-[10px] text-slate-500 italic truncate max-w-[100px]">"{s.metrics.nemesisTopic}"</span>}
+                    </div>
                  </div>
-              </div>
-
-            </div>
-          </div>
-
+              ))}
+              {redZone.length === 0 && <div className="text-center text-slate-600 text-xs py-10">No critical alerts.</div>}
+           </div>
         </div>
+
+        {/* COLUMNA 2: YELLOW ZONE (VIGILANCIA) */}
+        <div className="flex flex-col bg-amber-950/5 border border-amber-900/20 rounded-2xl overflow-hidden">
+           <div className="p-4 bg-amber-950/20 border-b border-amber-900/20 flex justify-between items-center">
+              <h2 className="text-xs font-black text-amber-500 uppercase tracking-widest flex items-center gap-2">
+                 ⚠️ Watch List
+              </h2>
+              <span className="bg-amber-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">{yellowZone.length}</span>
+           </div>
+           <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {yellowZone.map(s => (
+                 <div key={s.id} onClick={() => setSelectedStudent(s)} className="bg-slate-900/80 p-3 rounded-xl border-l-4 border-amber-500 cursor-pointer hover:bg-slate-800 transition-all group">
+                    <div className="flex justify-between items-start mb-1">
+                       <h3 className="font-bold text-slate-200 text-sm">{s.firstName} {s.lastName}</h3>
+                       <span className="text-[10px] font-mono text-amber-500/50">ROI: {s.dri.iROI}</span>
+                    </div>
+                    <div className="text-[10px] text-amber-400 font-mono">
+                       Signal: {s.dri.driSignal}
+                    </div>
+                    {s.dri.precisionDecay > 1.2 && (
+                       <div className="w-full bg-slate-800 h-1 mt-2 rounded-full overflow-hidden">
+                          <div className="bg-amber-500 h-full" style={{width: `${(s.dri.precisionDecay - 1) * 100}%`}}></div>
+                       </div>
+                    )}
+                 </div>
+              ))}
+           </div>
+        </div>
+
+        {/* COLUMNA 3: GREEN ZONE (FLOW) */}
+        <div className="flex flex-col bg-emerald-950/5 border border-emerald-900/20 rounded-2xl overflow-hidden">
+           <div className="p-4 bg-emerald-950/20 border-b border-emerald-900/20 flex justify-between items-center">
+              <h2 className="text-xs font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                 ⚡ Honors Track
+              </h2>
+              <span className="bg-emerald-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">{greenZone.length}</span>
+           </div>
+           <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {greenZone.map(s => (
+                 <div key={s.id} onClick={() => setSelectedStudent(s)} className="bg-slate-900/50 p-2 rounded-lg border border-slate-800 cursor-pointer hover:border-emerald-500/50 transition-all flex justify-between items-center opacity-70 hover:opacity-100">
+                    <div>
+                       <div className="font-bold text-slate-300 text-xs">{s.firstName} {s.lastName}</div>
+                       <div className="text-[9px] text-emerald-600 uppercase font-bold tracking-wider">Flowing</div>
+                    </div>
+                    <div className="text-right">
+                       <div className="text-[10px] font-mono text-emerald-400">{s.metrics?.velocityScore}%</div>
+                       <div className="text-[8px] text-slate-600">Vel</div>
+                    </div>
+                 </div>
+              ))}
+           </div>
+        </div>
+
       </div>
 
+      {/* MODAL LAYER */}
       {selectedStudent && (
         <StudentModal 
           student={selectedStudent} 
