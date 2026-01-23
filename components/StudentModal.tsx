@@ -17,20 +17,27 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
     return Array.from(new Set(topics)).slice(0, 3) as string[];
   }, [tasks]);
 
-  // Formateamos los puntos del gráfico e historial incluyendo fecha y tiempo
-  const chartData = useMemo(() => tasks.map((t: any, i: number) => {
-    const dateObj = new Date(t.completedLocal);
-    return {
-      i: i + 1, 
-      acc: Math.round((t.questionsCorrect / (t.questions || 1)) * 100),
-      topic: t.topic?.name || 'Session Task',
-      questions: t.questions || 0,
-      correct: t.questionsCorrect || 0,
-      // Extracción de Fecha y Tiempo (en minutos)
-      date: dateObj.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' }),
-      time: Math.round((t.timeTotal || 0) / 60)
-    };
-  }).reverse(), [tasks]); // Invertimos para mostrar lo más reciente primero en la tabla
+  // Formateamos y ordenamos cronológicamente (Más reciente primero para la tabla)
+  const sortedData = useMemo(() => {
+    return tasks.map((t: any, i: number) => {
+      const dateObj = new Date(t.completedLocal);
+      return {
+        id: t.id,
+        timestamp: dateObj.getTime(),
+        acc: Math.round((t.questionsCorrect / (t.questions || 1)) * 100),
+        topic: t.topic?.name || 'Session Task',
+        questions: t.questions || 0,
+        correct: t.questionsCorrect || 0,
+        date: dateObj.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' }),
+        time: Math.round((t.timeTotal || 0) / 60)
+      };
+    }).sort((a: any, b: any) => b.timestamp - a.timestamp); // Orden: Reciente -> Antiguo
+  }, [tasks]);
+
+  // Datos para el gráfico: Invertimos sortedData para que el tiempo corra de izquierda a derecha
+  const chartData = useMemo(() => 
+    [...sortedData].reverse().map((d, i) => ({ ...d, i: i + 1 })), 
+  [sortedData]);
 
   const lmpDisplay = isNaN(student.metrics.lmp) ? '0%' : `${(student.metrics.lmp * 100).toFixed(0)}%`;
 
@@ -42,13 +49,14 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
         {/* HEADER */}
         <div className="p-8 border-b border-slate-800 flex justify-between items-start bg-slate-900/30">
           <div className="flex gap-8 items-center">
-             <div className="w-20 h-20 rounded-full border-4 flex items-center justify-center text-2xl font-black italic border-emerald-500 text-emerald-500">
+             <div className={`w-20 h-20 rounded-full border-4 flex items-center justify-center text-2xl font-black italic ${student.dri.driTier === 'RED' ? 'border-red-500 text-red-500' : 'border-emerald-500 text-emerald-500'}`}>
                {student.metrics.velocityScore || 0}
              </div>
              <div>
                 <h2 className="text-4xl font-black text-white italic tracking-tighter uppercase">{student.firstName} {student.lastName}</h2>
                 <div className="flex gap-4 mt-2 font-black text-[10px] uppercase">
-                  <span className={`px-3 py-1 rounded-full border ${student.dri.driTier === 'RED' ? 'bg-red-500/10 text-red-500 border-red-500/50' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/50'}`}>
+                  {/* Solución Aplicada: driColor para evitar el verde en inactivos */}
+                  <span className={`px-3 py-1 rounded-full border border-current ${student.dri.driColor || (student.dri.driTier === 'RED' ? 'text-red-500 border-red-500/50' : 'text-emerald-500 border-emerald-500/50')}`}>
                     {student.dri.driSignal}
                   </span>
                   <span className="text-slate-500 self-center">{student.currentCourse?.name}</span>
@@ -85,10 +93,11 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
             <div className="bg-slate-900/20 rounded-[2.5rem] border border-slate-800 p-8">
                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-8 italic">Curva de Precisión</h3>
                <ResponsiveContainer width="100%" height={250}>
-                 <LineChart data={[...chartData].reverse()} margin={{ bottom: 10 }}>
+                 <LineChart data={chartData} margin={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                    <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
                    <XAxis dataKey="i" stroke="#475569" fontSize={10} />
-                   <YAxis domain={[0, 100]} stroke="#475569" fontSize={10} />
+                   {/* Dominio ajustado a 110 para que los puntos 100% no se corten */}
+                   <YAxis domain={[0, 110]} ticks={[0, 25, 50, 75, 100]} stroke="#475569" fontSize={10} />
                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '15px' }} />
                    <Line type="monotone" dataKey="acc" stroke="#6366f1" strokeWidth={5} dot={{ r: 4, fill: '#6366f1' }} activeDot={{ r: 8 }} />
                  </LineChart>
@@ -112,7 +121,7 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-800/50">
-                        {chartData.map((task: any, idx: number) => (
+                        {sortedData.map((task: any, idx: number) => (
                            <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
                               <td className="p-4 text-[10px] font-mono text-slate-500">{task.date}</td>
                               <td className="p-4 text-[11px] font-bold text-slate-300 uppercase italic truncate max-w-[250px]">{task.topic}</td>
