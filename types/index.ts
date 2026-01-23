@@ -44,12 +44,12 @@ export interface Metrics {
   accuracyRate: number | null;
   focusIntegrity: number;
   nemesisTopic: string;
-  // --- Psicomotricidad V3.5 ---
+  // --- Psicomotricidad V3.8 (Hallazgos del Reporte) ---
   lmp: number; // Probabilidad de Maestría Latente [cite: 41]
   ksi: number; // Índice de Estabilidad (Incertidumbre NIG) [cite: 30, 35]
-  stallStatus: 'Optimal' | 'Productive Struggle' | 'Frustrated Stall'; // [cite: 83]
+  stallStatus: 'Optimal' | 'Productive Struggle' | 'Frustrated Stall'; // [cite: 83, 102]
   idleRatio: number; // [cite: 93]
-  // --- Campos de Compatibilidad ---
+  // --- Campos de Compatibilidad (Evitan Errores de Vercel) ---
   consistencyIndex: number;
   stuckScore: number;
   dropoutProbability: number;
