@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { 
-  ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell 
+  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell 
 } from 'recharts';
 import StudentModal from '@/components/StudentModal';
 import { calculateTier1Metrics } from '@/lib/metrics';
@@ -22,10 +22,7 @@ const CustomTooltip = ({ active, payload }: any) => {
         <p className="text-indigo-400 font-bold mb-1 uppercase text-[9px]">{data.currentCourse?.name}</p>
         <p className="text-emerald-400">Mastery (LMP): {(data.metrics?.lmp * 100).toFixed(0)}%</p>
         <p className="text-blue-400">Stability (KSI): {data.metrics?.ksi}%</p>
-        <p className={`mt-1 font-mono uppercase font-bold ${
-            data.dri.driTier === 'RED' ? 'text-red-500' : 
-            data.dri.driTier === 'YELLOW' ? 'text-amber-500' : 'text-emerald-500'
-        }`}>
+        <p className={`mt-1 font-mono uppercase font-bold ${data.dri.driColor}`}>
             {data.dri.driSignal}
         </p>
       </div>
@@ -43,7 +40,6 @@ export default function HomePage() {
   const [progress, setProgress] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   
-  // Estados de Navegación y Filtro
   const [viewMode, setViewMode] = useState<'TRIAGE' | 'MATRIX' | 'HEATMAP' | 'LOG'>('TRIAGE');
   const [search, setSearch] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('ALL');
@@ -104,11 +100,11 @@ export default function HomePage() {
     return nameMatch && courseMatch;
   }), [students, search, selectedCourse]);
 
-  const redZone = filtered.filter(s => s.dri.driTier === 'RED' || (s.metrics.velocityScore || 0) < 30);
-  const yellowZone = filtered.filter(s => (s.dri.driTier === 'YELLOW' || (s.metrics.ksi || 0) < 70) && !redZone.some(r => r.id === s.id));
-  const greenZone = filtered.filter(s => !redZone.some(r => r.id === s.id) && !yellowZone.some(y => y.id === s.id));
+  const redZone = useMemo(() => filtered.filter(s => s.dri.driTier === 'RED'), [filtered]);
+  const yellowZone = useMemo(() => filtered.filter(s => s.dri.driTier === 'YELLOW' && !redZone.some(r => r.id === s.id)), [filtered, redZone]);
+  const greenZone = useMemo(() => filtered.filter(s => !redZone.some(r => r.id === s.id) && !yellowZone.some(y => y.id === s.id)), [filtered, redZone, yellowZone]);
 
-  if (loading) return <div className="p-10 bg-black min-h-screen text-emerald-500 font-mono italic animate-pulse text-center">DRI COMMAND CENTER INITIALIZING...</div>;
+  if (loading) return <div className="p-10 bg-black min-h-screen text-emerald-500 font-mono italic animate-pulse text-center uppercase tracking-widest">DRI Cockpit Initializing...</div>;
 
   return (
     <div className="p-4 bg-[#050505] min-h-screen text-slate-300 font-sans">
@@ -117,7 +113,7 @@ export default function HomePage() {
       <div className="flex flex-col md:flex-row justify-between items-end mb-8 border-b border-slate-800 pb-6 gap-4">
         <div>
           <h1 className="text-3xl font-black uppercase italic text-white tracking-tighter">DRI COMMAND CENTER</h1>
-          <p className="text-[10px] text-indigo-400 font-bold tracking-[0.3em] uppercase">V4.3 All-In-One Unified</p>
+          <p className="text-[10px] text-indigo-400 font-bold tracking-[0.3em] uppercase">Population Management: {students.length} / 1613</p>
         </div>
         
         <div className="flex flex-col items-end gap-3">
@@ -127,10 +123,10 @@ export default function HomePage() {
             ))}
           </div>
           
-          <div className="flex gap-4 items-center bg-slate-900/40 p-2 px-4 rounded-xl border border-slate-800 relative overflow-hidden group">
+          <div className="flex gap-4 items-center bg-slate-900/40 p-2 px-4 rounded-xl border border-slate-800 relative overflow-hidden">
             {autoSync && <div className="absolute bottom-0 left-0 h-0.5 bg-emerald-500 transition-all duration-700 shadow-[0_0_10px_#10b981]" style={{ width: `${progress}%` }} />}
             <span className="text-[10px] font-mono font-bold text-white">{students.length} / 1613</span>
-            <button onClick={() => setAutoSync(!autoSync)} className={`px-4 py-1.5 rounded-lg font-black text-[9px] tracking-widest uppercase transition-all ${autoSync ? 'bg-red-900/50 text-red-500 border border-red-500 animate-pulse' : 'bg-emerald-600 text-white hover:bg-emerald-500'}`}>
+            <button onClick={() => setAutoSync(!autoSync)} className={`px-4 py-1.5 rounded-lg font-black text-[9px] tracking-widest uppercase transition-all ${autoSync ? 'bg-red-900/50 text-red-500 border border-red-500 animate-pulse' : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg'}`}>
               {autoSync ? `STOP SYNC ${progress}%` : '⚡ AUTO SYNC'}
             </button>
           </div>
@@ -139,25 +135,25 @@ export default function HomePage() {
 
       {/* FILTROS */}
       <div className="flex flex-wrap gap-4 mb-8">
-        <input onChange={(e) => setSearch(e.target.value)} placeholder="🔎 SEARCH UNIT..." className="flex-1 min-w-[300px] bg-slate-900/40 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-indigo-500 outline-none font-mono" />
+        <input onChange={(e) => setSearch(e.target.value)} placeholder="🔎 SEARCH UNIT BY NAME OR ID..." className="flex-1 min-w-[300px] bg-slate-900/40 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-indigo-500 outline-none font-mono transition-all" />
         <select value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-[10px] font-black uppercase text-slate-400 outline-none">
           <option value="ALL">ALL COURSES</option>
           {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
-      {/* ÁREA DE CONTENIDO DINÁMICO */}
+      {/* CONTENIDO DINÁMICO */}
       <div className="h-[calc(100vh-280px)] overflow-hidden">
         {viewMode === 'TRIAGE' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full animate-in fade-in duration-500">
             {[
-                { label: '🚨 Critical Ops', data: redZone, tier: 'RED', color: 'text-red-500', border: 'border-red-500' },
-                { label: '⚠️ Watch List', data: yellowZone, tier: 'YELLOW', color: 'text-amber-500', border: 'border-amber-500' },
-                { label: '⚡ Stable Units', data: greenZone, tier: 'GREEN', color: 'text-emerald-500', border: 'border-emerald-500' }
+                { label: '🚨 Critical Ops', data: redZone, tier: 'RED', border: 'border-red-500' },
+                { label: '⚠️ Watch List', data: yellowZone, tier: 'YELLOW', border: 'border-amber-500' },
+                { label: '⚡ Stable Units', data: greenZone, tier: 'GREEN', border: 'border-emerald-500' }
             ].map(col => (
               <div key={col.tier} className="flex flex-col bg-slate-900/20 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-                <div className={`p-4 bg-slate-900/40 border-b border-slate-800 font-black text-[10px] uppercase tracking-widest flex justify-between ${col.color}`}>
-                  <span>{col.label}</span>
+                <div className={`p-4 bg-slate-900/40 border-b border-slate-800 font-black text-[10px] uppercase tracking-widest flex justify-between`}>
+                  <span className="text-slate-300">{col.label}</span>
                   <span className="bg-slate-800 text-slate-500 px-2 py-0.5 rounded font-mono">{col.data.length} UNITS</span>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
@@ -169,7 +165,7 @@ export default function HomePage() {
                       </div>
                       <p className="text-[9px] text-indigo-400/70 font-bold uppercase mb-3 truncate italic">{s.currentCourse.name}</p>
                       <div className="flex justify-between items-center text-[8px] font-black uppercase font-mono">
-                        <span className={col.color}>{s.dri.driSignal}</span>
+                        <span className={s.dri.driColor}>{s.dri.driSignal}</span>
                         <span className="text-slate-600">KSI: {s.metrics.ksi}%</span>
                       </div>
                     </div>
