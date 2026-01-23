@@ -9,9 +9,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. Verificar integridad de la lista de IDs
+    // 1. Verificación de Integridad de IDs
     if (!studentIds || !Array.isArray(studentIds)) {
-      throw new Error("ID List (student_ids.json) is missing or invalid.");
+      throw new Error("El archivo student_ids.json no es un array válido");
     }
 
     const stateRef = doc(db, 'system', 'scheduler_state');
@@ -20,40 +20,67 @@ export async function GET(request: Request) {
 
     if (startIndex >= studentIds.length) startIndex = 0;
 
+    // Procesamos lotes de 50 para seguridad (100 escrituras totales)
     const endIndex = Math.min(startIndex + 50, studentIds.length);
     const currentBatchIds = studentIds.slice(startIndex, endIndex);
 
-    // 2. Procesamiento de Lote
+    console.log(`⚡ SYNC BATCH: Processing indices ${startIndex} to ${endIndex}...`);
+
+    // 2. Procesamiento Paralelo con Protección de Errores
     const updates = await Promise.all(
       currentBatchIds.map(async (id) => {
         try {
           const rawData = await getStudentData(id.toString());
+          
+          // Validación crítica: Si no hay datos o actividad, saltamos para no romper el lote
           if (!rawData) return null;
-          const metrics = calculateTier1Metrics(rawData, rawData.activity);
-          return { id: id.toString(), data: { ...rawData, metrics, lastUpdated: new Date().toISOString() } };
-        } catch (e) { 
-          console.error(`Error fetching ID ${id}:`, e);
-          return null; 
+
+          // Aseguramos que activity tenga estructura válida
+          const activityData = rawData.activity || { tasks: [], totals: {} };
+
+          // Cálculo de métricas científicas (LMP, KSI, DER)
+          const metrics = calculateTier1Metrics(rawData, activityData);
+          
+          return { 
+            id: id.toString(), 
+            data: { 
+              ...rawData, // IMPORTANTE: Esto incluye 'activity' y 'tasks'
+              activity: activityData, // Refuerzo explícito
+              metrics, 
+              lastUpdated: new Date().toISOString() 
+            } 
+          };
+        } catch (e) {
+          console.error(`Skipping student ${id} due to fetch error:`, e);
+          return null;
         }
       })
     );
 
-    // 3. Escritura en Batch (Protección de Cuota)
+    // 3. Escritura en Lote (Batch)
     const batch = writeBatch(db);
     let updateCount = 0;
     const todayStr = new Date().toISOString().split('T')[0];
 
     updates.forEach((item) => {
       if (item) {
-        const ref = doc(db, 'students', item.id);
-        batch.set(ref, item.data, { merge: true });
+        // A. Perfil Principal (Para el Dashboard en tiempo real)
+        const studentRef = doc(db, 'students', item.id);
+        batch.set(studentRef, item.data, { merge: true });
         
-        // Historial diario para PDI y DER
+        // B. Historial Diario (Para tendencias y análisis PDI)
         const historyRef = doc(db, 'students', item.id, 'history', todayStr);
         batch.set(historyRef, {
             date: todayStr,
-            metrics: item.data.metrics,
-            courseName: item.data.currentCourse?.name
+            timestamp: new Date().toISOString(),
+            metrics: {
+              ksi: item.data.metrics.ksi,
+              lmp: item.data.metrics.lmp,
+              accuracyRate: item.data.metrics.accuracyRate,
+              velocityScore: item.data.metrics.velocityScore,
+              stallStatus: item.data.metrics.stallStatus
+            },
+            courseName: item.data.currentCourse?.name || 'Unknown'
         }, { merge: true });
 
         updateCount++;
@@ -62,20 +89,25 @@ export async function GET(request: Request) {
 
     await batch.commit();
     
-    // 4. Actualización del puntero del sistema
-    await setDoc(stateRef, { lastIndex: endIndex, total: studentIds.length }, { merge: true });
+    // 4. Actualización del puntero
+    await setDoc(stateRef, { 
+      lastIndex: endIndex, 
+      total: studentIds.length,
+      lastSync: new Date().toISOString()
+    }, { merge: true });
 
     return NextResponse.json({ 
       success: true, 
       progress: Math.round((endIndex / studentIds.length) * 100),
-      updated: updateCount
+      count: updateCount,
+      nextIndex: endIndex
     });
 
   } catch (error: any) {
     console.error("CRITICAL SYNC ERROR:", error.message);
     return NextResponse.json({ 
       success: false, 
-      error: error.message 
+      error: error.message || "Internal Server Error" 
     }, { status: 500 });
   }
 }
