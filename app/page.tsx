@@ -38,15 +38,17 @@ export default function HomePage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const [autoSync, setAutoSync] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   
-  // Estados de Navegación y Filtro
   const [viewMode, setViewMode] = useState<'TRIAGE' | 'MATRIX' | 'HEATMAP' | 'LOG'>('TRIAGE');
   const [search, setSearch] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('ALL');
 
+  // --- ESCUCHA DE DATOS ---
   useEffect(() => {
-    // Escucha de Estudiantes con cálculo unificado
     const unsubStudents = onSnapshot(query(collection(db, 'students')), (snapshot) => {
       const data = snapshot.docs.map(doc => {
         const s = { id: doc.id, ...doc.data() } as any;
@@ -58,7 +60,6 @@ export default function HomePage() {
       setLoading(false);
     });
 
-    // Escucha de Intervenciones
     const unsubLogs = onSnapshot(query(collection(db, 'interventions'), orderBy('createdAt', 'desc'), limit(20)), (snapshot) => {
       setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -66,7 +67,33 @@ export default function HomePage() {
     return () => { unsubStudents(); unsubLogs(); };
   }, []);
 
-  // Datos para Heatmap de Brechas
+  // --- MOTOR DE SINCRONIZACIÓN ---
+  const runUpdateBatch = async () => {
+    if (updating) return;
+    setUpdating(true);
+    try {
+      const res = await fetch('/api/update-students');
+      const data = await res.json();
+      if (data.success) {
+        setProgress(data.progress);
+        if (autoSync && data.progress < 100) {
+          setTimeout(runUpdateBatch, 1200);
+        } else if (data.progress >= 100) {
+          setAutoSync(false);
+          setProgress(0);
+        }
+      }
+    } catch (err) {
+      setAutoSync(false);
+    }
+    setUpdating(false);
+  };
+
+  useEffect(() => {
+    if (autoSync) runUpdateBatch();
+  }, [autoSync]);
+
+  // --- LÓGICA DE DATOS ---
   const uniqueCourses = useMemo(() => Array.from(new Set(students.map(s => s.currentCourse?.name).filter(Boolean))).sort(), [students]);
   const criticalTopics = Object.keys(TOPIC_GRADE_MAP);
 
@@ -81,7 +108,6 @@ export default function HomePage() {
     });
   }, [students, uniqueCourses, criticalTopics]);
 
-  // Filtrado y Triaje
   const filtered = useMemo(() => students.filter(s => {
     const nameMatch = `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase());
     const courseMatch = selectedCourse === 'ALL' || s.currentCourse?.name === selectedCourse;
@@ -92,7 +118,7 @@ export default function HomePage() {
   const yellowZone = filtered.filter(s => s.dri.driTier === 'YELLOW');
   const greenZone = filtered.filter(s => s.dri.driTier === 'GREEN' && (s.metrics?.accuracyRate || 0) > 0);
 
-  if (loading) return <div className="p-10 bg-black min-h-screen text-emerald-500 font-mono italic animate-pulse">DRI COMMAND CENTER INITIALIZING...</div>;
+  if (loading) return <div className="p-10 bg-black min-h-screen text-emerald-500 font-mono italic animate-pulse text-center uppercase tracking-widest">DRI Command Cockpit Initializing...</div>;
 
   return (
     <div className="p-4 bg-[#050505] min-h-screen text-slate-300 font-sans">
@@ -101,41 +127,40 @@ export default function HomePage() {
       <div className="flex flex-col md:flex-row justify-between items-end mb-8 border-b border-slate-800 pb-6 gap-4">
         <div>
           <h1 className="text-3xl font-black uppercase tracking-tighter text-white italic">DRI COMMAND CENTER</h1>
-          <p className="text-[10px] text-indigo-400 font-bold tracking-[0.3em] uppercase">Intelligence Mode: KeenKT + DRI Triage</p>
+          <p className="text-[10px] text-indigo-400 font-bold tracking-[0.3em] uppercase">V4.1 Tactical Unification</p>
         </div>
         
-        <div className="flex bg-slate-900/50 p-1 rounded-xl border border-slate-800 font-black text-[10px] uppercase">
-          {['TRIAGE', 'MATRIX', 'HEATMAP', 'LOG'].map(m => (
+        <div className="flex flex-col items-end gap-3">
+          <div className="flex bg-slate-900/50 p-1 rounded-xl border border-slate-800 font-black text-[10px] uppercase">
+            {['TRIAGE', 'MATRIX', 'HEATMAP', 'LOG'].map(m => (
+              <button key={m} onClick={() => setViewMode(m as any)} className={`px-4 py-2 rounded-lg transition-all ${viewMode === m ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>{m}</button>
+            ))}
+          </div>
+          
+          <div className="flex gap-4 items-center bg-slate-900/40 p-2 px-4 rounded-xl border border-slate-800 relative overflow-hidden group">
+            {autoSync && <div className="absolute bottom-0 left-0 h-0.5 bg-emerald-500 transition-all duration-700" style={{ width: `${progress}%` }} />}
+            <span className="text-[10px] font-mono font-bold text-white">{students.length} / 1613</span>
             <button 
-              key={m} 
-              onClick={() => setViewMode(m as any)} 
-              className={`px-4 py-2 rounded-lg transition-all ${viewMode === m ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+              onClick={() => setAutoSync(!autoSync)}
+              className={`px-4 py-1.5 rounded-lg font-black text-[9px] tracking-widest uppercase transition-all ${autoSync ? 'bg-red-900/50 text-red-500 border border-red-500 animate-pulse' : 'bg-emerald-600 text-white hover:bg-emerald-500'}`}
             >
-              {m}
+              {autoSync ? `STOP SYNC ${progress}%` : '⚡ AUTO SYNC'}
             </button>
-          ))}
+          </div>
         </div>
       </div>
 
-      {/* CONTROLES DE FILTRADO */}
+      {/* FILTROS */}
       <div className="flex flex-wrap gap-4 mb-8">
-        <input 
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="🔎 SEARCH UNIT BY NAME..." 
-          className="flex-1 min-w-[300px] bg-slate-900/40 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-indigo-500 outline-none font-mono"
-        />
-        <select 
-          value={selectedCourse} 
-          onChange={(e) => setSelectedCourse(e.target.value)}
-          className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-[10px] font-black uppercase text-slate-400"
-        >
+        <input onChange={(e) => setSearch(e.target.value)} placeholder="🔎 SEARCH UNIT BY NAME..." className="flex-1 min-w-[300px] bg-slate-900/40 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-indigo-500 outline-none font-mono" />
+        <select value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-[10px] font-black uppercase text-slate-400 outline-none">
           <option value="ALL">ALL COURSES</option>
           {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
+      {/* ÁREA DE CONTENIDO */}
       <div className="h-[calc(100vh-280px)] overflow-hidden">
-        {/* VISTA 1: COLUMNAS DE TRIAJE */}
         {viewMode === 'TRIAGE' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
             {[
@@ -155,7 +180,7 @@ export default function HomePage() {
                         <h3 className="font-black text-white text-sm uppercase italic truncate w-40">{s.firstName} {s.lastName}</h3>
                         <span className="text-[10px] font-mono font-bold text-slate-500">{(s.metrics.lmp * 100).toFixed(0)}% LMP</span>
                       </div>
-                      <p className="text-[9px] text-indigo-400 font-bold uppercase mb-3">{s.currentCourse?.name}</p>
+                      <p className="text-[9px] text-indigo-400 font-bold uppercase mb-3 truncate italic">{s.currentCourse?.name}</p>
                       <div className="flex justify-between items-center text-[10px] font-mono font-black uppercase text-[8px]">
                         <span className={col.color}>{s.dri.driSignal}</span>
                         <span className="text-slate-600">KSI: {s.metrics.ksi}%</span>
@@ -168,18 +193,13 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* VISTA 2: MATRIZ KEENKT */}
         {viewMode === 'MATRIX' && (
           <div className="h-full w-full bg-slate-900/10 border border-slate-800 rounded-[2.5rem] p-8 relative overflow-hidden">
-            <div className="absolute top-12 right-12 text-emerald-500/5 font-black text-7xl select-none uppercase italic tracking-tighter">Flow Masters</div>
-            <div className="absolute bottom-12 left-12 text-red-500/5 font-black text-7xl select-none uppercase italic tracking-tighter">Stability Leak</div>
-            
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                 <XAxis type="number" dataKey="metrics.lmp" name="Mastery" domain={[0, 1]} stroke="#475569" fontSize={10} />
                 <YAxis type="number" dataKey="metrics.ksi" name="Stability" domain={[0, 100]} stroke="#475569" fontSize={10} />
-                <ZAxis type="number" range={[100, 600]} />
                 <Tooltip content={<CustomTooltip />} />
                 <ReferenceLine x={0.7} stroke="#10b981" strokeDasharray="5 5" opacity={0.3} />
                 <ReferenceLine y={60} stroke="#ef4444" strokeDasharray="5 5" opacity={0.3} />
@@ -193,7 +213,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* VISTA 3: HEATMAP */}
         {viewMode === 'HEATMAP' && (
            <div className="h-full w-full bg-slate-950 border border-slate-800 rounded-[2.5rem] p-8 overflow-hidden flex flex-col shadow-2xl">
               <div className="flex-1 overflow-auto custom-scrollbar">
@@ -212,8 +231,7 @@ export default function HomePage() {
                              <td className="sticky left-0 z-10 bg-slate-950 p-2 text-[9px] font-bold text-slate-400 border-r border-slate-800 uppercase">{row.topic}</td>
                              {row.courseStats.map((cell, idx) => (
                                 <td key={idx} className="p-1 border border-slate-900">
-                                   <div 
-                                      className="h-8 rounded-md flex items-center justify-center text-[10px] font-mono font-black transition-all"
+                                   <div className="h-8 rounded-md flex items-center justify-center text-[10px] font-mono font-black transition-all"
                                       style={{ 
                                          backgroundColor: cell.avgLMP < 0.4 ? 'rgba(239, 68, 68, 0.2)' : cell.avgLMP < 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.1)',
                                          color: cell.avgLMP < 0.4 ? '#ef4444' : cell.avgLMP < 0.7 ? '#f59e0b' : '#10b981',
@@ -232,14 +250,13 @@ export default function HomePage() {
            </div>
         )}
 
-        {/* VISTA 4: LOGS */}
         {viewMode === 'LOG' && (
            <div className="h-full bg-slate-950 border border-slate-800 rounded-[2.5rem] p-8 overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  {logs.map(log => (
                     <div key={log.id} className="flex items-center justify-between p-5 bg-slate-900/30 rounded-2xl border border-slate-800/50">
                        <div className="flex items-center gap-5">
-                          <div className={`w-3 h-3 rounded-full ${log.type === 'coaching' ? 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'bg-red-500'}`} />
+                          <div className={`w-3 h-3 rounded-full ${log.type === 'coaching' ? 'bg-indigo-500' : 'bg-red-500'}`} />
                           <div>
                              <p className="text-sm font-black text-white uppercase italic">{log.studentName}</p>
                              <p className="text-[10px] text-slate-500 font-mono">{log.type} • {log.targetTopic || 'General'}</p>
