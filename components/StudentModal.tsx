@@ -17,14 +17,20 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
     return Array.from(new Set(topics)).slice(0, 3) as string[];
   }, [tasks]);
 
-  // Formateamos los puntos del gráfico e historial
-  const chartData = useMemo(() => tasks.map((t: any, i: number) => ({
-    i: i + 1, 
-    acc: Math.round((t.questionsCorrect / (t.questions || 1)) * 100),
-    topic: t.topic?.name || 'Session Task',
-    questions: t.questions || 0,
-    correct: t.questionsCorrect || 0
-  })).reverse(), [tasks]); // Invertimos para mostrar lo más reciente primero en la tabla
+  // Formateamos los puntos del gráfico e historial incluyendo fecha y tiempo
+  const chartData = useMemo(() => tasks.map((t: any, i: number) => {
+    const dateObj = new Date(t.completedLocal);
+    return {
+      i: i + 1, 
+      acc: Math.round((t.questionsCorrect / (t.questions || 1)) * 100),
+      topic: t.topic?.name || 'Session Task',
+      questions: t.questions || 0,
+      correct: t.questionsCorrect || 0,
+      // Extracción de Fecha y Tiempo (en minutos)
+      date: dateObj.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' }),
+      time: Math.round((t.timeTotal || 0) / 60)
+    };
+  }).reverse(), [tasks]); // Invertimos para mostrar lo más reciente primero en la tabla
 
   const lmpDisplay = isNaN(student.metrics.lmp) ? '0%' : `${(student.metrics.lmp * 100).toFixed(0)}%`;
 
@@ -89,7 +95,7 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                </ResponsiveContainer>
             </div>
 
-            {/* TABLA DE SESIONES RECIENTES (Corregido tipado en el map) */}
+            {/* TABLA DE SESIONES RECIENTES */}
             <div className="bg-slate-900/10 rounded-3xl border border-slate-800 overflow-hidden">
                <div className="p-4 bg-slate-900/40 border-b border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500">
                   Historial de Sesiones (Recientes Primero)
@@ -98,15 +104,18 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                   <table className="w-full text-left border-collapse">
                      <thead className="sticky top-0 bg-[#080808] z-10">
                         <tr className="text-[9px] font-black text-slate-600 uppercase border-b border-slate-800">
+                           <th className="p-4">Fecha</th>
                            <th className="p-4">Tópico / Concepto</th>
                            <th className="p-4 text-center">Precisión</th>
-                           <th className="p-4 text-center">Resueltas</th>
+                           <th className="p-4 text-center">Ítems</th>
+                           <th className="p-4 text-center">Tiempo</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-800/50">
                         {chartData.map((task: any, idx: number) => (
                            <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
-                              <td className="p-4 text-[11px] font-bold text-slate-300 uppercase italic truncate max-w-[300px]">{task.topic}</td>
+                              <td className="p-4 text-[10px] font-mono text-slate-500">{task.date}</td>
+                              <td className="p-4 text-[11px] font-bold text-slate-300 uppercase italic truncate max-w-[250px]">{task.topic}</td>
                               <td className="p-4 text-center">
                                  <span className={`text-[10px] font-mono font-black ${task.acc >= 80 ? 'text-emerald-500' : task.acc >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
                                     {task.acc}%
@@ -114,6 +123,9 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                               </td>
                               <td className="p-4 text-center text-[10px] font-mono text-slate-500">
                                  {task.correct} / {task.questions}
+                              </td>
+                              <td className="p-4 text-center text-[10px] font-mono text-indigo-400">
+                                 {task.time} min
                               </td>
                            </tr>
                         ))}
