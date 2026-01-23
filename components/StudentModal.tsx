@@ -6,10 +6,11 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export default function StudentModal({ student, onClose }: { student: any; onClose: () => void }) {
   const [loading, setLoading] = useState(false);
 
+  // Definición de tipos para evitar errores de build en Vercel
   const chartData = useMemo(() => student.activity.tasks.map((t: any, i: number) => ({
     i: i + 1, 
-    acc: Math.round((t.questionsCorrect / t.questions) * 100),
-    topic: t.topic?.name
+    acc: Math.round((t.questionsCorrect / (t.questions || 1)) * 100),
+    topic: t.topic?.name || 'Unknown Topic'
   })), [student]);
 
   const logIntervention = async (type: string) => {
@@ -35,7 +36,6 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
       <div className="absolute inset-0" onClick={onClose} />
       <div className="bg-[#080808] border border-slate-800 w-full max-w-6xl h-[90vh] rounded-[2.5rem] relative z-10 flex flex-col shadow-2xl overflow-hidden">
         
-        {/* HEADER: SIGNOS VITALES PSICOMÉTRICOS */}
         <div className="p-8 border-b border-slate-800 flex justify-between items-start bg-slate-900/30">
           <div className="flex gap-8 items-center">
              <div className="relative">
@@ -58,8 +58,6 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
         </div>
 
         <div className="flex-1 p-8 grid grid-cols-12 gap-10 overflow-y-auto custom-scrollbar">
-          
-          {/* COL IZQUIERDA: DIAGNÓSTICO DRI */}
           <div className="col-span-4 space-y-8">
              <section>
                 <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-4">Composición de Carga (DER)</h3>
@@ -71,9 +69,6 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                    <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
                       <div className={`h-full transition-all duration-1000 ${student.dri.debtExposure > 25 ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${student.dri.debtExposure}%` }} />
                    </div>
-                   <p className="text-[9px] text-slate-600 mt-4 leading-relaxed uppercase font-bold tracking-tighter italic">
-                      {student.dri.debtExposure > 25 ? "⚠️ Atrapado en niveles inferiores. Requiere puente pedagógico." : "✅ Niveles alineados con el rigor de High School."}
-                   </p>
                 </div>
              </section>
 
@@ -89,51 +84,31 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
              </div>
 
              <div className="space-y-3 pt-6 border-t border-slate-800">
-                <button 
-                  disabled={loading}
-                  onClick={() => logIntervention('coaching')}
-                  className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-900/20 disabled:opacity-50"
-                >
+                <button disabled={loading} onClick={() => logIntervention('coaching')} className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">
                   Registrar Coaching DRI
-                </button>
-                <button 
-                  disabled={loading}
-                  onClick={() => logIntervention('nemesis_intervention')}
-                  className="w-full py-5 bg-transparent border-2 border-slate-800 text-slate-500 hover:border-red-500/50 hover:text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
-                >
-                  Limpiar Bloqueo (Némesis)
                 </button>
              </div>
           </div>
 
-          {/* COL DERECHA: TREND ANALYSIS (PDI) */}
           <div className="col-span-8 space-y-8">
-            <section className="h-72 bg-slate-900/20 rounded-[2.5rem] border border-slate-800 p-8 relative">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-6">Análisis de Decaimiento de Precisión (7 Días)</h3>
-              <ResponsiveContainer width="100%" height="80%">
+            <section className="h-72 bg-slate-900/20 rounded-[2.5rem] border border-slate-800 p-8">
+              <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
-                  <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
-                  <XAxis dataKey="i" stroke="#475569" fontSize={10} axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 100]} stroke="#475569" fontSize={10} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', fontSize: '10px' }} />
-                  <Line type="monotone" dataKey="acc" stroke="#6366f1" strokeWidth={5} dot={{ r: 6, fill: '#6366f1', strokeWidth: 0 }} activeDot={{ r: 10 }} />
+                  <CartesianGrid stroke="#1e293b" vertical={false} />
+                  <XAxis dataKey="i" stroke="#475569" fontSize={10} />
+                  <YAxis domain={[0, 100]} stroke="#475569" fontSize={10} />
+                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }} />
+                  <Line type="monotone" dataKey="acc" stroke="#6366f1" strokeWidth={5} dot={{ r: 6, fill: '#6366f1' }} />
                 </LineChart>
               </ResponsiveContainer>
-              <div className="absolute top-8 right-8 text-[9px] font-mono font-black text-indigo-500/50 uppercase italic tracking-widest">Latent Mastery Prob: {(student.metrics.lmp * 100).toFixed(0)}%</div>
             </section>
-
+            
             <section>
-               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                 <span className="w-2 h-2 bg-indigo-500 rounded-full" /> Auditoría de Tareas (Últimos Eventos)
-               </h3>
                <div className="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto pr-4 custom-scrollbar">
-                  {chartData.slice().reverse().map((t, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 bg-slate-900/30 border border-slate-800/50 rounded-2xl hover:border-slate-700 transition-colors">
-                       <span className="text-[10px] font-bold text-slate-400 truncate w-72 uppercase tracking-tighter italic">{t.topic}</span>
-                       <div className="flex items-center gap-6">
-                          <span className={`text-xs font-mono font-black ${t.acc < 60 ? 'text-red-500' : 'text-emerald-500'}`}>{t.acc}%</span>
-                          <div className={`w-2 h-2 rounded-full ${t.acc < 60 ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-emerald-500'}`} />
-                       </div>
+                  {chartData.slice().reverse().map((t: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between p-4 bg-slate-900/30 border border-slate-800/50 rounded-2xl">
+                       <span className="text-[10px] font-bold text-slate-400 truncate w-72 uppercase italic">{t.topic}</span>
+                       <span className={`text-xs font-mono font-black ${t.acc < 60 ? 'text-red-500' : 'text-emerald-500'}`}>{t.acc}%</span>
                     </div>
                   ))}
                </div>
