@@ -36,6 +36,7 @@ export interface Task {
   questions: number;
   questionsCorrect: number;
   completedLocal: string;
+  timeTotal?: number; // Agregado para soportar el cálculo de "Implementación" en minutos
   smartScore?: number;
 }
 
@@ -63,4 +64,5 @@ export interface DRIMetrics {
   precisionDecay: number; // PDI
   driTier: 'RED' | 'YELLOW' | 'GREEN';
   driSignal: string;
+  driColor: string; // <-- CRÍTICO: Esto soluciona el error de compilación de Vercel
 }
