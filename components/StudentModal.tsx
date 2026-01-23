@@ -6,25 +6,25 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export default function StudentModal({ student, onClose }: { student: any; onClose: () => void }) {
   const [loading, setLoading] = useState(false);
 
-  // Recuperamos las tareas del objeto activity profundo
-  const tasks = useMemo(() => student?.activity?.tasks || [], [student]);
+  // Fallback seguro para evitar errores de renderizado
+  const tasks = student?.activity?.tasks || [];
 
-  // Formateamos los puntos del gráfico
+  // Tipamos explícitamente para evitar errores de 'unknown' o 'any' implícito
+  const readyToAccelerate = useMemo((): string[] => {
+    const topics = tasks
+      .filter((t: any) => (t.questionsCorrect / (t.questions || 1)) > 0.7)
+      .map((t: any) => t.topic?.name || 'Unknown Topic');
+    return Array.from(new Set(topics)).slice(0, 3) as string[];
+  }, [tasks]);
+
+  // Formateamos los puntos del gráfico e historial
   const chartData = useMemo(() => tasks.map((t: any, i: number) => ({
     i: i + 1, 
     acc: Math.round((t.questionsCorrect / (t.questions || 1)) * 100),
     topic: t.topic?.name || 'Session Task',
-    questions: t.questions,
-    correct: t.questionsCorrect
-  })).reverse(), [tasks]); // Reverse para que la lista muestre lo más reciente primero
-
-  // Tipado para el Outer Fringe
-  const readyToAccelerate = useMemo((): string[] => {
-    const topics = tasks
-      .filter((t: any) => (t.questionsCorrect / (t.questions || 1)) > 0.7)
-      .map((t: any) => t.topic?.name || 'Unknown');
-    return Array.from(new Set(topics)).slice(0, 3) as string[];
-  }, [tasks]);
+    questions: t.questions || 0,
+    correct: t.questionsCorrect || 0
+  })).reverse(), [tasks]); // Invertimos para mostrar lo más reciente primero en la tabla
 
   const lmpDisplay = isNaN(student.metrics.lmp) ? '0%' : `${(student.metrics.lmp * 100).toFixed(0)}%`;
 
@@ -69,12 +69,12 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                          <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
                          <span className="text-[10px] font-bold text-indigo-200 uppercase truncate italic">{topic}</span>
                       </div>
-                   )) : <p className="text-[10px] text-slate-600 italic font-bold">Consolidando base para nuevos temas...</p>}
+                   )) : <p className="text-[10px] text-slate-600 italic font-bold">Consolidando base...</p>}
                 </div>
              </div>
           </div>
 
-          {/* COL DERECHA: ACTIVIDAD DETALLADA */}
+          {/* COL DERECHA: GRÁFICO Y LISTA */}
           <div className="col-span-8 space-y-8">
             <div className="bg-slate-900/20 rounded-[2.5rem] border border-slate-800 p-8">
                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-8 italic">Curva de Precisión</h3>
@@ -89,7 +89,7 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                </ResponsiveContainer>
             </div>
 
-            {/* TABLA DE SESIONES RECIENTES */}
+            {/* TABLA DE SESIONES RECIENTES (Corregido tipado en el map) */}
             <div className="bg-slate-900/10 rounded-3xl border border-slate-800 overflow-hidden">
                <div className="p-4 bg-slate-900/40 border-b border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500">
                   Historial de Sesiones (Recientes Primero)
@@ -104,7 +104,7 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-800/50">
-                        {chartData.map((task, idx) => (
+                        {chartData.map((task: any, idx: number) => (
                            <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
                               <td className="p-4 text-[11px] font-bold text-slate-300 uppercase italic truncate max-w-[300px]">{task.topic}</td>
                               <td className="p-4 text-center">
