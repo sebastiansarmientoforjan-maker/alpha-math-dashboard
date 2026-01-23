@@ -1,49 +1,25 @@
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { studentId, studentName, type, targetTopic, notes } = body;
-    
-    if (!studentId || !type) {
-      return NextResponse.json({ success: false, error: 'Missing fields' }, { status: 400 });
-    }
-    
-    const intervention = {
+    const { studentId, studentName, type, targetTopic, createdBy } = body;
+
+    const docRef = await addDoc(collection(db, 'interventions'), {
       studentId,
       studentName,
-      type,
-      targetTopic: targetTopic || undefined,
-      notes: notes || '',
-      createdBy: 'DRI',
-      createdAt: new Date().toISOString(),
-      status: 'pending'
-    };
-    
-    const docRef = await adminDb.collection('interventions').add(intervention);
-    
-    return NextResponse.json({ success: true, interventionId: docRef.id });
-  } catch (error) {
-    console.error('Error:', error);
-    return NextResponse.json({ success: false, error: 'Internal Error' }, { status: 500 });
-  }
-}
+      type, // 'coaching', 'nemesis_intervention', 'remedial_plan'
+      targetTopic,
+      status: 'active',
+      createdAt: serverTimestamp(),
+      createdBy: createdBy || 'DRI_COMMAND'
+    });
 
-export async function GET() {
-  try {
-    const snapshot = await adminDb.collection('interventions')
-      .orderBy('createdAt', 'desc')
-      .limit(100)
-      .get();
-    
-    const interventions = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    
-    return NextResponse.json({ success: true, interventions });
+    return NextResponse.json({ id: docRef.id, message: 'Intervención registrada con éxito' });
   } catch (error) {
-    return NextResponse.json({ success: false }, { status: 500 });
+    console.error('Error en API Interventions:', error);
+    return NextResponse.json({ error: 'Failed to log intervention' }, { status: 500 });
   }
 }
