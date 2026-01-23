@@ -1,115 +1,36 @@
 import { Metrics } from '@/types';
 
-export function calculateTier1Metrics(student: any, activity: any): Metrics {
-  const schedule = student?.schedule || {};
-  const totals = activity?.totals || activity || {}; 
-  const tasks = activity?.tasks || [];   
-
-  const weeklyGoal = (schedule.monGoal || 0) * 5; 
-  const weeklyXP = totals.xpAwarded || 0;
+export function calculateScientificMetrics(student: any, activity: any): Metrics {
+  const tasks = activity?.tasks || [];
+  const totals = activity?.totals || {};
   
-  const timeEngaged = Math.round((totals.timeEngaged || totals.time || 0) / 60);
-  const timeProductive = Math.round((totals.timeProductive || 0) / 60);
-  const timeElapsed = Math.round((totals.timeElapsed || 0) / 60);
+  // 1. LMP: Probabilidad de Maestría Latente [cite: 41]
+  const recentTasks = tasks.slice(0, 10);
+  const correctRecent = recentTasks.filter((t: any) => (t.questionsCorrect / t.questions) > 0.8).length;
+  const lmp = correctRecent / Math.max(1, recentTasks.length);
+
+  // 2. KSI: Índice de Estabilidad (Basado en NIG/Variancia) [cite: 35, 92]
+  const accuracies = tasks.map((t: any) => (t.questionsCorrect / t.questions) * 100);
+  const meanAcc = accuracies.reduce((a, b) => a + b, 0) / (accuracies.length || 1);
+  const variance = accuracies.reduce((a, b) => a + Math.pow(b - meanAcc, 2), 0) / (accuracies.length || 1);
+  const ksi = Math.max(0, 100 - Math.sqrt(variance)); // A mayor volatilidad, menor estabilidad
+
+  // 3. Stall Detection: Lucha vs Frustración [cite: 83, 101]
+  const idleRatio = (totals.timeElapsed - totals.timeEngaged) / (totals.timeElapsed || 1);
+  const challengeZoneFailure = tasks.some((t: any) => t.smartScore > 80 && (t.questionsCorrect / t.questions) < 0.2);
   
-  const questions = totals.questions || 0;
-  const questionsCorrect = totals.questionsCorrect || 0;
-  const accuracyRate = questions > 0 
-    ? Math.round((questionsCorrect / questions) * 100) 
-    : null;
-    
-  const numTasks = totals.numTasks || 0;
-
-  const focusIntegrity = timeEngaged > 0 
-    ? Math.round((timeProductive / timeEngaged) * 100) 
-    : 0;
-
-  let nemesisTopic = "";
-  let lowestAcc = 100;
-  
-  if (tasks && tasks.length > 0) {
-      tasks.forEach((t: any) => {
-        if (t.questions > 2) {
-          const taskAcc = (t.questionsCorrect / t.questions) * 100;
-          if (taskAcc < 60 && taskAcc < lowestAcc) {
-            lowestAcc = taskAcc;
-            nemesisTopic = t.topic?.name || "Unknown Topic";
-          }
-        }
-      });
-  }
-
-  const reviewTasks = tasks.filter((t: any) => t.type === 'Review');
-  let reviewCorrect = 0;
-  let reviewTotal = 0;
-  reviewTasks.forEach((t: any) => {
-    reviewCorrect += t.questionsCorrect || 0;
-    reviewTotal += t.questions || 0;
-  });
-  const reviewAccuracy = reviewTotal > 0 
-    ? Math.round((reviewCorrect / reviewTotal) * 100) 
-    : -1;
-
-  const totalWastedMin = timeElapsed - timeEngaged;
-  const microStalls = numTasks > 0 ? Math.round(totalWastedMin / numTasks) : 0;
-
-  const velocityScore = weeklyGoal > 0 ? Math.min(Math.round((weeklyXP / weeklyGoal) * 100), 100) : 0;
-  const efficiencyRatio = timeEngaged > 0 ? parseFloat((weeklyXP / timeEngaged).toFixed(2)) : 0;
-  const timePerQuestion = questions > 0 ? parseFloat((timeEngaged / questions).toFixed(1)) : 0;
-  const contentGap = nemesisTopic !== "" ? 10 : (timePerQuestion > 5 ? 5 : 0);
-
-  let archetype: Metrics['archetype'] = 'Neutral';
-
-  if (timeEngaged > 10) {
-      if (focusIntegrity < 40) {
-          archetype = 'Zombie';
-      } else if (timePerQuestion < 0.3 && (accuracyRate || 0) < 50) {
-          archetype = 'Guesser';
-      } else if (focusIntegrity > 70 && (accuracyRate || 0) < 60) {
-          archetype = 'Grinder';
-      } else if (focusIntegrity > 70 && (accuracyRate || 0) > 85) {
-          archetype = 'Flow Master';
-      }
-  }
-
-  let riskStatus: Metrics['riskStatus'] = 'On Track';
-  let dropoutRisk = 0;
-
-  if (weeklyXP === 0 || timeEngaged === 0) {
-      riskStatus = 'Dormant';
-  } else {
-      if (velocityScore < 30) dropoutRisk += 30;
-      if (velocityScore > 50) dropoutRisk = 0;
-      if ((accuracyRate || 100) < 55) dropoutRisk += 20;
-      if (nemesisTopic !== "") dropoutRisk += 20;
-      if (archetype === 'Grinder') dropoutRisk += 15;
-
-      if (velocityScore < 30 || contentGap > 5 || dropoutRisk > 50) {
-          riskStatus = 'Critical';
-      } else if (velocityScore < 60) {
-          riskStatus = 'Attention';
-      }
+  let stallStatus: Metrics['stallStatus'] = 'Optimal';
+  if (challengeZoneFailure && idleRatio > 0.4) {
+    stallStatus = 'Frustrated Stall'; // [cite: 102]
+  } else if (accuracies.some(a => a < 60) && idleRatio < 0.2) {
+    stallStatus = 'Productive Struggle'; // [cite: 84]
   }
 
   return {
-    velocityScore,
-    consistencyIndex: velocityScore > 50 ? 0.9 : 0.3,
-    stuckScore: nemesisTopic !== "" ? 90 : 0,
-    dropoutProbability: Math.min(dropoutRisk, 100),
-    accuracyRate,
-    efficiencyRatio,
-    coldStartDays: weeklyXP === 0 ? 7 : 0,
-    momentumScore: 1.0,
-    timePerQuestion,
-    contentGap,
-    balanceScore: 0,
-    burnoutRisk: timeEngaged > 120 && focusIntegrity < 40,
-    sessionQuality: 0,
-    focusIntegrity,
-    nemesisTopic,
-    reviewAccuracy,
-    microStalls,
-    archetype,
-    riskStatus
+    ...student.metrics,
+    lmp: parseFloat(lmp.toFixed(2)),
+    ksi: parseFloat(ksi.toFixed(2)),
+    stallStatus,
+    idleRatio: parseFloat(idleRatio.toFixed(2))
   };
 }
