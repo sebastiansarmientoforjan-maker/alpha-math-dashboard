@@ -4,7 +4,7 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
   const tasks = activity?.tasks || [];
   const totals = activity?.totals || activity || {}; 
 
-  // Normalización Temporal: Corrección del error de escala (Segundos -> Minutos)
+  // Normalización temporal: Segundos a Minutos
   const timeEngaged = Math.round((totals.timeEngaged || totals.time || 0) / 60);
   const timeProductive = Math.round((totals.timeProductive || 0) / 60);
   const timeElapsed = Math.round((totals.timeElapsed || 0) / 60);
@@ -12,31 +12,25 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
   const questionsCorrect = totals.questionsCorrect || 0;
   const accuracyRate = questions > 0 ? Math.round((questionsCorrect / questions) * 100) : null;
 
-  // 1. LMP: Probabilidad de Maestría Latente (Basado en DKT) [cite: 41]
+  // LMP (Maestría Latente) y KSI (Estabilidad NIG)
   const recentTasks = tasks.slice(0, 10);
-  const correctRecent = recentTasks.filter((t: any) => (t.questionsCorrect / (t.questions || 1)) > 0.8).length;
-  const lmp = correctRecent / Math.max(1, recentTasks.length);
+  const lmp = recentTasks.filter((t: any) => (t.questionsCorrect / (t.questions || 1)) > 0.8).length / Math.max(1, recentTasks.length);
 
-  // 2. KSI: Índice de Estabilidad (Incertidumbre NIG) [cite: 30, 35]
   const accuracies: number[] = tasks.map((t: any) => (t.questionsCorrect / (t.questions || 1)) * 100);
   const meanAcc = accuracies.length > 0 ? (accuracies.reduce((a: number, b: number) => a + b, 0) / accuracies.length) : 0;
   const variance = accuracies.length > 0 ? (accuracies.reduce((a: number, b: number) => a + Math.pow(b - meanAcc, 2), 0) / accuracies.length) : 0;
   const ksi = Math.max(0, 100 - Math.sqrt(variance));
 
-  // 3. Detección de Stall (Pseudocódigo del Reporte) [cite: 83, 101]
+  // Stall Detection
   const idleRatio = timeElapsed > 0 ? (timeElapsed - timeEngaged) / timeElapsed : 0;
   const challengeZoneFailure = tasks.some((t: any) => (t.smartScore || 0) > 80 && (t.questionsCorrect / (t.questions || 1)) < 0.2);
   
   let stallStatus: Metrics['stallStatus'] = 'Optimal';
-  if (challengeZoneFailure && idleRatio > 0.4) {
-    stallStatus = 'Frustrated Stall'; // [cite: 102]
-  } else if (accuracyRate !== null && accuracyRate < 60 && idleRatio < 0.2) {
-    stallStatus = 'Productive Struggle'; // [cite: 84]
-  }
+  if (challengeZoneFailure && idleRatio > 0.4) stallStatus = 'Frustrated Stall';
+  else if (accuracyRate !== null && accuracyRate < 60 && idleRatio < 0.2) stallStatus = 'Productive Struggle';
 
-  const velocityScore = (student?.schedule?.monGoal || 0) > 0 
-    ? Math.min(Math.round(((totals.xpAwarded || 0) / (student.schedule.monGoal * 5)) * 100), 100) 
-    : 0;
+  const weeklyGoal = (student?.schedule?.monGoal || 0) * 5;
+  const velocityScore = weeklyGoal > 0 ? Math.min(Math.round(((totals.xpAwarded || 0) / weeklyGoal) * 100), 100) : 0;
 
   return {
     velocityScore, accuracyRate,
@@ -49,8 +43,4 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
     riskStatus: (velocityScore < 30 || stallStatus === 'Frustrated Stall') ? 'Critical' : 'On Track',
     archetype: (timeEngaged > 0 && (timeProductive / timeEngaged) < 0.4) ? 'Zombie' : 'Neutral'
   };
-}
-
-export function calculateScientificMetrics(student: any, activity: any): Metrics {
-  return calculateTier1Metrics(student, activity);
 }
