@@ -6,16 +6,28 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export default function StudentModal({ student, onClose }: { student: any; onClose: () => void }) {
   const [loading, setLoading] = useState(false);
 
-  // Fallback seguro para evitar errores de renderizado
+  // Fallback seguro para actividades y tareas
   const tasks = student?.activity?.tasks || [];
 
+  // KST: Identificación del Outer Fringe (Temas listos para acelerar)
+  const readyToAccelerate = useMemo(() => {
+    const topics = tasks
+      .filter((t: any) => (t.questionsCorrect / (t.questions || 1)) > 0.7)
+      .map((t: any) => t.topic?.name);
+    return Array.from(new Set(topics)).slice(0, 3);
+  }, [tasks]);
+
+  // Procesamiento de datos para el gráfico
   const chartData = useMemo(() => tasks.map((t: any, i: number) => ({
     i: i + 1, 
     acc: Math.round((t.questionsCorrect / (t.questions || 1)) * 100),
     topic: t.topic?.name || 'Review Task'
   })), [tasks]);
 
+  // Formateo de métricas para evitar NaN
   const lmpDisplay = isNaN(student.metrics.lmp) ? '0%' : `${(student.metrics.lmp * 100).toFixed(0)}%`;
+  const ksiDisplay = student.metrics.ksi || 0;
+  const derDisplay = student.dri.debtExposure || 0;
 
   const logIntervention = async (type: string) => {
     setLoading(true);
@@ -37,7 +49,7 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
       <div className="absolute inset-0" onClick={onClose} />
       <div className="bg-[#080808] border border-slate-800 w-full max-w-6xl h-[90vh] rounded-[2.5rem] relative z-10 flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         
-        {/* HEADER */}
+        {/* HEADER: Signos Vitales */}
         <div className="p-8 border-b border-slate-800 flex justify-between items-start bg-slate-900/30">
           <div className="flex gap-8 items-center">
              <div className="w-20 h-20 rounded-full border-4 flex items-center justify-center text-2xl font-black italic border-emerald-500 text-emerald-500">
@@ -57,27 +69,77 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
         </div>
 
         <div className="flex-1 p-8 grid grid-cols-12 gap-10 overflow-y-auto custom-scrollbar">
-          <div className="col-span-4 space-y-8">
+          
+          {/* COL IZQUIERDA: Diagnóstico DRI */}
+          <div className="col-span-4 space-y-6">
              <div className="p-6 bg-slate-900/40 rounded-3xl border border-slate-800 text-center">
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Mastery Probability (LMP)</p>
                 <p className="text-5xl font-black text-white italic">{lmpDisplay}</p>
                 <p className="text-[9px] text-indigo-400 mt-4 font-bold uppercase italic">ESTADO: {student.metrics.stallStatus || 'OPTIMAL'}</p>
              </div>
-             
-             <button disabled={loading} onClick={() => logIntervention('coaching')} className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">
+
+             <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-900/40 p-4 rounded-2xl border border-slate-800 text-center">
+                   <p className="text-[8px] font-black text-slate-500 uppercase mb-1 tracking-widest">KSI Stability</p>
+                   <p className="text-lg font-black text-white">{ksiDisplay}%</p>
+                </div>
+                <div className="bg-slate-900/40 p-4 rounded-2xl border border-slate-800 text-center">
+                   <p className="text-[8px] font-black text-slate-500 uppercase mb-1 tracking-widest">DER Debt</p>
+                   <p className="text-lg font-black text-red-500">{derDisplay}%</p>
+                </div>
+             </div>
+
+             {/* Módulo Outer Fringe */}
+             <div className="bg-indigo-950/20 border border-indigo-500/30 p-6 rounded-3xl">
+                <h3 className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-4 italic">⚡ Aceleración (Outer Fringe)</h3>
+                <div className="space-y-2">
+                   {readyToAccelerate.length > 0 ? readyToAccelerate.map((topic, idx) => (
+                      <div key={idx} className="flex items-center gap-3 p-2 bg-indigo-900/20 rounded-xl border border-indigo-500/10">
+                         <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+                         <span className="text-[10px] font-bold text-indigo-200 uppercase truncate italic">{topic}</span>
+                      </div>
+                   )) : <p className="text-[10px] text-slate-600 italic font-bold">Consolidando base...</p>}
+                </div>
+             </div>
+
+             <button disabled={loading} onClick={() => logIntervention('coaching')} className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-900/20">
                 Registrar Intervención
              </button>
           </div>
 
+          {/* COL DERECHA: Análisis de Curva */}
           <div className="col-span-8 bg-slate-900/20 rounded-[2.5rem] border border-slate-800 p-8">
-            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-8 italic">Curva de Precisión: {tasks.length} Eventos Recientes</h3>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={chartData} margin={{ bottom: 20, left: 10 }}>
-                <CartesianGrid stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="i" stroke="#475569" fontSize={10} label={{ value: 'Sesiones Recientes', position: 'insideBottom', offset: -10, fill: '#475569', fontSize: 9, fontWeight: 'bold' }} />
-                <YAxis domain={[0, 100]} stroke="#475569" fontSize={10} label={{ value: '% Precisión', angle: -90, position: 'insideLeft', fill: '#475569', fontSize: 9, fontWeight: 'bold' }} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '15px' }} />
-                <Line type="monotone" dataKey="acc" stroke="#6366f1" strokeWidth={5} dot={{ r: 4, fill: '#6366f1' }} activeDot={{ r: 8 }} />
+            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-8 italic text-center">
+               Análisis de Precisión: {tasks.length} Sesiones Recientes
+            </h3>
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={chartData} margin={{ bottom: 25, left: 10, right: 10 }}>
+                <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
+                <XAxis 
+                   dataKey="i" 
+                   stroke="#475569" 
+                   fontSize={10} 
+                   label={{ value: 'Sesiones Recientes', position: 'insideBottom', offset: -15, fill: '#475569', fontSize: 9, fontWeight: 'bold' }} 
+                />
+                <YAxis 
+                   domain={[0, 100]} 
+                   stroke="#475569" 
+                   fontSize={10} 
+                   label={{ value: '% Precisión', angle: -90, position: 'insideLeft', offset: 5, fill: '#475569', fontSize: 9, fontWeight: 'bold' }} 
+                />
+                <Tooltip 
+                   contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
+                   itemStyle={{ color: '#6366f1', fontSize: '10px', fontWeight: 'bold' }}
+                />
+                <Line 
+                   type="monotone" 
+                   dataKey="acc" 
+                   stroke="#6366f1" 
+                   strokeWidth={5} 
+                   dot={{ r: 4, fill: '#6366f1', strokeWidth: 0 }} 
+                   activeDot={{ r: 8, fill: '#818cf8' }}
+                   animationDuration={1000}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
