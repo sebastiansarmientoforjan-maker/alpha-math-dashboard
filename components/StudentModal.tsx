@@ -2,22 +2,25 @@
 
 import { useState, useMemo } from 'react';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function StudentModal({ student, onClose }: { student: any; onClose: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   
-  // Calculamos las métricas DRI "al vuelo" para asegurar que estén frescas
-  // (Aunque ya vienen pre-calculadas en el panel, esto es doble seguridad)
   const dri = useMemo(() => calculateDRIMetrics(student), [student]);
   const m = student.metrics || {};
   const tasks = student.activity?.tasks || [];
 
-  // Ordenar tareas: Más recientes arriba para el historial visual
-  const sortedTasks = [...tasks].sort((a: any, b: any) => {
-    const dateA = a.completedLocal ? new Date(a.completedLocal).getTime() : 0;
-    const dateB = b.completedLocal ? new Date(b.completedLocal).getTime() : 0;
-    return dateB - dateA;
-  });
+  // Datos para el gráfico de fatiga (PDI)
+  const chartData = useMemo(() => {
+    return [...tasks]
+      .sort((a: any, b: any) => new Date(a.completedLocal).getTime() - new Date(b.completedLocal).getTime())
+      .map((t: any, index: number) => ({
+        index: index + 1,
+        acc: Math.round((t.questionsCorrect / t.questions) * 100),
+        topic: t.topic?.name
+      }));
+  }, [tasks]);
 
   const createIntervention = async (type: string) => {
     setSubmitting(true);
@@ -30,194 +33,122 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
           studentName: `${student.firstName} ${student.lastName}`,
           type,
           targetTopic: type === 'nemesis_intervention' ? m.nemesisTopic : undefined,
-          createdBy: 'DRI'
+          createdBy: 'DRI_COMMAND'
         })
       });
       onClose();
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setSubmitting(false);
-    }
+    } catch (error) { console.error(error); } finally { setSubmitting(false); }
   };
 
   if (!student) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 animate-in fade-in zoom-in duration-200">
+      <div className="absolute inset-0" onClick={onClose} />
 
-      <div className="bg-[#0a0a0a] border border-slate-800 w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl relative flex flex-col z-10">
+      <div className="bg-[#080808] border border-slate-800 w-full max-w-6xl max-h-[92vh] overflow-hidden rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(79,70,229,0.5)] relative flex flex-col z-10">
         
-        {/* --- HEADER TÁCTICO --- */}
-        <div className="p-6 border-b border-slate-800 bg-[#0f0f0f] flex justify-between items-start shrink-0">
-          <div className="flex gap-5 items-center">
-            {/* Velocity Gauge */}
-            <div className="relative w-16 h-16 flex items-center justify-center">
-                <div className={`absolute inset-0 rounded-full border-4 opacity-20 ${m.velocityScore < 50 ? 'border-red-500' : 'border-emerald-500'}`}></div>
-                <div className={`text-2xl font-black ${m.velocityScore < 50 ? 'text-red-500' : 'text-emerald-500'}`}>{m.velocityScore}</div>
-                <div className="absolute -bottom-2 text-[9px] font-bold uppercase tracking-widest text-slate-500 bg-[#0f0f0f] px-1">Vel</div>
+        {/* HEADER HOLOGRÁFICO */}
+        <div className="p-8 border-b border-slate-800 bg-gradient-to-r from-slate-900/50 to-transparent flex justify-between items-start">
+          <div className="flex gap-6 items-center">
+            <div className="relative">
+              <div className={`w-20 h-20 rounded-full border-4 flex items-center justify-center text-2xl font-black italic ${m.velocityScore < 50 ? 'border-red-500 text-red-500' : 'border-emerald-500 text-emerald-500'}`}>
+                {m.velocityScore}
+              </div>
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-slate-900 px-2 py-0.5 rounded text-[8px] font-black uppercase text-slate-500 border border-slate-800">Velocidad</div>
             </div>
             
             <div>
-              <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic">
-                {student.firstName} {student.lastName}
-              </h2>
-              <div className="flex gap-2 mt-2">
-                 <span className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] text-slate-400 font-mono">
-                    ID: {student.id}
-                 </span>
-                 <span className="px-2 py-0.5 bg-indigo-900/30 border border-indigo-500/30 rounded text-[10px] text-indigo-300 font-bold uppercase">
-                    {student.currentCourse?.name}
-                 </span>
+              <h2 className="text-4xl font-black text-white tracking-tighter uppercase italic">{student.firstName} {student.lastName}</h2>
+              <div className="flex gap-3 mt-2">
+                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${dri.driTier === 'RED' ? 'bg-red-500/10 text-red-500 border-red-500/50' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/50'}`}>
+                  {dri.driSignal}
+                </span>
+                <span className="text-slate-500 font-mono text-xs self-center">COURSE: {student.currentCourse?.name}</span>
               </div>
             </div>
           </div>
-
-          {/* DRI ARCHETYPE BADGE */}
-          <div className="text-right">
-             <div className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1">DRI Diagnosis</div>
-             <div className={`text-sm font-black uppercase px-3 py-1 rounded border ${
-                 dri.driTier === 'RED' ? 'bg-red-500/10 text-red-500 border-red-500/50' : 
-                 dri.driTier === 'YELLOW' ? 'bg-amber-500/10 text-amber-500 border-amber-500/50' : 
-                 'bg-emerald-500/10 text-emerald-500 border-emerald-500/50'
-             }`}>
-                {dri.driSignal}
-             </div>
-          </div>
-          
-          <button onClick={onClose} className="absolute top-4 right-4 text-slate-600 hover:text-white transition-colors">✕</button>
+          <button onClick={onClose} className="text-slate-500 hover:text-white text-2xl p-2 transition-transform hover:rotate-90">✕</button>
         </div>
 
-        {/* --- MAIN CONTENT GRID --- */}
-        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* CONTENIDO TÁCTICO */}
+        <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-10">
           
-          {/* LEFT COL: TIER 5 METRICS (NUEVO) */}
-          <div className="space-y-6">
-            
-            {/* 1. ACADEMIC DEBT (DER) */}
-            <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 relative overflow-hidden">
-                <div className="flex justify-between items-end mb-2">
-                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Academic Debt (DER)</h3>
-                    <span className={`text-2xl font-mono font-bold ${dri.debtExposure > 20 ? 'text-red-500' : 'text-slate-300'}`}>
-                        {dri.debtExposure}%
-                    </span>
+          {/* COL IZQUIERDA: DRI DIAGNOSTICS (Lógica de Deuda) */}
+          <div className="lg:col-span-4 space-y-8">
+            <section>
+              <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-4">Composición de Carga (DER)</h3>
+              <div className="bg-slate-900/40 p-5 rounded-3xl border border-slate-800 shadow-inner">
+                <div className="flex justify-between items-end mb-3">
+                  <span className="text-xs font-bold text-slate-400">Academic Debt</span>
+                  <span className={`text-3xl font-mono font-black ${dri.debtExposure > 20 ? 'text-red-500' : 'text-slate-200'}`}>{dri.debtExposure}%</span>
                 </div>
-                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                    <div className={`h-full ${dri.debtExposure > 20 ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(dri.debtExposure, 100)}%` }}></div>
+                <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden">
+                  <div className={`h-full transition-all duration-1000 ${dri.debtExposure > 20 ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${dri.debtExposure}%` }} />
                 </div>
-                <p className="text-[9px] text-slate-600 mt-2">
-                    {dri.debtExposure > 20 
-                        ? "⚠️ High remedial load. Student is spending >20% time on K-8 topics." 
-                        : "✅ Healthy ratio. Focus is primarily on HS syllabus."}
+                <p className="text-[9px] text-slate-600 mt-4 leading-relaxed">
+                  {dri.debtExposure > 20 
+                    ? "ATENCIÓN: El alumno está atrapado en conceptos de K-8. Requiere puente pedagógico inmediato." 
+                    : "NIVEL ÓPTIMO: El esfuerzo está centrado en estándares de Secundaria."}
                 </p>
-            </div>
+              </div>
+            </section>
 
-            {/* 2. COGNITIVE FATIGUE (PDI) */}
-            <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-                <div className="flex justify-between items-end mb-2">
-                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Precision Decay (PDI)</h3>
-                    <span className={`text-2xl font-mono font-bold ${dri.precisionDecay > 1.5 ? 'text-amber-500' : 'text-slate-300'}`}>
-                        {dri.precisionDecay}x
-                    </span>
+            <section>
+              <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-4">Eficiencia Energética</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-900/40 p-4 rounded-3xl border border-slate-800">
+                  <div className="text-[8px] text-slate-500 uppercase mb-1">PDI (Fatiga)</div>
+                  <div className="text-xl font-black text-white">{dri.precisionDecay}x</div>
                 </div>
-                <p className="text-[9px] text-slate-600">
-                    {dri.precisionDecay > 1.5 
-                        ? "⚠️ Fatigue Detected. Error rate spikes significantly at end of session." 
-                        : "✅ Stable Stamina. Consistency maintained throughout session."}
-                </p>
-            </div>
-
-            {/* 3. INSTRUCTIONAL ROI */}
-            <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-                <div className="flex justify-between items-end mb-2">
-                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Instructional ROI</h3>
-                    <span className="text-2xl font-mono font-bold text-yellow-500">
-                        {dri.iROI}
-                    </span>
+                <div className="bg-slate-900/40 p-4 rounded-3xl border border-slate-800">
+                  <div className="text-[8px] text-slate-500 uppercase mb-1">ROI (XP/min)</div>
+                  <div className="text-xl font-black text-alpha-gold">{dri.iROI}</div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-800">
-                    <div>
-                        <div className="text-[8px] text-slate-600 uppercase">Focus Integrity</div>
-                        <div className={`font-bold ${m.focusIntegrity < 40 ? 'text-red-500' : 'text-white'}`}>{m.focusIntegrity}%</div>
-                    </div>
-                    <div>
-                        <div className="text-[8px] text-slate-600 uppercase">Accuracy</div>
-                        <div className="font-bold text-white">{m.accuracyRate}%</div>
-                    </div>
-                </div>
-            </div>
+              </div>
+            </section>
 
-            {/* ACTION PANEL */}
-            <div className="space-y-2 pt-4">
-                <button 
-                    onClick={() => createIntervention('coaching')}
-                    disabled={submitting}
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold uppercase tracking-widest transition-all"
-                >
-                    💬 Log Coaching Session
-                </button>
-                {m.nemesisTopic && (
-                    <button 
-                        onClick={() => createIntervention('nemesis_intervention')}
-                        disabled={submitting}
-                        className="w-full py-3 bg-red-900/50 hover:bg-red-900/80 border border-red-500/30 text-red-200 rounded-lg text-xs font-bold uppercase tracking-widest transition-all"
-                    >
-                        👹 Clear Nemesis Block
-                    </button>
-                )}
+            <div className="space-y-3 pt-6">
+              <button onClick={() => createIntervention('coaching')} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-900/20">Registrar Coaching</button>
+              {m.nemesisTopic && (
+                <button onClick={() => createIntervention('nemesis_intervention')} className="w-full py-4 bg-transparent border-2 border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">Limpiar Bloqueo</button>
+              )}
             </div>
-
           </div>
 
-          {/* RIGHT COL: TIMELINE (HISTORIAL) */}
-          <div className="lg:col-span-2 bg-slate-900/20 rounded-xl border border-slate-800 p-4 flex flex-col">
-             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 flex justify-between">
-                <span>Session Timeline</span>
-                <span>{tasks.length} Tasks Analyzed</span>
-             </h3>
+          {/* COL DERECHA: TREND ANALYSIS (PDI VISUAL) */}
+          <div className="lg:col-span-8 space-y-8">
+            <section className="h-64 bg-slate-900/20 rounded-[2rem] border border-slate-800 p-6">
+              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-6">Curva de Precisión (Fatiga en Tiempo Real)</h3>
+              <ResponsiveContainer width="100%" height="80%">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                  <XAxis dataKey="index" stroke="#475569" fontSize={10} />
+                  <YAxis domain={[0, 100]} stroke="#475569" fontSize={10} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f8fafc' }}
+                    itemStyle={{ color: '#818cf8', fontSize: '10px', fontWeight: 'bold' }}
+                  />
+                  <Line type="monotone" dataKey="acc" stroke="#6366f1" strokeWidth={4} dot={{ r: 4, fill: '#6366f1' }} activeDot={{ r: 8 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </section>
 
-             <div className="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-                {sortedTasks.length === 0 ? (
-                    <div className="text-center py-20 text-slate-700 italic text-xs">No recent data available for analysis.</div>
-                ) : (
-                    sortedTasks.map((task: any) => {
-                        const acc = Math.round((task.questionsCorrect / task.questions) * 100);
-                        const isFail = acc < 60;
-                        const minutes = Math.round((task.analysis?.timeEngaged || 0) / 60);
-                        
-                        return (
-                            <div key={task.id} className="flex items-center gap-4 p-3 rounded-lg bg-[#0f0f0f] border border-slate-800 hover:border-slate-600 transition-colors">
-                                {/* Type Indicator */}
-                                <div className={`w-1 h-8 rounded-full ${task.type === 'Review' ? 'bg-indigo-500' : 'bg-emerald-500'}`}></div>
-                                
-                                {/* Content */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex justify-between">
-                                        <h4 className="text-xs font-bold text-slate-300 truncate">{task.topic?.name || 'Unknown Topic'}</h4>
-                                        <span className={`text-xs font-mono font-bold ${isFail ? 'text-red-500' : 'text-emerald-500'}`}>
-                                            {acc}%
-                                        </span>
-                                    </div>
-                                    <div className="flex gap-3 mt-1">
-                                        <span className="text-[10px] text-slate-600 flex items-center gap-1">
-                                            ⏱ {minutes}m
-                                        </span>
-                                        <span className="text-[10px] text-slate-600 flex items-center gap-1">
-                                            ❓ {task.questionsCorrect}/{task.questions}
-                                        </span>
-                                        <span className="text-[10px] text-slate-600 font-mono">
-                                            {task.completedLocal?.split(' ')[0]}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })
-                )}
-             </div>
+            <section>
+               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Registro de Campo (Últimas Tareas)</h3>
+               <div className="space-y-2 max-h-60 overflow-y-auto pr-4 custom-scrollbar">
+                  {chartData.reverse().map((t, i) => (
+                    <div key={i} className="flex items-center justify-between p-4 bg-slate-900/30 border border-slate-800/50 rounded-2xl">
+                       <span className="text-[10px] font-bold text-slate-400 truncate w-64">{t.topic}</span>
+                       <div className="flex items-center gap-4">
+                          <span className={`text-xs font-mono font-black ${t.acc < 60 ? 'text-red-500' : 'text-emerald-500'}`}>{t.acc}%</span>
+                          <div className={`w-2 h-2 rounded-full ${t.acc < 60 ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-emerald-500'}`} />
+                       </div>
+                    </div>
+                  ))}
+               </div>
+            </section>
           </div>
-
         </div>
       </div>
     </div>
