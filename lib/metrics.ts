@@ -4,15 +4,14 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
   const tasks = activity?.tasks || [];
   const totals = activity?.totals || activity || {}; 
 
-  // Normalización temporal: Segundos a Minutos
+  // Normalización temporal (Segundos a Minutos)
   const timeEngaged = Math.round((totals.timeEngaged || totals.time || 0) / 60);
   const timeProductive = Math.round((totals.timeProductive || 0) / 60);
   const timeElapsed = Math.round((totals.timeElapsed || 0) / 60);
   const questions = totals.questions || 0;
-  const questionsCorrect = totals.questionsCorrect || 0;
-  const accuracyRate = questions > 0 ? Math.round((questionsCorrect / questions) * 100) : null;
+  const accuracyRate = questions > 0 ? Math.round(((totals.questionsCorrect || 0) / questions) * 100) : null;
 
-  // LMP (Maestría Latente) y KSI (Estabilidad NIG)
+  // LMP y KSI (KeenKT / NIG Distribution)
   const recentTasks = tasks.slice(0, 10);
   const lmp = recentTasks.filter((t: any) => (t.questionsCorrect / (t.questions || 1)) > 0.8).length / Math.max(1, recentTasks.length);
 
@@ -21,7 +20,7 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
   const variance = accuracies.length > 0 ? (accuracies.reduce((a: number, b: number) => a + Math.pow(b - meanAcc, 2), 0) / accuracies.length) : 0;
   const ksi = Math.max(0, 100 - Math.sqrt(variance));
 
-  // Stall Detection
+  // Stall Detection (Pseudocódigo DRI del reporte)
   const idleRatio = timeElapsed > 0 ? (timeElapsed - timeEngaged) / timeElapsed : 0;
   const challengeZoneFailure = tasks.some((t: any) => (t.smartScore || 0) > 80 && (t.questionsCorrect / (t.questions || 1)) < 0.2);
   
@@ -37,10 +36,15 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
     focusIntegrity: timeEngaged > 0 ? Math.round((timeProductive / timeEngaged) * 100) : 0,
     lmp: parseFloat(lmp.toFixed(2)), ksi: parseFloat(ksi.toFixed(2)),
     stallStatus, idleRatio: parseFloat(idleRatio.toFixed(2)),
-    nemesisTopic: tasks.find((t: any) => t.questions > 2 && (t.questionsCorrect / t.questions) < 0.6)?.topic?.name || "",
+    nemesisTopic: tasks.find((t: any) => t.questions > 2 && (t.questionsCorrect / (t.questions || 1)) < 0.6)?.topic?.name || "",
     consistencyIndex: velocityScore > 50 ? 0.9 : 0.3,
     stuckScore: lmp < 0.3 ? 90 : 0, dropoutProbability: velocityScore < 30 ? 60 : 10,
     riskStatus: (velocityScore < 30 || stallStatus === 'Frustrated Stall') ? 'Critical' : 'On Track',
     archetype: (timeEngaged > 0 && (timeProductive / timeEngaged) < 0.4) ? 'Zombie' : 'Neutral'
   };
+}
+
+// Mantenemos esta exportación para compatibilidad total con el código anterior
+export function calculateScientificMetrics(student: any, activity: any): Metrics {
+  return calculateTier1Metrics(student, activity);
 }
