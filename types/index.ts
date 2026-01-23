@@ -44,12 +44,12 @@ export interface Metrics {
   accuracyRate: number | null;
   focusIntegrity: number;
   nemesisTopic: string;
-  // --- Psicomotricidad V3.8 (Hallazgos del Reporte) ---
-  lmp: number; // Probabilidad de Maestría Latente [cite: 41]
-  ksi: number; // Índice de Estabilidad (Incertidumbre NIG) [cite: 30, 35]
-  stallStatus: 'Optimal' | 'Productive Struggle' | 'Frustrated Stall'; // [cite: 83, 102]
-  idleRatio: number; // [cite: 93]
-  // --- Campos de Compatibilidad (Evitan Errores de Vercel) ---
+  // --- Psicomotricidad V3.8 ---
+  lmp: number; // Probabilidad de Maestría Latente
+  ksi: number; // Índice de Estabilidad (NIG)
+  stallStatus: 'Optimal' | 'Productive Struggle' | 'Frustrated Stall'; 
+  idleRatio: number; 
+  // --- Compatibilidad ---
   consistencyIndex: number;
   stuckScore: number;
   dropoutProbability: number;
@@ -59,8 +59,8 @@ export interface Metrics {
 
 export interface DRIMetrics {
   iROI: number;
-  debtExposure: number; // DER [cite: 51]
-  precisionDecay: number; // PDI [cite: 42]
+  debtExposure: number; // DER
+  precisionDecay: number; // PDI
   driTier: 'RED' | 'YELLOW' | 'GREEN';
   driSignal: string;
 }
