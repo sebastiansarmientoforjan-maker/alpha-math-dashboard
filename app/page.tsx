@@ -4,18 +4,42 @@ import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { 
-  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell 
+  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  ReferenceLine, Cell, ReferenceArea 
 } from 'recharts';
 import StudentModal from '@/components/StudentModal';
+import { TriageColumnSkeleton, MatrixSkeleton, HeatmapSkeleton } from '@/components/LoadingSkeleton';
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
+import { driColorToHex, kMeansCluster } from '@/lib/color-utils';
 import { Student } from '@/types';
 import { TOPIC_GRADE_MAP } from '@/lib/grade-maps';
+import { formatDistanceToNow } from 'date-fns';
 
-// Tooltip táctico para la Matriz KeenKT
+// Tooltip mejorado para la Matriz KeenKT
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+    const isCluster = data.members && data.members.length > 1;
+    
+    if (isCluster) {
+      return (
+        <div className="bg-slate-900 border border-slate-700 p-4 rounded-lg shadow-2xl text-xs max-w-xs">
+          <p className="font-black text-white mb-2 text-lg">📍 Cluster de {data.members.length} estudiantes</p>
+          <div className="border-t border-slate-700 pt-2 mt-2">
+            <p className="font-bold text-indigo-400 mb-1">Caso más crítico:</p>
+            <p className="text-white font-bold">{data.worstStudent.firstName} {data.worstStudent.lastName}</p>
+            <p className="text-slate-400 text-[10px] mb-2">{data.worstStudent.currentCourse?.name}</p>
+            <p className="text-emerald-400">Mastery: {(data.worstStudent.metrics?.lmp * 100).toFixed(0)}%</p>
+            <p className="text-blue-400">Stability: {data.worstStudent.metrics?.ksi}%</p>
+            <p className={`mt-2 font-mono uppercase font-bold text-sm ${data.worstStudent.dri.driColor}`}>
+              {data.worstStudent.dri.driSignal}
+            </p>
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <div className="bg-slate-900 border border-slate-700 p-3 rounded-lg shadow-2xl text-xs">
         <p className="font-bold text-white mb-1">{data.firstName} {data.lastName}</p>
@@ -23,7 +47,7 @@ const CustomTooltip = ({ active, payload }: any) => {
         <p className="text-emerald-400">Mastery (LMP): {(data.metrics?.lmp * 100).toFixed(0)}%</p>
         <p className="text-blue-400">Stability (KSI): {data.metrics?.ksi}%</p>
         <p className={`mt-1 font-mono uppercase font-bold ${data.dri.driColor}`}>
-            {data.dri.driSignal}
+          {data.dri.driSignal}
         </p>
       </div>
     );
@@ -38,9 +62,13 @@ export default function HomePage() {
   const [updating, setUpdating] = useState(false);
   const [autoSync, setAutoSync] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [batchStatus, setBatchStatus] = useState({ current: 0, total: 33 });
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   
   const [viewMode, setViewMode] = useState<'TRIAGE' | 'MATRIX' | 'HEATMAP' | 'LOG'>('TRIAGE');
+  const [matrixMode, setMatrixMode] = useState<'full' | 'critical'>('critical');
   const [search, setSearch] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('ALL');
 
@@ -66,32 +94,61 @@ export default function HomePage() {
   const runUpdateBatch = async () => {
     if (updating) return;
     setUpdating(true);
+    setSyncError(null);
+    
     try {
       const res = await fetch('/api/update-students');
+      if (!res.ok) throw new Error('API failure');
+      
       const data = await res.json();
+      
       if (data.success) {
         setProgress(data.progress);
-        if (autoSync && data.progress < 100) setTimeout(runUpdateBatch, 1500);
-        else if (data.progress >= 100) setAutoSync(false);
+        setBatchStatus({
+          current: Math.ceil(data.nextIndex / 50),
+          total: 33
+        });
+        
+        if (autoSync && data.progress < 100) {
+          setTimeout(runUpdateBatch, 1500);
+        } else if (data.progress >= 100) {
+          setAutoSync(false);
+          setLastSync(new Date());
+        }
       }
-    } catch (err) { setAutoSync(false); }
+    } catch (err) {
+      setSyncError('Sync paused: API unreachable');
+      setAutoSync(false);
+    }
+    
     setUpdating(false);
   };
 
-  useEffect(() => { if (autoSync) runUpdateBatch(); }, [autoSync]);
+  useEffect(() => { 
+    if (autoSync && !updating) runUpdateBatch(); 
+  }, [autoSync]);
 
-  const uniqueCourses = useMemo(() => Array.from(new Set(students.map(s => s.currentCourse?.name).filter(Boolean))).sort(), [students]);
+  const uniqueCourses = useMemo(() => 
+    Array.from(new Set(students.map(s => s.currentCourse?.name).filter(Boolean))).sort(), 
+  [students]);
+  
   const criticalTopics = Object.keys(TOPIC_GRADE_MAP);
 
+  // Heatmap con priorización
   const heatmapData = useMemo(() => {
-    return criticalTopics.map(topic => {
+    const data = criticalTopics.map(topic => {
       const courseStats = uniqueCourses.map(course => {
         const relevant = students.filter(s => s.currentCourse?.name === course);
         const avgLMP = relevant.reduce((acc, s) => acc + (s.metrics?.lmp || 0), 0) / Math.max(1, relevant.length);
         return { course, avgLMP };
       });
-      return { topic, courseStats };
+      
+      const criticalCourses = courseStats.filter(c => c.avgLMP < 0.4).length;
+      
+      return { topic, courseStats, criticalCourses };
     });
+    
+    return data.sort((a, b) => b.criticalCourses - a.criticalCourses).slice(0, 15);
   }, [students, uniqueCourses, criticalTopics]);
 
   const filtered = useMemo(() => students.filter(s => {
@@ -100,49 +157,126 @@ export default function HomePage() {
     return nameMatch && courseMatch;
   }), [students, search, selectedCourse]);
 
-  // Lógica Distributiva Inclusiva para los 1613 registros
+  // Distribución Inclusiva
   const redZone = useMemo(() => filtered.filter(s => s.dri.driTier === 'RED'), [filtered]);
   const yellowZone = useMemo(() => filtered.filter(s => s.dri.driTier === 'YELLOW' && !redZone.some(r => r.id === s.id)), [filtered, redZone]);
   const greenZone = useMemo(() => filtered.filter(s => !redZone.some(r => r.id === s.id) && !yellowZone.some(y => y.id === s.id)), [filtered, redZone, yellowZone]);
 
-  if (loading) return <div className="p-10 bg-black min-h-screen text-emerald-500 font-mono italic animate-pulse text-center uppercase tracking-widest">DRI COMMAND CENTER INITIALIZING...</div>;
+  // Matrix data con clustering
+  const matrixData = useMemo(() => {
+    const baseData = matrixMode === 'critical' 
+      ? [...redZone, ...yellowZone]
+      : filtered;
+    
+    if (baseData.length > 200) {
+      const clusters = kMeansCluster(baseData, 100, {
+        x: (d) => d.metrics.lmp,
+        y: (d) => d.metrics.ksi
+      });
+      
+      return clusters.map(c => ({
+        ...c.worstStudent,
+        metrics: {
+          lmp: c.centroid.x,
+          ksi: c.centroid.y
+        },
+        isCluster: true,
+        members: c.members,
+        worstStudent: c.worstStudent
+      }));
+    }
+    
+    return baseData;
+  }, [filtered, redZone, yellowZone, matrixMode]);
+
+  if (loading) return (
+    <div className="p-10 bg-black min-h-screen text-emerald-500 font-mono italic animate-pulse text-center uppercase tracking-widest">
+      DRI COMMAND CENTER INITIALIZING...
+    </div>
+  );
 
   return (
     <div className="p-4 bg-[#050505] min-h-screen text-slate-300 font-sans">
       
-      {/* HEADER INTEGRADO CON SINCRONIZACIÓN */}
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-end mb-8 border-b border-slate-800 pb-6 gap-4">
         <div>
           <h1 className="text-3xl font-black uppercase italic text-white tracking-tighter">DRI COMMAND CENTER</h1>
-          <p className="text-[10px] text-indigo-400 font-bold tracking-[0.3em] uppercase">V4.8 Auditoría Poblacional: {students.length} / 1613</p>
+          <p className="text-xs text-indigo-400 font-bold tracking-[0.3em] uppercase">V4.9 Auditoría Poblacional: {students.length} / 1613</p>
+          {lastSync && (
+            <p className="text-[10px] text-slate-600 font-mono mt-1">
+              Last sync: {formatDistanceToNow(lastSync, { addSuffix: true })}
+            </p>
+          )}
         </div>
         
         <div className="flex flex-col items-end gap-3">
           <div className="flex bg-slate-900/50 p-1 rounded-xl border border-slate-800 font-black text-[10px] uppercase">
             {['TRIAGE', 'MATRIX', 'HEATMAP', 'LOG'].map(m => (
-              <button key={m} onClick={() => setViewMode(m as any)} className={`px-4 py-2 rounded-lg transition-all ${viewMode === m ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>{m}</button>
+              <button 
+                key={m} 
+                onClick={() => setViewMode(m as any)} 
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  viewMode === m 
+                    ? 'bg-indigo-600 text-white shadow-lg' 
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {m}
+              </button>
             ))}
           </div>
           
           <div className="flex gap-4 items-center bg-slate-900/40 p-2 px-4 rounded-xl border border-slate-800 relative overflow-hidden group">
-            {autoSync && <div className="absolute bottom-0 left-0 h-0.5 bg-emerald-500 transition-all duration-700 shadow-[0_0_10px_#10b981]" style={{ width: `${progress}%` }} />}
-            <span className="text-[10px] font-mono font-bold text-white">{students.length} / 1613</span>
-            <button onClick={() => setAutoSync(!autoSync)} className={`px-4 py-1.5 rounded-lg font-black text-[9px] tracking-widest uppercase transition-all ${autoSync ? 'bg-red-900/50 text-red-500 border border-red-500 animate-pulse' : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg'}`}>
-              {autoSync ? `STOP SYNC ${progress}%` : '⚡ AUTO SYNC'}
+            {autoSync && (
+              <div 
+                className="absolute bottom-0 left-0 h-0.5 bg-emerald-500 transition-all duration-700 shadow-[0_0_10px_#10b981]" 
+                style={{ width: `${progress}%` }} 
+              />
+            )}
+            <div className="text-[10px] font-mono">
+              <div className="font-bold text-white">{students.length} / 1613</div>
+              {autoSync && (
+                <div className="text-slate-500">Batch {batchStatus.current}/{batchStatus.total}</div>
+              )}
+            </div>
+            <button 
+              onClick={() => setAutoSync(!autoSync)} 
+              disabled={updating && !autoSync}
+              className={`px-4 py-1.5 rounded-lg font-black text-[9px] tracking-widest uppercase transition-all ${
+                autoSync 
+                  ? 'bg-red-900/50 text-red-500 border border-red-500 animate-pulse' 
+                  : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg disabled:opacity-50'
+              }`}
+            >
+              {autoSync ? `⏸ STOP ${progress}%` : '⚡ AUTO SYNC'}
             </button>
           </div>
+          
+          {syncError && (
+            <div className="bg-red-900/20 border border-red-500/50 px-4 py-2 rounded-lg text-[10px] text-red-400 font-mono">
+              {syncError}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* FILTROS TÁCTICOS */}
+      {/* FILTROS */}
       <div className="flex flex-wrap gap-4 mb-8">
-        <input onChange={(e) => setSearch(e.target.value)} placeholder="🔎 SEARCH UNIT BY NAME OR ID..." className="flex-1 min-w-[300px] bg-slate-900/40 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-indigo-500 outline-none font-mono transition-all" />
-        <select value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-[10px] font-black uppercase text-slate-400 outline-none">
+        <input 
+          onChange={(e) => setSearch(e.target.value)} 
+          placeholder="🔎 SEARCH UNIT BY NAME OR ID..." 
+          className="flex-1 min-w-[300px] bg-slate-900/40 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-indigo-500 outline-none font-mono transition-all" 
+        />
+        <select 
+          value={selectedCourse} 
+          onChange={(e) => setSelectedCourse(e.target.value)} 
+          className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs font-black uppercase text-slate-400 outline-none"
+        >
           <option value="ALL">ALL COURSES</option>
           {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
-
       {/* ÁREA DE CONTENIDO DINÁMICO */}
       <div className="h-[calc(100vh-280px)] overflow-hidden">
         {viewMode === 'TRIAGE' && (
@@ -153,25 +287,41 @@ export default function HomePage() {
                 { label: '⚡ Stable Units', data: greenZone, tier: 'GREEN', border: 'border-emerald-500' }
             ].map(col => (
               <div key={col.tier} className="flex flex-col bg-slate-900/20 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-                <div className={`p-4 bg-slate-900/40 border-b border-slate-800 font-black text-[10px] uppercase tracking-widest flex justify-between`}>
+                <div className={`p-4 bg-slate-900/40 border-b border-slate-800 font-black text-xs uppercase tracking-widest flex justify-between`}>
                   <span className="text-slate-300">{col.label}</span>
                   <span className="bg-slate-800 text-slate-500 px-2 py-0.5 rounded font-mono">{col.data.length} UNITS</span>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                  {col.data.map(s => (
-                    <div key={s.id} onClick={() => setSelectedStudent(s)} className={`p-4 bg-slate-900/80 rounded-2xl border-l-4 ${col.border} cursor-pointer hover:scale-[1.02] transition-all group shadow-lg`}>
-                      <div className="flex justify-between items-start mb-1">
-                        <h3 className="font-black text-white text-sm uppercase italic truncate w-40 group-hover:text-indigo-400">{s.firstName} {s.lastName}</h3>
-                        <span className="text-[10px] font-mono font-bold text-slate-500 italic">{(s.metrics.lmp * 100).toFixed(0)}% LMP</span>
-                      </div>
-                      <p className="text-[9px] text-indigo-400/70 font-bold uppercase mb-3 truncate italic">{s.currentCourse.name}</p>
-                      <div className="flex justify-between items-center text-[8px] font-black uppercase font-mono">
-                        {/* Solución Aplicada: driColor para gestionar Inactivos (Gris) vs Críticos (Rojo) */}
-                        <span className={s.dri.driColor}>{s.dri.driSignal}</span>
-                        <span className="text-slate-600">KSI: {s.metrics.ksi}%</span>
-                      </div>
+                  {col.data.length === 0 ? (
+                    <div className="text-center py-20 text-slate-600 italic text-xs">
+                      No students in this tier
                     </div>
-                  ))}
+                  ) : (
+                    col.data.map(s => (
+                      <div 
+                        key={s.id} 
+                        onClick={() => setSelectedStudent(s)} 
+                        className={`p-4 bg-slate-900/80 rounded-2xl border-l-4 ${col.border} cursor-pointer hover:scale-[1.02] transition-all group shadow-lg`}
+                      >
+                        <div className="flex justify-between items-start mb-1">
+                          <h3 className="font-black text-white text-sm uppercase italic truncate w-40 group-hover:text-indigo-400">
+                            {s.firstName} {s.lastName}
+                          </h3>
+                          <span className="text-[10px] font-mono font-bold text-slate-500 italic">
+                            {(s.metrics.lmp * 100).toFixed(0)}% LMP
+                          </span>
+                        </div>
+                        <p className="text-[9px] text-indigo-400/70 font-bold uppercase mb-3 truncate italic">
+                          {s.currentCourse.name}
+                        </p>
+                        <div className="flex justify-between items-center text-[8px] font-black uppercase font-mono">
+                          {/* ✅ SOLUCIÓN: Usar driColor directamente */}
+                          <span className={s.dri.driColor}>{s.dri.driSignal}</span>
+                          <span className="text-slate-600">KSI: {s.metrics.ksi}%</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             ))}
@@ -180,54 +330,171 @@ export default function HomePage() {
 
         {viewMode === 'MATRIX' && (
           <div className="h-full w-full bg-slate-900/10 border border-slate-800 rounded-[2.5rem] p-8 relative overflow-hidden animate-in fade-in duration-500 shadow-2xl">
+            {/* Toggle de modo */}
+            <div className="absolute top-4 right-4 z-20 flex gap-2">
+              <button
+                onClick={() => setMatrixMode(m => m === 'full' ? 'critical' : 'full')}
+                className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 transition-all"
+              >
+                {matrixMode === 'full' 
+                  ? `Show Critical Only (${redZone.length + yellowZone.length})` 
+                  : `Show All (${filtered.length})`
+                }
+              </button>
+            </div>
+
             <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 0 }}>
+              <ScatterChart margin={{ top: 40, right: 30, bottom: 20, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis type="number" dataKey="metrics.lmp" name="Mastery" domain={[0, 1]} stroke="#475569" fontSize={10} />
-                <YAxis type="number" dataKey="metrics.ksi" name="Stability" domain={[0, 100]} stroke="#475569" fontSize={10} />
+                <XAxis 
+                  type="number" 
+                  dataKey="metrics.lmp" 
+                  name="Mastery" 
+                  domain={[0, 1]} 
+                  stroke="#475569" 
+                  fontSize={10}
+                  label={{ value: 'Learning Mastery Probability', position: 'insideBottom', offset: -10, fill: '#64748b' }}
+                />
+                <YAxis 
+                  type="number" 
+                  dataKey="metrics.ksi" 
+                  name="Stability" 
+                  domain={[0, 100]} 
+                  stroke="#475569" 
+                  fontSize={10}
+                  label={{ value: 'Knowledge Stability Index', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                />
                 <Tooltip content={<CustomTooltip />} />
+                
+                {/* ✅ SOLUCIÓN: Zonas de intervención */}
+                <ReferenceArea 
+                  x1={0} x2={0.7} y1={0} y2={60} 
+                  fill="#ef4444" 
+                  fillOpacity={0.05}
+                  label={{ 
+                    value: 'CRITICAL ZONE', 
+                    position: 'insideTopLeft', 
+                    fill: '#ef4444',
+                    fontSize: 10,
+                    fontWeight: 'bold'
+                  }}
+                />
+                <ReferenceArea 
+                  x1={0.7} x2={1} y1={60} y2={100} 
+                  fill="#10b981" 
+                  fillOpacity={0.05}
+                  label={{ 
+                    value: 'OPTIMAL ZONE', 
+                    position: 'insideTopRight', 
+                    fill: '#10b981',
+                    fontSize: 10,
+                    fontWeight: 'bold'
+                  }}
+                />
+                
                 <ReferenceLine x={0.7} stroke="#10b981" strokeDasharray="5 5" opacity={0.3} />
                 <ReferenceLine y={60} stroke="#ef4444" strokeDasharray="5 5" opacity={0.3} />
-                <Scatter data={filtered} onClick={(n) => setSelectedStudent(n.payload)}>
-                  {filtered.map((e, i) => (
-                    <Cell 
-                      key={i} 
-                      fill={e.dri.driSignal === 'INACTIVE' ? '#475569' : e.dri.driTier === 'RED' ? '#ef4444' : e.dri.driTier === 'YELLOW' ? '#f59e0b' : '#10b981'} 
-                      className="cursor-pointer opacity-60 hover:opacity-100 transition-all duration-300" 
-                    />
-                  ))}
+                
+                <Scatter data={matrixData} onClick={(n) => setSelectedStudent(n.payload.isCluster ? n.payload.worstStudent : n.payload)}>
+                  {matrixData.map((e, i) => {
+                    // ✅ SOLUCIÓN: Mapear driColor a hex
+                    const baseColor = driColorToHex(e.dri.driColor);
+                    const isCluster = e.isCluster;
+                    
+                    return (
+                      <Cell 
+                        key={i} 
+                        fill={baseColor}
+                        r={isCluster ? 8 : 5}
+                        stroke={isCluster ? '#fff' : 'none'}
+                        strokeWidth={isCluster ? 2 : 0}
+                        className="cursor-pointer opacity-70 hover:opacity-100 transition-all duration-300" 
+                      />
+                    );
+                  })}
                 </Scatter>
               </ScatterChart>
             </ResponsiveContainer>
+            
+            {/* Leyenda */}
+            <div className="absolute bottom-4 left-4 bg-slate-900/90 border border-slate-700 p-4 rounded-xl text-[10px]">
+              <p className="font-black text-slate-400 mb-2 uppercase tracking-wider">Legend</p>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-slate-400" />
+                  <span className="text-slate-400">Inactive</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <span className="text-red-400">Critical</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-amber-500" />
+                  <span className="text-amber-400">Watch</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <span className="text-emerald-400">Optimal</span>
+                </div>
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-700">
+                  <div className="w-4 h-4 rounded-full bg-indigo-500 border-2 border-white" />
+                  <span className="text-slate-400">Cluster (multiple students)</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
         {viewMode === 'HEATMAP' && (
            <div className="h-full w-full bg-slate-950 border border-slate-800 rounded-[2.5rem] p-8 overflow-hidden flex flex-col shadow-2xl animate-in fade-in duration-500">
+              <div className="mb-4">
+                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  📊 Top 15 Critical Knowledge Components
+                </h3>
+                <p className="text-[10px] text-slate-600 font-mono mt-1">
+                  Sorted by number of courses with avgLMP &lt; 40%
+                </p>
+              </div>
+              
               <div className="flex-1 overflow-auto custom-scrollbar">
                  <table className="w-full border-collapse">
                     <thead>
                        <tr>
-                          <th className="sticky top-0 left-0 z-20 bg-slate-950 p-2 text-[8px] font-black text-slate-600 uppercase text-left border-b border-slate-800">Knowledge Component</th>
+                          <th className="sticky top-0 left-0 z-20 bg-slate-950 p-2 text-[8px] font-black text-slate-600 uppercase text-left border-b border-slate-800">
+                            Knowledge Component
+                          </th>
                           {uniqueCourses.map(course => (
-                             <th key={course} className="sticky top-0 z-10 bg-slate-950 p-2 text-[8px] font-black text-slate-500 uppercase border-b border-slate-800 min-w-[80px] font-mono">{course}</th>
+                             <th key={course} className="sticky top-0 z-10 bg-slate-950 p-2 text-[8px] font-black text-slate-500 uppercase border-b border-slate-800 min-w-[80px] font-mono">
+                               {course}
+                             </th>
                           ))}
                        </tr>
                     </thead>
                     <tbody>
                        {heatmapData.map(row => (
                           <tr key={row.topic} className="hover:bg-slate-900/50 transition-colors">
-                             <td className="sticky left-0 z-10 bg-slate-950 p-2 text-[9px] font-bold text-slate-400 border-r border-slate-800 uppercase italic">{row.topic}</td>
+                             <td className="sticky left-0 z-10 bg-slate-950 p-2 text-[9px] font-bold text-slate-400 border-r border-slate-800 uppercase italic">
+                               {row.topic}
+                               <span className="ml-2 text-[8px] text-red-500 font-mono">
+                                 ({row.criticalCourses} critical)
+                               </span>
+                             </td>
                              {row.courseStats.map((cell, idx) => (
                                 <td key={idx} className="p-1 border border-slate-900">
-                                   <div className="h-8 rounded-md flex items-center justify-center text-[10px] font-mono font-black"
-                                      style={{ 
-                                         backgroundColor: cell.avgLMP < 0.4 ? 'rgba(239, 68, 68, 0.2)' : cell.avgLMP < 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.1)',
-                                         color: cell.avgLMP < 0.4 ? '#ef4444' : cell.avgLMP < 0.7 ? '#f59e0b' : '#10b981',
-                                         border: `1px solid ${cell.avgLMP < 0.4 ? '#ef444433' : cell.avgLMP < 0.7 ? '#f59e0b33' : '#10b98133'}`
-                                      }}
+                                   <div 
+                                     className="h-8 rounded-md flex items-center justify-center text-[10px] font-mono font-black"
+                                     style={{ 
+                                       backgroundColor: cell.avgLMP < 0.4 ? 'rgba(239, 68, 68, 0.2)' : cell.avgLMP < 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.1)',
+                                       border: `1px solid ${cell.avgLMP < 0.4 ? '#ef444433' : cell.avgLMP < 0.7 ? '#f59e0b33' : '#10b98133'}`
+                                     }}
                                    >
-                                      {(cell.avgLMP * 100).toFixed(0)}%
+                                     {/* ✅ SOLUCIÓN: Texto con contraste alto */}
+                                     <span style={{ 
+                                       color: cell.avgLMP < 0.4 ? '#fca5a5' : cell.avgLMP < 0.7 ? '#fbbf24' : '#6ee7b7',
+                                       textShadow: '0 0 2px rgba(0,0,0,0.8)'
+                                     }}>
+                                       {(cell.avgLMP * 100).toFixed(0)}%
+                                     </span>
                                    </div>
                                 </td>
                              ))}
