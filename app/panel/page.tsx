@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import StudentModal from '@/components/StudentModal';
+import KeenKTMatrix from '@/components/KeenKTMatrix'; // Importación de la nueva Matrix
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
 import { Student } from '@/types';
@@ -40,16 +41,55 @@ export default function PanelPage() {
 
   return (
     <div className="p-6 bg-[#050505] min-h-screen text-slate-300 font-sans">
+      {/* HEADER SECTION */}
       <div className="mb-8 border-b border-slate-800 pb-6 flex justify-between items-end">
-         <div>
+          <div>
             <h1 className="text-3xl font-black uppercase italic text-white tracking-tighter">DRI COMMAND V3.8</h1>
             <p className="text-[10px] text-indigo-400 font-bold tracking-[0.3em] uppercase mt-1">Direct Instruction Triage Protocol</p>
-         </div>
+          </div>
+          <div className="flex gap-4">
+            <div className="text-right">
+              <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Global Matrix Density</p>
+              <p className="text-xl font-mono font-black text-white">{students.length} UNITS</p>
+            </div>
+          </div>
       </div>
 
-      <input onChange={e => setSearch(e.target.value)} placeholder="🔎 SEARCH UNIT BY NAME..." className="w-full bg-slate-900/40 border border-slate-800 rounded-2xl px-6 py-4 mb-8 text-sm focus:border-indigo-500 outline-none font-mono" />
+      <input 
+        onChange={e => setSearch(e.target.value)} 
+        placeholder="🔎 SEARCH UNIT BY NAME..." 
+        className="w-full bg-slate-900/40 border border-slate-800 rounded-2xl px-6 py-4 mb-8 text-sm focus:border-indigo-500 outline-none font-mono" 
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-280px)]">
+      {/* MATRIX E INTERACTIVIDAD RLM */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+        <div className="lg:col-span-3 h-[600px]">
+          {/* Implementación de la Matrix KeenKT */}
+          <KeenKTMatrix 
+            students={filtered} 
+            onStudentClick={(s) => setSelectedStudent(s)} 
+          />
+        </div>
+
+        {/* STATS RÁPIDAS AL LADO DE LA MATRIX */}
+        <div className="lg:col-span-1 space-y-4">
+          <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-3xl">
+            <p className="text-[9px] font-black text-red-500 uppercase mb-1">Critical Tier</p>
+            <p className="text-3xl font-black text-white italic">{redZone.length}</p>
+          </div>
+          <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-3xl">
+            <p className="text-[9px] font-black text-amber-500 uppercase mb-1">Watch List</p>
+            <p className="text-3xl font-black text-white italic">{yellowZone.length}</p>
+          </div>
+          <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-3xl">
+            <p className="text-[9px] font-black text-emerald-500 uppercase mb-1">Optimal Flow</p>
+            <p className="text-3xl font-black text-white italic">{greenZone.length}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* TRIAGE COLUMNS (Original) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-280px)] mt-12">
         {[
           { id: 'RED', label: '🚨 Critical Ops', data: redZone, color: 'text-red-500', border: 'border-red-500' },
           { id: 'YELLOW', label: '⚠️ Watch List', data: yellowZone, color: 'text-amber-500', border: 'border-amber-500' },
@@ -57,12 +97,16 @@ export default function PanelPage() {
         ].map(column => (
           <div key={column.id} className="flex flex-col bg-slate-900/20 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
             <div className="p-4 flex justify-between items-center bg-slate-900/40 border-b border-slate-800">
-               <h2 className={`font-black text-[10px] uppercase tracking-widest ${column.color}`}>{column.label}</h2>
-               <span className="bg-slate-800 text-slate-400 text-[9px] px-2 py-1 rounded font-mono font-black">{column.data.length} ALUMNOS</span>
+                <h2 className={`font-black text-[10px] uppercase tracking-widest ${column.color}`}>{column.label}</h2>
+                <span className="bg-slate-800 text-slate-400 text-[9px] px-2 py-1 rounded font-mono font-black">{column.data.length} ALUMNOS</span>
             </div>
             <div className="p-4 space-y-3 overflow-y-auto custom-scrollbar">
               {column.data.map(s => (
-                <div key={s.id} onClick={() => setSelectedStudent(s)} className={`p-4 bg-slate-900/80 rounded-2xl border-l-4 ${column.border} cursor-pointer hover:scale-[1.02] transition-all`}>
+                <div 
+                  key={s.id} 
+                  onClick={() => setSelectedStudent(s)} 
+                  className={`p-4 bg-slate-900/80 rounded-2xl border-l-4 ${column.border} cursor-pointer hover:scale-[1.02] transition-all`}
+                >
                   <div className="flex justify-between items-start mb-1">
                     <h3 className="font-black text-white text-sm uppercase italic truncate w-40">{s.firstName} {s.lastName}</h3>
                     <span className="text-[10px] font-mono font-bold text-slate-500 italic">{(s.metrics.lmp * 100).toFixed(0)}% LMP</span>
@@ -78,6 +122,8 @@ export default function PanelPage() {
           </div>
         ))}
       </div>
+
+      {/* MODAL DE ESTUDIANTE */}
       {selectedStudent && <StudentModal student={selectedStudent} onClose={() => setSelectedStudent(null)} />}
     </div>
   );
