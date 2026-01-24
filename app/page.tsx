@@ -8,7 +8,6 @@ import {
   ReferenceLine, Cell, ReferenceArea 
 } from 'recharts';
 import StudentModal from '@/components/StudentModal';
-import { TriageColumnSkeleton, MatrixSkeleton, HeatmapSkeleton } from '@/components/LoadingSkeleton';
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
 import { driColorToHex, kMeansCluster } from '@/lib/color-utils';
@@ -1005,7 +1004,7 @@ export default function HomePage() {
                        </tr>
                     </thead>
                     <tbody>
-                       {heatmapData.map((row, rowIndex) => (
+                        {heatmapData.map((row, rowIndex) => (
                           <tr key={row.topic} className="hover:bg-slate-900/50 transition-colors group">
                              <td className="sticky left-0 z-10 bg-slate-950 p-3 border-r border-slate-800">
                                <div className="flex items-center gap-3">
@@ -1061,11 +1060,11 @@ export default function HomePage() {
                                      className="h-10 rounded-md flex items-center justify-center text-[10px] font-mono font-black transition-all hover:scale-105 cursor-help group/cell"
                                      style={{ 
                                        backgroundColor: cell.avgLMP < 0.4 ? 'rgba(239, 68, 68, 0.2)' : 
-                                                       cell.avgLMP < 0.7 ? 'rgba(245, 158, 11, 0.15)' : 
-                                                       'rgba(16, 185, 129, 0.1)',
+                                                        cell.avgLMP < 0.7 ? 'rgba(245, 158, 11, 0.15)' : 
+                                                        'rgba(16, 185, 129, 0.1)',
                                        border: `1px solid ${cell.avgLMP < 0.4 ? '#ef444433' : 
-                                                            cell.avgLMP < 0.7 ? '#f59e0b33' : 
-                                                            '#10b98133'}`
+                                                             cell.avgLMP < 0.7 ? '#f59e0b33' : 
+                                                             '#10b98133'}`
                                      }}
                                    >
                                      <span style={{ 
@@ -1084,7 +1083,7 @@ export default function HomePage() {
                                 </td>
                              ))}
                           </tr>
-                       ))}
+                        ))}
                     </tbody>
                  </table>
               </div>
