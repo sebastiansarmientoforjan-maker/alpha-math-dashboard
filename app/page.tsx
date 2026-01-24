@@ -12,11 +12,14 @@ import { TriageColumnSkeleton, MatrixSkeleton, HeatmapSkeleton } from '@/compone
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
 import { driColorToHex, kMeansCluster } from '@/lib/color-utils';
+import { DRI_CONFIG } from '@/lib/dri-config';
 import { Student } from '@/types';
 import { TOPIC_GRADE_MAP } from '@/lib/grade-maps';
 import { formatDistanceToNow } from 'date-fns';
 
-// Tooltip mejorado para la Matriz KeenKT
+// ==========================================
+// TOOLTIP MEJORADO PARA MATRIZ KEENKT
+// ==========================================
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
@@ -30,11 +33,18 @@ const CustomTooltip = ({ active, payload }: any) => {
             <p className="font-bold text-indigo-400 mb-1">Caso más crítico:</p>
             <p className="text-white font-bold">{data.worstStudent.firstName} {data.worstStudent.lastName}</p>
             <p className="text-slate-400 text-[10px] mb-2">{data.worstStudent.currentCourse?.name}</p>
-            <p className="text-emerald-400">Mastery: {(data.worstStudent.metrics?.lmp * 100).toFixed(0)}%</p>
-            <p className="text-blue-400">Stability: {data.worstStudent.metrics?.ksi}%</p>
+            <p className="text-emerald-400">RSR: {(data.worstStudent.metrics?.lmp * 100).toFixed(0)}%</p>
+            <p className="text-blue-400">KSI: {data.worstStudent.metrics?.ksi}%</p>
+            <p className="text-amber-400 text-[10px] mt-1">
+              Velocity: {data.worstStudent.metrics?.velocityScore}% 
+              <span className="text-slate-600"> (de {DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP)</span>
+            </p>
             <p className={`mt-2 font-mono uppercase font-bold text-sm ${data.worstStudent.dri.driColor}`}>
               {data.worstStudent.dri.driSignal}
             </p>
+            {data.worstStudent.dri.riskScore !== undefined && (
+              <p className="text-[10px] text-slate-500 mt-1">Risk Score: {data.worstStudent.dri.riskScore}/100</p>
+            )}
           </div>
         </div>
       );
@@ -44,17 +54,27 @@ const CustomTooltip = ({ active, payload }: any) => {
       <div className="bg-slate-900 border border-slate-700 p-3 rounded-lg shadow-2xl text-xs">
         <p className="font-bold text-white mb-1">{data.firstName} {data.lastName}</p>
         <p className="text-indigo-400 font-bold mb-1 uppercase text-[9px]">{data.currentCourse?.name}</p>
-        <p className="text-emerald-400">Mastery (LMP): {(data.metrics?.lmp * 100).toFixed(0)}%</p>
+        <p className="text-emerald-400">Recent Success Rate: {(data.metrics?.lmp * 100).toFixed(0)}%</p>
         <p className="text-blue-400">Stability (KSI): {data.metrics?.ksi}%</p>
+        <p className="text-amber-400 text-[10px] mt-1">
+          Velocity: {data.metrics?.velocityScore}% 
+          <span className="text-slate-600"> (de {DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP)</span>
+        </p>
         <p className={`mt-1 font-mono uppercase font-bold ${data.dri.driColor}`}>
           {data.dri.driSignal}
         </p>
+        {data.dri.riskScore !== undefined && (
+          <p className="text-[10px] text-slate-500 mt-1">Risk Score: {data.dri.riskScore}/100</p>
+        )}
       </div>
     );
   }
   return null;
 };
 
+// ==========================================
+// COMPONENTE PRINCIPAL
+// ==========================================
 export default function HomePage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
@@ -64,7 +84,7 @@ export default function HomePage() {
   const [progress, setProgress] = useState(0);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [batchStatus, setBatchStatus] = useState({ current: 0, total: 33 });
+  const [batchStatus, setBatchStatus] = useState({ current: 0, total: 33, lastStudent: '' });
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   
   const [viewMode, setViewMode] = useState<'TRIAGE' | 'MATRIX' | 'HEATMAP' | 'LOG'>('TRIAGE');
@@ -72,6 +92,9 @@ export default function HomePage() {
   const [search, setSearch] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('ALL');
 
+  // ==========================================
+  // FIREBASE LISTENERS
+  // ==========================================
   useEffect(() => {
     const unsubStudents = onSnapshot(query(collection(db, 'students')), (snapshot) => {
       const data = snapshot.docs.map(doc => {
@@ -84,13 +107,19 @@ export default function HomePage() {
       setLoading(false);
     });
 
-    const unsubLogs = onSnapshot(query(collection(db, 'interventions'), orderBy('createdAt', 'desc'), limit(20)), (snapshot) => {
-      setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    const unsubLogs = onSnapshot(
+      query(collection(db, 'interventions'), orderBy('createdAt', 'desc'), limit(20)), 
+      (snapshot) => {
+        setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }
+    );
 
     return () => { unsubStudents(); unsubLogs(); };
   }, []);
 
+  // ==========================================
+  // AUTO-SYNC RECURSIVO
+  // ==========================================
   const runUpdateBatch = async () => {
     if (updating) return;
     setUpdating(true);
@@ -105,8 +134,9 @@ export default function HomePage() {
       if (data.success) {
         setProgress(data.progress);
         setBatchStatus({
-          current: Math.ceil(data.nextIndex / 50),
-          total: 33
+          current: data.currentBatch || Math.ceil(data.nextIndex / 50),
+          total: data.totalBatches || 33,
+          lastStudent: data.lastStudentName || ''
         });
         
         if (autoSync && data.progress < 100) {
@@ -128,13 +158,16 @@ export default function HomePage() {
     if (autoSync && !updating) runUpdateBatch(); 
   }, [autoSync]);
 
+  // ==========================================
+  // DATOS COMPUTADOS
+  // ==========================================
   const uniqueCourses = useMemo(() => 
     Array.from(new Set(students.map(s => s.currentCourse?.name).filter(Boolean))).sort(), 
   [students]);
   
   const criticalTopics = Object.keys(TOPIC_GRADE_MAP);
 
-  // Heatmap con priorización
+  // Heatmap con priorización (Top 15 más críticos)
   const heatmapData = useMemo(() => {
     const data = criticalTopics.map(topic => {
       const courseStats = uniqueCourses.map(course => {
@@ -148,19 +181,30 @@ export default function HomePage() {
       return { topic, courseStats, criticalCourses };
     });
     
-    return data.sort((a, b) => b.criticalCourses - a.criticalCourses).slice(0, 15);
+    return data
+      .sort((a, b) => b.criticalCourses - a.criticalCourses)
+      .slice(0, 15);
   }, [students, uniqueCourses, criticalTopics]);
 
+  // Filtrado
   const filtered = useMemo(() => students.filter(s => {
     const nameMatch = `${s.firstName} ${s.lastName} ${s.id}`.toLowerCase().includes(search.toLowerCase());
     const courseMatch = selectedCourse === 'ALL' || s.currentCourse?.name === selectedCourse;
     return nameMatch && courseMatch;
   }), [students, search, selectedCourse]);
 
-  // Distribución Inclusiva
-  const redZone = useMemo(() => filtered.filter(s => s.dri.driTier === 'RED'), [filtered]);
-  const yellowZone = useMemo(() => filtered.filter(s => s.dri.driTier === 'YELLOW' && !redZone.some(r => r.id === s.id)), [filtered, redZone]);
-  const greenZone = useMemo(() => filtered.filter(s => !redZone.some(r => r.id === s.id) && !yellowZone.some(y => y.id === s.id)), [filtered, redZone, yellowZone]);
+  // Distribución Inclusiva (cada estudiante en solo un tier)
+  const redZone = useMemo(() => 
+    filtered.filter(s => s.dri.driTier === 'RED'), 
+  [filtered]);
+  
+  const yellowZone = useMemo(() => 
+    filtered.filter(s => s.dri.driTier === 'YELLOW' && !redZone.some(r => r.id === s.id)), 
+  [filtered, redZone]);
+  
+  const greenZone = useMemo(() => 
+    filtered.filter(s => !redZone.some(r => r.id === s.id) && !yellowZone.some(y => y.id === s.id)), 
+  [filtered, redZone, yellowZone]);
 
   // Matrix data con clustering
   const matrixData = useMemo(() => {
@@ -177,6 +221,7 @@ export default function HomePage() {
       return clusters.map(c => ({
         ...c.worstStudent,
         metrics: {
+          ...c.worstStudent.metrics,
           lmp: c.centroid.x,
           ksi: c.centroid.y
         },
@@ -189,6 +234,16 @@ export default function HomePage() {
     return baseData;
   }, [filtered, redZone, yellowZone, matrixMode]);
 
+  // Estadísticas globales
+  const stats = useMemo(() => ({
+    total: students.length,
+    atRisk: students.filter(s => s.dri.driTier === 'RED').length,
+    attention: students.filter(s => s.dri.driTier === 'YELLOW').length,
+    onTrack: students.filter(s => s.dri.driTier === 'GREEN').length,
+    avgVelocity: Math.round(students.reduce((sum, s) => sum + (s.metrics?.velocityScore || 0), 0) / (students.length || 1)),
+    avgRSR: Math.round(students.reduce((sum, s) => sum + ((s.metrics?.lmp || 0) * 100), 0) / (students.length || 1))
+  }), [students]);
+
   if (loading) return (
     <div className="p-10 bg-black min-h-screen text-emerald-500 font-mono italic animate-pulse text-center uppercase tracking-widest">
       DRI COMMAND CENTER INITIALIZING...
@@ -198,11 +253,20 @@ export default function HomePage() {
   return (
     <div className="p-4 bg-[#050505] min-h-screen text-slate-300 font-sans">
       
-      {/* HEADER */}
+      {/* ========================================== */}
+      {/* HEADER CON SYNC STATUS */}
+      {/* ========================================== */}
       <div className="flex flex-col md:flex-row justify-between items-end mb-8 border-b border-slate-800 pb-6 gap-4">
         <div>
           <h1 className="text-3xl font-black uppercase italic text-white tracking-tighter">DRI COMMAND CENTER</h1>
-          <p className="text-xs text-indigo-400 font-bold tracking-[0.3em] uppercase">V4.9 Auditoría Poblacional: {students.length} / 1613</p>
+          <p className="text-xs text-indigo-400 font-bold tracking-[0.3em] uppercase">
+            V5.0 Alpha Protocol • {students.length} / 1613 Estudiantes
+          </p>
+          <p className="text-[10px] text-slate-600 mt-1">
+            <span className="text-emerald-500 font-mono">{DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP/semana</span> standard • 
+            <span className="text-amber-500 font-mono ml-2">DER &gt; {DRI_CONFIG.DER_CRITICAL_THRESHOLD}%</span> critical • 
+            <span className="text-red-500 font-mono ml-2">PDI &gt; {DRI_CONFIG.PDI_CRITICAL_THRESHOLD}</span> fatigue
+          </p>
           {lastSync && (
             <p className="text-[10px] text-slate-600 font-mono mt-1">
               Last sync: {formatDistanceToNow(lastSync, { addSuffix: true })}
@@ -211,11 +275,12 @@ export default function HomePage() {
         </div>
         
         <div className="flex flex-col items-end gap-3">
+          {/* View Mode Selector */}
           <div className="flex bg-slate-900/50 p-1 rounded-xl border border-slate-800 font-black text-[10px] uppercase">
-            {['TRIAGE', 'MATRIX', 'HEATMAP', 'LOG'].map(m => (
+            {(['TRIAGE', 'MATRIX', 'HEATMAP', 'LOG'] as const).map(m => (
               <button 
                 key={m} 
-                onClick={() => setViewMode(m as any)} 
+                onClick={() => setViewMode(m)} 
                 className={`px-4 py-2 rounded-lg transition-all ${
                   viewMode === m 
                     ? 'bg-indigo-600 text-white shadow-lg' 
@@ -227,6 +292,7 @@ export default function HomePage() {
             ))}
           </div>
           
+          {/* Sync Controls */}
           <div className="flex gap-4 items-center bg-slate-900/40 p-2 px-4 rounded-xl border border-slate-800 relative overflow-hidden group">
             {autoSync && (
               <div 
@@ -237,7 +303,12 @@ export default function HomePage() {
             <div className="text-[10px] font-mono">
               <div className="font-bold text-white">{students.length} / 1613</div>
               {autoSync && (
-                <div className="text-slate-500">Batch {batchStatus.current}/{batchStatus.total}</div>
+                <div className="text-slate-500">
+                  Batch {batchStatus.current}/{batchStatus.total}
+                  {batchStatus.lastStudent && (
+                    <span className="ml-2 text-slate-600">• {batchStatus.lastStudent}</span>
+                  )}
+                </div>
               )}
             </div>
             <button 
@@ -253,6 +324,7 @@ export default function HomePage() {
             </button>
           </div>
           
+          {/* Error Display */}
           {syncError && (
             <div className="bg-red-900/20 border border-red-500/50 px-4 py-2 rounded-lg text-[10px] text-red-400 font-mono">
               {syncError}
@@ -261,7 +333,46 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* ========================================== */}
+      {/* STATS CARDS */}
+      {/* ========================================== */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+        <div className="bg-blue-500/10 border border-blue-500/30 p-4 rounded-xl">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-blue-400 mb-1">Total Students</div>
+          <div className="text-2xl font-black text-white">{stats.total}</div>
+        </div>
+        
+        <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-xl">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-red-400 mb-1">🔴 At Risk</div>
+          <div className="text-2xl font-black text-white">{stats.atRisk}</div>
+        </div>
+        
+        <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-xl">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400 mb-1">🟡 Attention</div>
+          <div className="text-2xl font-black text-white">{stats.attention}</div>
+        </div>
+        
+        <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-xl">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 mb-1">🟢 On Track</div>
+          <div className="text-2xl font-black text-white">{stats.onTrack}</div>
+        </div>
+        
+        <div className="bg-purple-500/10 border border-purple-500/30 p-4 rounded-xl">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-purple-400 mb-1">Avg Velocity</div>
+          <div className="text-2xl font-black text-white">{stats.avgVelocity}%</div>
+          <div className="text-[9px] text-slate-600 font-mono mt-1">vs {DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP</div>
+        </div>
+        
+        <div className="bg-indigo-500/10 border border-indigo-500/30 p-4 rounded-xl">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 mb-1">Avg RSR</div>
+          <div className="text-2xl font-black text-white">{stats.avgRSR}%</div>
+          <div className="text-[9px] text-slate-600 font-mono mt-1">Recent Success</div>
+        </div>
+      </div>
+
+      {/* ========================================== */}
       {/* FILTROS */}
+      {/* ========================================== */}
       <div className="flex flex-wrap gap-4 mb-8">
         <input 
           onChange={(e) => setSearch(e.target.value)} 
@@ -277,8 +388,12 @@ export default function HomePage() {
           {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
+{/* ========================================== */}
       {/* ÁREA DE CONTENIDO DINÁMICO */}
-      <div className="h-[calc(100vh-280px)] overflow-hidden">
+      {/* ========================================== */}
+      <div className="h-[calc(100vh-420px)] overflow-hidden">
+        
+        {/* ==================== TRIAGE VIEW ==================== */}
         {viewMode === 'TRIAGE' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full animate-in fade-in duration-500">
             {[
@@ -308,17 +423,32 @@ export default function HomePage() {
                             {s.firstName} {s.lastName}
                           </h3>
                           <span className="text-[10px] font-mono font-bold text-slate-500 italic">
-                            {(s.metrics.lmp * 100).toFixed(0)}% LMP
+                            {(s.metrics.lmp * 100).toFixed(0)}% RSR
                           </span>
                         </div>
                         <p className="text-[9px] text-indigo-400/70 font-bold uppercase mb-3 truncate italic">
                           {s.currentCourse.name}
                         </p>
                         <div className="flex justify-between items-center text-[8px] font-black uppercase font-mono">
-                          {/* ✅ SOLUCIÓN: Usar driColor directamente */}
                           <span className={s.dri.driColor}>{s.dri.driSignal}</span>
-                          <span className="text-slate-600">KSI: {s.metrics.ksi}%</span>
+                          <span className="text-slate-600">
+                            {s.metrics.velocityScore}% v • KSI: {s.metrics.ksi}%
+                          </span>
                         </div>
+                        {s.dri.riskScore !== undefined && (
+                          <div className="mt-2 pt-2 border-t border-slate-800">
+                            <div className="flex justify-between items-center text-[9px]">
+                              <span className="text-slate-600">Risk Score:</span>
+                              <span className={`font-mono font-bold ${
+                                s.dri.riskScore >= 60 ? 'text-red-400' : 
+                                s.dri.riskScore >= 35 ? 'text-amber-400' : 
+                                'text-emerald-400'
+                              }`}>
+                                {s.dri.riskScore}/100
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
@@ -328,6 +458,7 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* ==================== MATRIX VIEW ==================== */}
         {viewMode === 'MATRIX' && (
           <div className="h-full w-full bg-slate-900/10 border border-slate-800 rounded-[2.5rem] p-8 relative overflow-hidden animate-in fade-in duration-500 shadow-2xl">
             {/* Toggle de modo */}
@@ -349,24 +480,36 @@ export default function HomePage() {
                 <XAxis 
                   type="number" 
                   dataKey="metrics.lmp" 
-                  name="Mastery" 
+                  name="RSR" 
                   domain={[0, 1]} 
                   stroke="#475569" 
                   fontSize={10}
-                  label={{ value: 'Learning Mastery Probability', position: 'insideBottom', offset: -10, fill: '#64748b' }}
+                  label={{ 
+                    value: 'Recent Success Rate (RSR)', 
+                    position: 'insideBottom', 
+                    offset: -10, 
+                    fill: '#64748b',
+                    fontSize: 11
+                  }}
                 />
                 <YAxis 
                   type="number" 
                   dataKey="metrics.ksi" 
-                  name="Stability" 
+                  name="KSI" 
                   domain={[0, 100]} 
                   stroke="#475569" 
                   fontSize={10}
-                  label={{ value: 'Knowledge Stability Index', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                  label={{ 
+                    value: 'Knowledge Stability Index', 
+                    angle: -90, 
+                    position: 'insideLeft', 
+                    fill: '#64748b',
+                    fontSize: 11
+                  }}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 
-                {/* ✅ SOLUCIÓN: Zonas de intervención */}
+                {/* Zonas de intervención */}
                 <ReferenceArea 
                   x1={0} x2={0.7} y1={0} y2={60} 
                   fill="#ef4444" 
@@ -397,7 +540,6 @@ export default function HomePage() {
                 
                 <Scatter data={matrixData} onClick={(n) => setSelectedStudent(n.payload.isCluster ? n.payload.worstStudent : n.payload)}>
                   {matrixData.map((e, i) => {
-                    // ✅ SOLUCIÓN: Mapear driColor a hex
                     const baseColor = driColorToHex(e.dri.driColor);
                     const isCluster = e.isCluster;
                     
@@ -422,19 +564,19 @@ export default function HomePage() {
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-slate-400" />
-                  <span className="text-slate-400">Inactive</span>
+                  <span className="text-slate-400">Inactive ({students.filter(s => s.dri.driSignal === 'INACTIVE').length})</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-red-500" />
-                  <span className="text-red-400">Critical</span>
+                  <span className="text-red-400">Critical ({stats.atRisk})</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-amber-500" />
-                  <span className="text-amber-400">Watch</span>
+                  <span className="text-amber-400">Watch ({stats.attention})</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                  <span className="text-emerald-400">Optimal</span>
+                  <span className="text-emerald-400">Optimal ({stats.onTrack})</span>
                 </div>
                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-700">
                   <div className="w-4 h-4 rounded-full bg-indigo-500 border-2 border-white" />
@@ -444,7 +586,7 @@ export default function HomePage() {
             </div>
           </div>
         )}
-
+        {/* ==================== HEATMAP VIEW ==================== */}
         {viewMode === 'HEATMAP' && (
            <div className="h-full w-full bg-slate-950 border border-slate-800 rounded-[2.5rem] p-8 overflow-hidden flex flex-col shadow-2xl animate-in fade-in duration-500">
               <div className="mb-4">
@@ -452,7 +594,7 @@ export default function HomePage() {
                   📊 Top 15 Critical Knowledge Components
                 </h3>
                 <p className="text-[10px] text-slate-600 font-mono mt-1">
-                  Sorted by number of courses with avgLMP &lt; 40%
+                  Sorted by number of courses with avg RSR &lt; 40%
                 </p>
               </div>
               
@@ -488,7 +630,6 @@ export default function HomePage() {
                                        border: `1px solid ${cell.avgLMP < 0.4 ? '#ef444433' : cell.avgLMP < 0.7 ? '#f59e0b33' : '#10b98133'}`
                                      }}
                                    >
-                                     {/* ✅ SOLUCIÓN: Texto con contraste alto */}
                                      <span style={{ 
                                        color: cell.avgLMP < 0.4 ? '#fca5a5' : cell.avgLMP < 0.7 ? '#fbbf24' : '#6ee7b7',
                                        textShadow: '0 0 2px rgba(0,0,0,0.8)'
@@ -506,13 +647,16 @@ export default function HomePage() {
            </div>
         )}
 
+        {/* ==================== LOG VIEW ==================== */}
         {viewMode === 'LOG' && (
            <div className="h-full bg-slate-950 border border-slate-800 rounded-[2.5rem] p-8 overflow-y-auto custom-scrollbar animate-in fade-in duration-500 shadow-2xl">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  {logs.map(log => (
                     <div key={log.id} className="flex items-center justify-between p-5 bg-slate-900/30 rounded-2xl border border-slate-800/50 shadow-inner">
                        <div className="flex items-center gap-5">
-                          <div className={`w-3 h-3 rounded-full ${log.type === 'coaching' ? 'bg-indigo-500 shadow-[0_0_10px_#6366f1]' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'}`} />
+                          <div className={`w-3 h-3 rounded-full ${
+                            log.type === 'coaching' ? 'bg-indigo-500 shadow-[0_0_10px_#6366f1]' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'
+                          }`} />
                           <div>
                              <p className="text-sm font-black text-white uppercase italic">{log.studentName}</p>
                              <p className="text-[10px] text-slate-500 font-mono">{log.type} • {log.targetTopic || 'General'}</p>
@@ -528,6 +672,9 @@ export default function HomePage() {
         )}
       </div>
 
+      {/* ========================================== */}
+      {/* STUDENT MODAL */}
+      {/* ========================================== */}
       {selectedStudent && <StudentModal student={selectedStudent} onClose={() => setSelectedStudent(null)} />}
     </div>
   );
