@@ -13,7 +13,7 @@ function getWeekRange() {
 
   const startDateObj = new Date(now);
   const day = startDateObj.getDay();
-  startDateObj.setDate(startDateObj.getDate() - day - 1); // Domingo - 1 día
+  startDateObj.setDate(startDateObj.getDate() - day - 30); // Domingo - 1 día
   const startDate = startDateObj.toISOString().split('T')[0];
 
   return { startDate, endDate };
