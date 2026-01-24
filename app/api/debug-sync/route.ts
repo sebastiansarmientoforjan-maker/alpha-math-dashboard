@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   // Usamos un ID de tu lista que sabemos que debería existir
-  const TEST_STUDENT_ID = '22122'; 
+  const TEST_STUDENT_ID = '29509'; 
 
   try {
     // 1. Verificar API Key antes de llamar
