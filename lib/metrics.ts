@@ -16,10 +16,14 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
   const totals = activity?.totals || activity || {}; 
 
   // ==========================================
-  // NORMALIZACIÓN TEMPORAL (Segundos → Minutos)
+  // NORMALIZACIÓN TEMPORAL (BLINDADA)
   // ==========================================
-  // SOLUCIÓN: Asegurar lectura desde la raíz 'time' que ya viene corregida de la API
-  const rawTimeSeconds = activity?.time ?? totals.timeEngaged ?? totals.time ?? 0;
+  // SOLUCIÓN: Buscamos el tiempo en todas las variantes posibles:
+  // 1. activity.time (Procesado por mathAcademyAPI.ts)
+  // 2. totals.time_engaged (Crudo de la API en snake_case)
+  // 3. totals.timeEngaged (Legacy camelCase)
+  // 4. totals.time (Legacy simple)
+  const rawTimeSeconds = activity?.time ?? totals.time_engaged ?? totals.timeEngaged ?? totals.time ?? 0;
   
   const timeEngaged = Math.round(rawTimeSeconds / 60);
   const timeProductive = Math.round((totals.timeProductive || 0) / 60);
