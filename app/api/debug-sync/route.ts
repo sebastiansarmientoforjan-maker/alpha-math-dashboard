@@ -1,64 +1,73 @@
 import { NextResponse } from 'next/server';
-import { getStudentData } from '@/lib/mathAcademyAPI';
 
-// Evita caché para ver datos reales
 export const dynamic = 'force-dynamic';
 
+const BASE_URL = 'https://mathacademy.com/api/beta6';
+
 export async function GET(request: Request) {
-  // Usamos un ID de tu lista que sabemos que debería existir
-  const TEST_STUDENT_ID = '29509'; 
+  const API_KEY = process.env.NEXT_PUBLIC_MATH_ACADEMY_API_KEY;
+
+  if (!API_KEY) {
+    return NextResponse.json({ error: 'Falta API Key' }, { status: 500 });
+  }
 
   try {
-    // 1. Verificar API Key antes de llamar
-    const apiKey = process.env.NEXT_PUBLIC_MATH_ACADEMY_API_KEY;
-    if (!apiKey) {
-        return NextResponse.json({ 
-            status: '❌ FALLO DE CONFIGURACIÓN',
-            error: 'No se encontró la API Key en las variables de entorno (.env.local)' 
-        }, { status: 500 });
-    }
-
-    console.log(`🔍 Consultando API para ID: ${TEST_STUDENT_ID}...`);
-    const data = await getStudentData(TEST_STUDENT_ID);
+    // 1. INTENTO DE DESCUBRIMIENTO: Pedir la lista completa
+    // Probamos el endpoint estándar de colección
+    console.log('📡 Intentando descubrir estudiantes activos...');
     
-    // 2. Manejar caso de Estudiante No Encontrado (Aquí fue el error anterior)
-    if (!data) {
-        return NextResponse.json({ 
-            status: '⚠️ API CONECTADA PERO SIN DATOS',
-            message: `La API respondió, pero devolvió NULL para el estudiante ${TEST_STUDENT_ID}.`,
-            possible_causes: [
-                "El ID del estudiante no existe o está inactivo.",
-                "La API Key no tiene permisos suficientes.",
-                "Math Academy bloqueó la solicitud (Rate Limit)."
-            ]
-        }, { status: 404 });
+    const res = await fetch(`${BASE_URL}/students`, {
+      headers: { 'Public-API-Key': API_KEY },
+      cache: 'no-store'
+    });
+
+    if (!res.ok) {
+        return NextResponse.json({
+            status: '❌ ERROR EN DESCUBRIMIENTO',
+            code: res.status,
+            statusText: res.statusText,
+            message: 'No se pudo obtener la lista de estudiantes. Revisa permisos de la API Key.'
+        }, { status: res.status });
     }
 
-    // 3. Si llegamos aquí, TENEMOS DATOS. Analicemos el tiempo.
-    return NextResponse.json({
-      status: '✅ CONEXIÓN EXITOSA',
-      student_name: `${data.firstName} ${data.lastName}`,
-      
-      // Diagnóstico del tiempo (Aquí veremos si llegan los segundos)
-      time_diagnosis: {
-          raw_seconds_from_api: data.activity?.time,
-          minutes_calculated: Math.round((data.activity?.time || 0) / 60) + ' min',
-          is_zero: (data.activity?.time || 0) === 0
-      },
+    const data = await res.json();
 
-      // Verificamos de dónde viene el dato para estar seguros
-      debug_sources: {
-          totals_time_engaged: data.activity?.totals?.time_engaged,
-          totals_timeEngaged: data.activity?.totals?.timeEngaged,
-          root_time: data.activity?.time
+    // 2. Analizar qué devolvió la API
+    // A veces devuelve { students: [...] } o directamente [...]
+    const studentList = Array.isArray(data) ? data : (data.students || []);
+
+    if (studentList.length === 0) {
+        return NextResponse.json({
+            status: '⚠️ API VACÍA',
+            message: 'La API respondió OK, pero la lista de estudiantes está vacía.',
+            suggestion: 'Tu API Key podría ser válida pero no tener estudiantes asignados.'
+        });
+    }
+
+    // 3. ÉXITO: Tomamos el primer estudiante REAL para probar sus datos
+    const realStudent = studentList[0];
+    
+    return NextResponse.json({
+      status: '✅ DESCUBRIMIENTO EXITOSO',
+      count: studentList.length,
+      
+      // Muestra IDs reales para que actualices tu JSON
+      first_5_ids: studentList.slice(0, 5).map((s: any) => s.id),
+      
+      // Muestra la estructura del primer estudiante para ver dónde está el tiempo
+      sample_student: {
+          id: realStudent.id,
+          name: `${realStudent.first_name || realStudent.firstName} ${realStudent.last_name || realStudent.lastName}`,
+          // Aquí veremos si los datos vienen en la lista o si hay que pedir detalle
+          has_activity_data: !!realStudent.activity, 
+          raw_data_keys: Object.keys(realStudent)
       }
     });
 
   } catch (e: any) {
     return NextResponse.json({ 
-        status: '❌ ERROR DE SERVIDOR',
-        error_message: e.message,
-        stack: e.stack
+        status: '❌ ERROR DE CONEXIÓN',
+        error: e.message 
     }, { status: 500 });
   }
 }
