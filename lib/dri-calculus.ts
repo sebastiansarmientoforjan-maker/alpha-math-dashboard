@@ -26,12 +26,11 @@ export function calculateDRIMetrics(student: Student) {
   let driSignal = 'Flowing';
   let driColor = 'text-emerald-500';
 
-  // 1. Caso de Inactividad (Seguridad para el reporte de Middle School)
-  // Si no hay tareas o el esfuerzo y avance son nulos
+  // 1. Caso de Inactividad (MEJOR CONTRASTE)
   if (tasks.length === 0 || (student.metrics?.velocityScore === 0 && student.metrics?.lmp === 0)) {
-    driTier = 'RED'; // Se mantiene en Red Zone para llamar la atención del DRI
+    driTier = 'RED';
     driSignal = 'INACTIVE';
-    driColor = 'text-slate-500'; // Gris para diferenciar de un error académico real
+    driColor = 'text-slate-400'; // ✅ CAMBIO: Mejor contraste que slate-500
   } 
   // 2. Casos de Riesgo Académico
   else if (debtExposure > 25 || student.metrics?.stallStatus === 'Frustrated Stall' || student.metrics?.velocityScore < 30) {
@@ -53,6 +52,6 @@ export function calculateDRIMetrics(student: Student) {
     precisionDecay, 
     driTier, 
     driSignal,
-    driColor // Nueva propiedad para que el Dashboard y Modal sepan qué color usar
+    driColor
   };
 }
