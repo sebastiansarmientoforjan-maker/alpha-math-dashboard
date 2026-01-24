@@ -3,10 +3,8 @@
 import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
-import { 
-  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  ReferenceLine, Cell, ReferenceArea 
-} from 'recharts';
+// ✅ Reemplazamos las importaciones manuales de Recharts por el componente KeenKTMatrix
+import KeenKTMatrix from '@/components/KeenKTMatrix'; 
 import StudentModal from '@/components/StudentModal';
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
@@ -93,7 +91,7 @@ const StudentCard = memo(({ student, onClick, borderColor }: { student: Student;
       <div className="flex justify-between items-center text-[8px] font-black uppercase font-mono">
         <span className={student.dri.driColor}>{student.dri.driSignal}</span>
         <span className="text-slate-600">
-          {student.metrics.velocityScore}% v • KSI: {student.metrics.ksi}%
+          {student.metrics.velocityScore}% v • KSI: {student.metrics.ksi !== null ? student.metrics.ksi + '%' : 'N/A'}
         </span>
       </div>
       
@@ -131,124 +129,6 @@ const StudentCard = memo(({ student, onClick, borderColor }: { student: Student;
 StudentCard.displayName = 'StudentCard';
 
 // ==========================================
-// CUSTOM TOOLTIP OPTIMIZADO
-// ==========================================
-const CustomTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    const isCluster = data.members && data.members.length > 1;
-    
-    if (isCluster) {
-      return (
-        <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-xl shadow-2xl backdrop-blur-md max-w-xs">
-          <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-700">
-            <p className="font-black text-white text-sm">📍 {data.members.length} estudiantes</p>
-          </div>
-          
-          <div className="space-y-1">
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider">Caso más crítico:</p>
-            <p className="text-white font-bold text-xs">{data.worstStudent.firstName} {data.worstStudent.lastName}</p>
-            
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-2 pt-2 border-t border-slate-700/50">
-              <div className="flex justify-between items-center">
-                <span className="text-[9px] text-slate-500">RSR:</span>
-                <span className="text-emerald-400 font-mono font-bold text-[10px]">
-                  {(data.worstStudent.metrics?.lmp * 100).toFixed(0)}%
-                </span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-[9px] text-slate-500">KSI:</span>
-                <span className="text-blue-400 font-mono font-bold text-[10px]">
-                  {data.worstStudent.metrics?.ksi}%
-                </span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-[9px] text-slate-500">V:</span>
-                <span className="text-amber-400 font-mono font-bold text-[10px]">
-                  {data.worstStudent.metrics?.velocityScore}%
-                </span>
-              </div>
-              
-              {data.worstStudent.dri.riskScore !== undefined && (
-                <div className="flex justify-between items-center">
-                  <span className="text-[9px] text-slate-500">Risk:</span>
-                  <span className={`font-mono font-bold text-[10px] ${
-                    data.worstStudent.dri.riskScore >= 60 ? 'text-red-400' :
-                    data.worstStudent.dri.riskScore >= 35 ? 'text-amber-400' :
-                    'text-emerald-400'
-                  }`}>
-                    {data.worstStudent.dri.riskScore}
-                  </span>
-                </div>
-              )}
-            </div>
-            
-            <div className="mt-2 pt-2 border-t border-slate-700/50">
-              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${data.worstStudent.dri.driColor}`}>
-                {data.worstStudent.dri.driSignal}
-              </span>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-xl shadow-2xl backdrop-blur-md">
-        <div className="flex items-center justify-between gap-3 mb-2 pb-2 border-b border-slate-700/50">
-          <div>
-            <p className="font-black text-white text-xs leading-tight">{data.firstName} {data.lastName}</p>
-            <p className="text-indigo-400/70 text-[9px] font-bold uppercase mt-0.5">{data.currentCourse?.name}</p>
-          </div>
-          <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase whitespace-nowrap ${data.dri.driColor}`}>
-            {data.dri.driSignal}
-          </span>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-          <div className="flex justify-between items-center">
-            <span className="text-[9px] text-slate-500">RSR:</span>
-            <span className="text-emerald-400 font-mono font-bold text-[10px]">
-              {(data.metrics?.lmp * 100).toFixed(0)}%
-            </span>
-          </div>
-          
-          <div className="flex justify-between items-center">
-            <span className="text-[9px] text-slate-500">KSI:</span>
-            <span className="text-blue-400 font-mono font-bold text-[10px]">
-              {data.metrics?.ksi}%
-            </span>
-          </div>
-          
-          <div className="flex justify-between items-center">
-            <span className="text-[9px] text-slate-500">V:</span>
-            <span className="text-amber-400 font-mono font-bold text-[10px]">
-              {data.metrics?.velocityScore}%
-            </span>
-          </div>
-          
-          {data.dri.riskScore !== undefined && (
-            <div className="flex justify-between items-center">
-              <span className="text-[9px] text-slate-500">Risk:</span>
-              <span className={`font-mono font-bold text-[10px] ${
-                data.dri.riskScore >= 60 ? 'text-red-400' :
-                data.dri.riskScore >= 35 ? 'text-amber-400' :
-                'text-emerald-400'
-              }`}>
-                {data.dri.riskScore}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
-
-// ==========================================
 // MAIN COMPONENT
 // ==========================================
 export default function HomePage() {
@@ -270,11 +150,11 @@ export default function HomePage() {
   const [isPaused, setIsPaused] = useState(false);
   
   const [viewMode, setViewMode] = useState<'TRIAGE' | 'MATRIX' | 'HEATMAP' | 'LOG'>('TRIAGE');
-  const [matrixMode, setMatrixMode] = useState<'full' | 'critical'>('critical');
   const [search, setSearch] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('ALL');
   
-  // Matrix filters
+  // Matrix filters (Legacy internal states, maintained for structure safety)
+  const [matrixMode, setMatrixMode] = useState<'full' | 'critical'>('critical');
   const [tierFilter, setTierFilter] = useState<'RED' | 'YELLOW' | 'GREEN' | null>(null);
   const [derFilter, setDerFilter] = useState<string | null>(null);
 
@@ -321,7 +201,6 @@ export default function HomePage() {
       if (!res.ok) throw new Error('API failure');
       
       const data = await res.json();
-      const batchDuration = Date.now() - batchStartTime;
       
       if (data.success) {
         setProgress(data.progress);
@@ -414,43 +293,6 @@ export default function HomePage() {
   const yellowZone = useMemo(() => filtered.filter(s => s.dri.driTier === 'YELLOW' && !redZone.some(r => r.id === s.id)), [filtered, redZone]);
   const greenZone = useMemo(() => filtered.filter(s => !redZone.some(r => r.id === s.id) && !yellowZone.some(y => y.id === s.id)), [filtered, redZone, yellowZone]);
 
-  const matrixData = useMemo(() => {
-    let baseData = matrixMode === 'critical' ? [...redZone, ...yellowZone] : filtered;
-    
-    // Apply filters
-    if (tierFilter) {
-      baseData = baseData.filter(s => s.dri.driTier === tierFilter);
-    }
-    if (derFilter) {
-      const [min, max] = derFilter.split('-').map(Number);
-      baseData = baseData.filter(s => {
-        if (s.dri.debtExposure === null) return false;
-        return s.dri.debtExposure >= min && s.dri.debtExposure < max;
-      });
-    }
-    
-    if (baseData.length > 200) {
-      const clusters = kMeansCluster(baseData, 100, {
-        x: (d) => d.metrics.lmp,
-        y: (d) => d.metrics.ksi
-      });
-      
-      return clusters.map(c => ({
-        ...c.worstStudent,
-        metrics: {
-          ...c.worstStudent.metrics,
-          lmp: c.centroid.x,
-          ksi: c.centroid.y
-        },
-        isCluster: true,
-        members: c.members,
-        worstStudent: c.worstStudent
-      }));
-    }
-    
-    return baseData;
-  }, [filtered, redZone, yellowZone, matrixMode, tierFilter, derFilter]);
-
   const stats = useMemo(() => ({
     total: students.length,
     atRisk: students.filter(s => s.dri.driTier === 'RED').length,
@@ -460,7 +302,6 @@ export default function HomePage() {
     avgRSR: Math.round(students.reduce((sum, s) => sum + ((s.metrics?.lmp || 0) * 100), 0) / (students.length || 1))
   }), [students]);
 
-  // Mock trends (replace with real data from history)
   const trends = {
     atRisk: -5,
     attention: 2,
@@ -712,252 +553,13 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* MATRIX VIEW */}
+        {/* MATRIX VIEW - ✅ SUSTITUCIÓN POR EL COMPONENTE PREMIUM */}
         {viewMode === 'MATRIX' && (
-          <div className="h-full w-full bg-slate-900/10 border border-slate-800 rounded-[2.5rem] p-8 relative overflow-hidden animate-in fade-in duration-500 shadow-2xl">
-            
-            <div className="absolute top-4 right-4 z-20 flex flex-wrap gap-2 max-w-2xl">
-              <button
-                onClick={() => setMatrixMode(m => m === 'full' ? 'critical' : 'full')}
-                className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 transition-all whitespace-nowrap"
-              >
-                {matrixMode === 'full' 
-                  ? `Critical Only (${redZone.length + yellowZone.length})` 
-                  : `Show All (${filtered.length})`
-                }
-              </button>
-              
-              <select 
-                value={selectedCourse}
-                onChange={(e) => setSelectedCourse(e.target.value)}
-                className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-[10px] font-black uppercase text-slate-300 outline-none hover:bg-slate-800 transition-all"
-              >
-                <option value="ALL">All Courses</option>
-                {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              
-              <select 
-                value={tierFilter || 'ALL'}
-                onChange={(e) => setTierFilter(e.target.value === 'ALL' ? null : e.target.value as any)}
-                className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-[10px] font-black uppercase text-slate-300 outline-none hover:bg-slate-800 transition-all"
-              >
-                <option value="ALL">All Tiers</option>
-                <option value="RED">🔴 Critical</option>
-                <option value="YELLOW">🟡 Watch</option>
-                <option value="GREEN">🟢 Optimal</option>
-              </select>
-              
-              <select 
-                value={derFilter || 'ALL'}
-                onChange={(e) => setDerFilter(e.target.value === 'ALL' ? null : e.target.value)}
-                className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-[10px] font-black uppercase text-slate-300 outline-none hover:bg-slate-800 transition-all"
-              >
-                <option value="ALL">All DER</option>
-                <option value="0-20">DER: 0-20%</option>
-                <option value="20-40">DER: 20-40%</option>
-                <option value="40-100">DER: &gt;40%</option>
-              </select>
-            </div>
-
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 60, right: 30, bottom: 20, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                
-                <XAxis 
-                  type="number" 
-                  dataKey="metrics.lmp" 
-                  name="RSR" 
-                  domain={[0, 1]} 
-                  stroke="#475569" 
-                  fontSize={10}
-                  label={{ 
-                    value: 'Recent Success Rate (RSR)', 
-                    position: 'insideBottom', 
-                    offset: -10, 
-                    fill: '#64748b',
-                    fontSize: 11
-                  }}
-                />
-                
-                <YAxis 
-                  type="number" 
-                  dataKey="metrics.ksi" 
-                  name="KSI" 
-                  domain={[0, 100]} 
-                  stroke="#475569" 
-                  fontSize={10}
-                  label={{ 
-                    value: 'Knowledge Stability Index', 
-                    angle: -90, 
-                    position: 'insideLeft', 
-                    fill: '#64748b',
-                    fontSize: 11
-                  }}
-                />
-                
-                <Tooltip content={<CustomTooltip />} />
-                
-                <ReferenceArea 
-                  x1={0} x2={0.7} y1={0} y2={60} 
-                  fill="#ef4444" 
-                  fillOpacity={0.05}
-                  label={{ 
-                    value: '🚨 CRITICAL ZONE', 
-                    position: 'insideTopLeft', 
-                    fill: '#ef4444',
-                    fontSize: 11,
-                    fontWeight: 'bold',
-                    offset: 10
-                  }}
-                />
-                
-                <ReferenceArea 
-                  x1={0.7} x2={1} y1={60} y2={100} 
-                  fill="#10b981" 
-                  fillOpacity={0.05}
-                  label={{ 
-                    value: '✅ OPTIMAL ZONE', 
-                    position: 'insideTopRight', 
-                    fill: '#10b981',
-                    fontSize: 11,
-                    fontWeight: 'bold',
-                    offset: 10
-                  }}
-                />
-                
-                <ReferenceLine 
-                  x={0.7} 
-                  stroke="#10b981" 
-                  strokeDasharray="5 5" 
-                  opacity={0.4}
-                  label={{ 
-                    value: 'RSR 70%', 
-                    position: 'top',
-                    fill: '#10b981',
-                    fontSize: 9
-                  }}
-                />
-                
-                <ReferenceLine 
-                  y={60} 
-                  stroke="#ef4444" 
-                  strokeDasharray="5 5" 
-                  opacity={0.4}
-                  label={{ 
-                    value: 'KSI 60%', 
-                    position: 'right',
-                    fill: '#ef4444',
-                    fontSize: 9
-                  }}
-                />
-                
-                <Scatter 
-                  data={matrixData} 
-                  onClick={(data) => {
-                    const student = data.payload.isCluster ? data.payload.worstStudent : data.payload;
-                    setSelectedStudent(student);
-                  }}
-                >
-                  {matrixData.map((e, i) => {
-                    const baseColor = driColorToHex(e.dri.driColor);
-                    const isCluster = e.isCluster;
-                    
-                    let opacity = 0.7;
-                    if (selectedCourse !== 'ALL' && e.currentCourse?.name !== selectedCourse) opacity = 0.15;
-                    if (tierFilter && e.dri.driTier !== tierFilter) opacity = 0.15;
-                    if (derFilter && e.dri.debtExposure !== null) {
-                      const [min, max] = derFilter.split('-').map(Number);
-                      if (e.dri.debtExposure < min || e.dri.debtExposure >= max) opacity = 0.15;
-                    }
-                    
-                    return (
-                      <Cell 
-                        key={i} 
-                        fill={baseColor}
-                        fillOpacity={opacity}
-                        r={isCluster ? 9 : 5}
-                        stroke={isCluster ? '#fff' : opacity > 0.5 ? baseColor : 'none'}
-                        strokeWidth={isCluster ? 2 : 0}
-                        className="cursor-pointer hover:opacity-100 transition-all duration-300" 
-                      />
-                    );
-                  })}
-                </Scatter>
-              </ScatterChart>
-            </ResponsiveContainer>
-            
-            <div className="absolute bottom-4 left-4 bg-slate-900/95 border border-slate-700 p-4 rounded-xl text-[10px] backdrop-blur-md">
-              <p className="font-black text-slate-400 mb-3 uppercase tracking-wider">Legend</p>
-              
-              <div className="space-y-2">
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-slate-400" />
-                    <span className="text-slate-400">Inactive</span>
-                    <span className="text-slate-600 text-[9px] ml-auto">
-                      ({students.filter(s => s.dri.driSignal === 'INACTIVE').length})
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-red-500" />
-                    <span className="text-red-400">Critical</span>
-                    <span className="text-slate-600 text-[9px] ml-auto">({stats.atRisk})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-amber-500" />
-                    <span className="text-amber-400">Watch</span>
-                    <span className="text-slate-600 text-[9px] ml-auto">({stats.attention})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                    <span className="text-emerald-400">Optimal</span>
-                    <span className="text-slate-600 text-[9px] ml-auto">({stats.onTrack})</span>
-                  </div>
-                </div>
-                
-                <div className="border-t border-slate-700/50 my-2" />
-                
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-indigo-500 border-2 border-white" />
-                  <span className="text-slate-400">Cluster</span>
-                  <span className="text-slate-600 text-[9px] ml-auto">(multiple)</span>
-                </div>
-                
-                {(selectedCourse !== 'ALL' || tierFilter || derFilter) && (
-                  <>
-                    <div className="border-t border-slate-700/50 my-2" />
-                    <div className="space-y-1">
-                      <p className="text-slate-500 text-[9px] uppercase tracking-wider mb-1">Active Filters:</p>
-                      {selectedCourse !== 'ALL' && (
-                        <div className="text-indigo-400 text-[9px]">• Course: {selectedCourse}</div>
-                      )}
-                      {tierFilter && (
-                        <div className="text-indigo-400 text-[9px]">• Tier: {tierFilter}</div>
-                      )}
-                      {derFilter && (
-                        <div className="text-indigo-400 text-[9px]">• DER: {derFilter}%</div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-            
-            <div className="absolute top-4 left-4 bg-slate-900/95 border border-slate-700 p-3 rounded-xl text-[10px] backdrop-blur-md">
-              <p className="font-black text-slate-400 mb-2 uppercase tracking-wider">Visible</p>
-              <div className="space-y-1">
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500">Students:</span>
-                  <span className="text-white font-mono font-bold">{matrixData.length}</span>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500">Clusters:</span>
-                  <span className="text-indigo-400 font-mono font-bold">
-                    {matrixData.filter(d => d.isCluster).length}
-                  </span>
-                </div>
-              </div>
-            </div>
+          <div className="h-full w-full animate-in zoom-in-95 duration-300">
+             <KeenKTMatrix 
+                students={filtered} 
+                onStudentClick={(s) => setSelectedStudent(s)} 
+             />
           </div>
         )}
 
