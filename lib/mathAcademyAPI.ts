@@ -1,4 +1,6 @@
 const API_KEY = process.env.NEXT_PUBLIC_MATH_ACADEMY_API_KEY;
+// NOTA: La documentación es Beta 5.1, pero la URL usa beta6. 
+// Mantenemos soporte para ambos esquemas de nombres.
 const BASE_URL = 'https://mathacademy.com/api/beta6'; 
 
 export async function getStudentData(studentId: string) {
@@ -7,26 +9,24 @@ export async function getStudentData(studentId: string) {
   try {
     const profileRes = await fetch(`${BASE_URL}/students/${studentId}`, {
       headers: { 'Public-API-Key': API_KEY },
-      cache: 'no-store' // 🔥 Forzamos a no usar caché para traer datos frescos
+      cache: 'no-store'
     });
-    
     if (!profileRes.ok) return null;
     const { student } = await profileRes.json();
 
     const activityRes = await fetch(`${BASE_URL}/students/${studentId}/activity`, {
       headers: { 'Public-API-Key': API_KEY },
-      cache: 'no-store' // 🔥 Importante: datos en tiempo real
+      cache: 'no-store'
     });
 
-    // Valores por defecto
     let activityMetrics = { 
-      xpAwarded: 0, 
-      time: 0, 
-      questions: 0, 
-      questionsCorrect: 0, 
-      numTasks: 0, 
-      tasks: [] as any[], 
-      totals: {} 
+        xpAwarded: 0, 
+        time: 0, 
+        questions: 0, 
+        questionsCorrect: 0, 
+        numTasks: 0, 
+        tasks: [] as any[], 
+        totals: {} 
     };
 
     if (activityRes.ok) {
@@ -34,33 +34,36 @@ export async function getStudentData(studentId: string) {
       if (activity) {
         const t = activity.totals || {};
         
-        // 🕵️‍♂️ BUSQUEDA PROFUNDA DE TIEMPO
-        // 1. Intentar en totals.time_engaged (snake_case)
-        // 2. Intentar en totals.timeEngaged (camelCase)
-        // 3. Intentar en raíz activity.time_engaged
-        // 4. Intentar sumar el tiempo de todas las tareas individuales
-        
-        let calculatedTime = t.time_engaged ?? t.timeEngaged ?? activity.time_engaged ?? 0;
-        
-        // Si sigue siendo 0, sumamos manualmente las tareas (Plan C)
+        // 1. INTENTO MAESTRO: Leer 'time' (según Doc Beta 5.1)
+        // También buscamos variantes snake_case por si Beta 6 cambió algo.
+        let calculatedTime = t.time ?? t.time_engaged ?? activity.time ?? 0;
+
+        // 2. PLAN C: Sumar 'timeSpent' de las tareas (según Doc Beta 5.1)
+        // Si el total viene vacío o es 0, lo reconstruimos sumando tarea por tarea.
         if (calculatedTime === 0 && activity.tasks && activity.tasks.length > 0) {
            calculatedTime = activity.tasks.reduce((acc: number, task: any) => {
-             return acc + (task.time_total || task.timeTotal || 0);
+             // Doc dice: timeSpent. Código viejo buscaba: time_total.
+             // Probamos todos:
+             const taskTime = task.timeSpent ?? task.time_spent ?? task.timeTotal ?? task.time_total ?? 0;
+             return acc + taskTime;
            }, 0);
         }
 
         activityMetrics = {
-          xpAwarded: t.xp_awarded ?? t.xpAwarded ?? 0,
-          time: calculatedTime, // ✅ Aquí va el valor rescatado
+          xpAwarded: t.xpAwarded ?? t.xp_awarded ?? 0,
+          time: calculatedTime, // ✅ Valor corregido
           questions: t.questions || 0,
-          questionsCorrect: t.questions_correct ?? t.questionsCorrect ?? 0,
-          numTasks: t.num_tasks ?? t.numTasks ?? 0,
+          questionsCorrect: t.questionsCorrect ?? t.questions_correct ?? 0,
+          numTasks: t.numTasks ?? t.num_tasks ?? 0,
+          
           tasks: (activity.tasks || []).map((task: any) => ({
              ...task,
-             questionsCorrect: task.questions_correct ?? task.questionsCorrect ?? 0,
-             timeTotal: task.time_total ?? task.timeTotal ?? 0,
+             // Normalizamos nombres según la documentación
+             questionsCorrect: task.questionsCorrect ?? task.questions_correct ?? 0,
+             timeTotal: task.timeSpent ?? task.time_spent ?? 0, // Usamos timeSpent
              smartScore: task.smart_score ?? task.smartScore ?? 0
           })),
+          
           totals: t
         };
       }
