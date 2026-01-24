@@ -64,8 +64,7 @@ export interface Metrics {
   
   /**
    * Learning Mastery Probability (LEGACY)
-   * 
-   * NOTA: Realmente es "Recent Success Rate" (RSR)
+   * * NOTA: Realmente es "Recent Success Rate" (RSR)
    * Proporción de tasks recientes con >80% accuracy
    * NO es una probabilidad bayesiana real
    */
@@ -74,9 +73,10 @@ export interface Metrics {
   /**
    * Knowledge Stability Index
    * 100 - sqrt(variance_of_accuracy)
-   * Mide consistencia del desempeño
+   * Mide consistencia del desempeño.
+   * Ahora permite null para representar "No Data" (ej: Aiden)
    */
-  ksi: number;
+  ksi: number | null;
   
   /**
    * Estado de estancamiento detectado
@@ -99,11 +99,9 @@ export interface Metrics {
 export interface DRIMetrics {
   /**
    * Investment ROI (PROXY)
-   * 
-   * Alpha Protocol define: ΔS (SAT points) / T_min
+   * * Alpha Protocol define: ΔS (SAT points) / T_min
    * Dashboard usa: XP_awarded / time_seconds
-   * 
-   * NOTA: Este es un proxy. El iROI real requiere datos de SAT mocks
+   * * NOTA: Este es un proxy. El iROI real requiere datos de SAT mocks
    * que no están disponibles en Math Academy API
    */
   iROI: number | null;
@@ -111,16 +109,14 @@ export interface DRIMetrics {
   /**
    * Debt Exposure Ratio
    * Proporción de topics K-8 maestreados durante High School
-   * 
-   * Alpha Standard: DER > 20% = "remedial mode"
+   * * Alpha Standard: DER > 20% = "remedial mode"
    */
   debtExposure: number | null;
   
   /**
    * Precision Decay Index
    * (Errores finales + 1) / (Errores iniciales + 1)
-   * 
-   * Alpha Standard: PDI > 1.5 = "Short-Burst Specialist"
+   * * Alpha Standard: PDI > 1.5 = "Short-Burst Specialist"
    */
   precisionDecay: number | null;
   
