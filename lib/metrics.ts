@@ -18,18 +18,22 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
   // ==========================================
   // NORMALIZACIÓN TEMPORAL (Segundos → Minutos)
   // ==========================================
-  const timeEngaged = Math.round((totals.timeEngaged || totals.time || 0) / 60);
+  // SOLUCIÓN: Asegurar lectura desde la raíz 'time' que ya viene corregida de la API
+  const rawTimeSeconds = activity?.time ?? totals.timeEngaged ?? totals.time ?? 0;
+  
+  const timeEngaged = Math.round(rawTimeSeconds / 60);
   const timeProductive = Math.round((totals.timeProductive || 0) / 60);
   const timeElapsed = Math.round((totals.timeElapsed || 0) / 60);
+  
   const questions = totals.questions || 0;
   const accuracyRate = questions > 0 
-    ? Math.round(((totals.questionsCorrect || 0) / questions) * 100) 
+    ? Math.round(((activity?.questionsCorrect || totals.questionsCorrect || 0) / questions) * 100) 
     : null;
 
   // ==========================================
   // VELOCITY SCORE (ESTÁNDAR ALPHA: 125 XP/SEMANA)
   // ==========================================
-  const xpAwarded = totals.xpAwarded || 0;
+  const xpAwarded = activity?.xpAwarded || totals.xpAwarded || 0;
   
   /**
    * CAMBIO CRÍTICO: Usar estándar Alpha de 125 XP/semana
@@ -57,7 +61,7 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
   // ==========================================
   // KSI (KNOWLEDGE STABILITY INDEX)
   // ==========================================
-  // Inicializamos en null para representar "No Data" por defecto
+  // Inicializamos en null para representar "No Data" por defecto (Caso Aiden)
   let ksi: number | null = null;
 
   if (tasks.length > 0) {
@@ -67,7 +71,7 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
     
     const meanAcc = accuracies.reduce((a: number, b: number) => a + b, 0) / accuracies.length;
     
-    // Solo calculamos estabilidad si hay competencia demostrada (>0%)
+    // Solo calculamos estabilidad si hay competencia real (>0%)
     if (meanAcc > 0) {
       const variance = accuracies.reduce((a: number, b: number) => 
         a + Math.pow(b - meanAcc, 2), 0
@@ -75,14 +79,13 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
       
       let calculatedKsi = Math.max(0, parseFloat((100 - Math.sqrt(variance)).toFixed(2)));
 
-      // Penalización pedagógica: Si el promedio es muy bajo (<30%), la estabilidad pierde valor
+      // Penalización: Si el promedio es bajo (<30%), la estabilidad pierde valor
       if (meanAcc < 30) {
         calculatedKsi = Math.round(calculatedKsi * (meanAcc / 100));
       }
 
       ksi = calculatedKsi;
     }
-    // Si meanAcc es 0 (todo fallado), ksi se mantiene en null ("No Data" útil)
   }
 
   // ==========================================
@@ -138,7 +141,7 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
     focusIntegrity,
     nemesisTopic,
     lmp, // Mantener por compatibilidad (es RSR internamente)
-    ksi, // Ahora devuelve null si no hay datos suficientes
+    ksi, // Devuelve null si no hay datos suficientes
     stallStatus,
     idleRatio: parseFloat(idleRatio.toFixed(2)),
     consistencyIndex,
