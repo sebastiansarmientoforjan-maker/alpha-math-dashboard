@@ -32,7 +32,8 @@ export async function GET(request: Request) {
               ...rawData, 
               metrics, 
               lastUpdated: new Date().toISOString() 
-            } 
+            },
+            studentName: `${rawData.firstName} ${rawData.lastName}` // ✅ NUEVO: Para feedback
           };
         } catch (e) { return null; }
       })
@@ -40,6 +41,7 @@ export async function GET(request: Request) {
 
     const batch = writeBatch(db);
     const todayStr = new Date().toISOString().split('T')[0];
+    let lastStudentName = '';
 
     updates.forEach((item) => {
       if (item) {
@@ -52,19 +54,34 @@ export async function GET(request: Request) {
             metrics: item.data.metrics,
             courseName: item.data.currentCourse?.name
         }, { merge: true });
+        
+        lastStudentName = item.studentName; // ✅ NUEVO
       }
     });
 
     await batch.commit();
-    await setDoc(stateRef, { lastIndex: endIndex, total: studentIds.length }, { merge: true });
+    await setDoc(stateRef, { 
+      lastIndex: endIndex, 
+      total: studentIds.length,
+      lastUpdated: new Date().toISOString() // ✅ NUEVO
+    }, { merge: true });
 
     return NextResponse.json({ 
       success: true, 
       progress: Math.round((endIndex / studentIds.length) * 100),
-      nextIndex: endIndex
+      nextIndex: endIndex,
+      lastStudentName, // ✅ NUEVO
+      batchSize: currentBatchIds.length,
+      currentBatch: Math.ceil(endIndex / 50),
+      totalBatches: Math.ceil(studentIds.length / 50)
     });
 
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('Update students error:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message,
+      progress: 0
+    }, { status: 500 });
   }
 }
