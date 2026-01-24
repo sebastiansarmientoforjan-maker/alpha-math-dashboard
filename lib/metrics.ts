@@ -3,13 +3,11 @@ import { DRI_CONFIG } from './dri-config';
 
 /**
  * Calcula métricas TIER 1 según estándares Alpha School
- * 
- * CAMBIOS CLAVE:
+ * * CAMBIOS CLAVE:
  * - Velocity basado en 125 XP/semana (25 XP/día × 5 días)
  * - Recent Success Rate en lugar de "LMP"
  * - Normalización temporal correcta (segundos → minutos)
- * 
- * @param student - Datos del estudiante desde Math Academy API
+ * * @param student - Datos del estudiante desde Math Academy API
  * @param activity - Datos de actividad (tasks, totals)
  * @returns Metrics object con todas las métricas calculadas
  */
@@ -36,8 +34,7 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
   /**
    * CAMBIO CRÍTICO: Usar estándar Alpha de 125 XP/semana
    * En lugar de weeklyGoal individual del estudiante
-   * 
-   * Fuente: Technical Protocol - Mastery Density = Σ Kp / (D × 25)
+   * * Fuente: Technical Protocol - Mastery Density = Σ Kp / (D × 25)
    */
   const velocityScore = Math.min(
     Math.round((xpAwarded / DRI_CONFIG.ALPHA_WEEKLY_STANDARD) * 100),
@@ -60,21 +57,33 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
   // ==========================================
   // KSI (KNOWLEDGE STABILITY INDEX)
   // ==========================================
-  const accuracies: number[] = tasks.map((t: any) => 
-    (t.questionsCorrect / (t.questions || 1)) * 100
-  );
-  
-  const meanAcc = accuracies.length > 0 
-    ? accuracies.reduce((a: number, b: number) => a + b, 0) / accuracies.length 
-    : 0;
-  
-  const variance = accuracies.length > 0 
-    ? accuracies.reduce((a: number, b: number) => 
+  // Inicializamos en null para representar "No Data" por defecto
+  let ksi: number | null = null;
+
+  if (tasks.length > 0) {
+    const accuracies: number[] = tasks.map((t: any) => 
+      (t.questionsCorrect / (t.questions || 1)) * 100
+    );
+    
+    const meanAcc = accuracies.reduce((a: number, b: number) => a + b, 0) / accuracies.length;
+    
+    // Solo calculamos estabilidad si hay competencia demostrada (>0%)
+    if (meanAcc > 0) {
+      const variance = accuracies.reduce((a: number, b: number) => 
         a + Math.pow(b - meanAcc, 2), 0
-      ) / accuracies.length 
-    : 0;
-  
-  const ksi = Math.max(0, parseFloat((100 - Math.sqrt(variance)).toFixed(2)));
+      ) / accuracies.length;
+      
+      let calculatedKsi = Math.max(0, parseFloat((100 - Math.sqrt(variance)).toFixed(2)));
+
+      // Penalización pedagógica: Si el promedio es muy bajo (<30%), la estabilidad pierde valor
+      if (meanAcc < 30) {
+        calculatedKsi = Math.round(calculatedKsi * (meanAcc / 100));
+      }
+
+      ksi = calculatedKsi;
+    }
+    // Si meanAcc es 0 (todo fallado), ksi se mantiene en null ("No Data" útil)
+  }
 
   // ==========================================
   // STALL DETECTION
@@ -129,7 +138,7 @@ export function calculateTier1Metrics(student: any, activity: any): Metrics {
     focusIntegrity,
     nemesisTopic,
     lmp, // Mantener por compatibilidad (es RSR internamente)
-    ksi,
+    ksi, // Ahora devuelve null si no hay datos suficientes
     stallStatus,
     idleRatio: parseFloat(idleRatio.toFixed(2)),
     consistencyIndex,
