@@ -14,7 +14,7 @@ function getWeekRange() {
   return { startDate, endDate };
 }
 
-export async function getStudentData(studentId: string) {  // ← EXPORT aquí
+export async function getStudentData(studentId: string) {
   if (!API_KEY) return null;
 
   try {
