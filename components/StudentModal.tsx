@@ -6,10 +6,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export default function StudentModal({ student, onClose }: { student: any; onClose: () => void }) {
   const [loading, setLoading] = useState(false);
 
-  // Fallback seguro para evitar errores de renderizado
   const tasks = student?.activity?.tasks || [];
 
-  // Tipamos explícitamente para evitar errores de 'unknown' o 'any' implícito
   const readyToAccelerate = useMemo((): string[] => {
     const topics = tasks
       .filter((t: any) => (t.questionsCorrect / (t.questions || 1)) > 0.7)
@@ -17,7 +15,6 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
     return Array.from(new Set(topics)).slice(0, 3) as string[];
   }, [tasks]);
 
-  // Formateamos y ordenamos cronológicamente (Más reciente primero para la tabla)
   const sortedData = useMemo(() => {
     return tasks.map((t: any, i: number) => {
       const dateObj = new Date(t.completedLocal);
@@ -31,10 +28,9 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
         date: dateObj.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' }),
         time: Math.round((t.timeTotal || 0) / 60)
       };
-    }).sort((a: any, b: any) => b.timestamp - a.timestamp); // Orden: Reciente -> Antiguo
+    }).sort((a: any, b: any) => b.timestamp - a.timestamp);
   }, [tasks]);
 
-  // Datos para el gráfico: Invertimos sortedData para que el tiempo corra de izquierda a derecha
   const chartData = useMemo(() => 
     [...sortedData].reverse().map((d, i) => ({ ...d, i: i + 1 })), 
   [sortedData]);
@@ -49,21 +45,25 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
         {/* HEADER */}
         <div className="p-8 border-b border-slate-800 flex justify-between items-start bg-slate-900/30">
           <div className="flex gap-8 items-center">
-             <div className={`w-20 h-20 rounded-full border-4 flex items-center justify-center text-2xl font-black italic ${student.dri.driTier === 'RED' ? 'border-red-500 text-red-500' : 'border-emerald-500 text-emerald-500'}`}>
+             <div className={`w-20 h-20 rounded-full border-4 flex items-center justify-center text-2xl font-black italic ${
+               student.dri.driTier === 'RED' ? 'border-red-500 text-red-500' : 'border-emerald-500 text-emerald-500'
+             }`}>
                {student.metrics.velocityScore || 0}
              </div>
              <div>
-                <h2 className="text-4xl font-black text-white italic tracking-tighter uppercase">{student.firstName} {student.lastName}</h2>
+                <h2 className="text-4xl font-black text-white italic tracking-tighter uppercase">
+                  {student.firstName} {student.lastName}
+                </h2>
                 <div className="flex gap-4 mt-2 font-black text-[10px] uppercase">
-                  {/* Solución Aplicada: driColor para evitar el verde en inactivos */}
-                  <span className={`px-3 py-1 rounded-full border border-current ${student.dri.driColor || (student.dri.driTier === 'RED' ? 'text-red-500 border-red-500/50' : 'text-emerald-500 border-emerald-500/50')}`}>
+                  {/* ✅ SOLUCIÓN: Usar driColor directamente */}
+                  <span className={`px-3 py-1 rounded-full border border-current ${student.dri.driColor}`}>
                     {student.dri.driSignal}
                   </span>
                   <span className="text-slate-500 self-center">{student.currentCourse?.name}</span>
                 </div>
              </div>
           </div>
-          <button onClick={onClose} className="text-slate-600 hover:text-white text-2xl">✕</button>
+          <button onClick={onClose} className="text-slate-600 hover:text-white text-2xl transition-colors">✕</button>
         </div>
 
         <div className="flex-1 p-8 grid grid-cols-12 gap-10 overflow-y-auto custom-scrollbar">
@@ -72,11 +72,15 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
              <div className="p-6 bg-slate-900/40 rounded-3xl border border-slate-800 text-center shadow-inner">
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Mastery Probability (LMP)</p>
                 <p className="text-5xl font-black text-white italic">{lmpDisplay}</p>
-                <p className="text-[9px] text-indigo-400 mt-4 font-bold uppercase italic tracking-widest">Estado: {student.metrics.stallStatus || 'Optimal'}</p>
+                <p className="text-[9px] text-indigo-400 mt-4 font-bold uppercase italic tracking-widest">
+                  Estado: {student.metrics.stallStatus || 'Optimal'}
+                </p>
              </div>
 
              <div className="bg-indigo-950/20 border border-indigo-500/30 p-6 rounded-3xl">
-                <h3 className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-4 italic">⚡ Aceleración (Outer Fringe)</h3>
+                <h3 className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-4 italic">
+                  ⚡ Aceleración (Outer Fringe)
+                </h3>
                 <div className="space-y-2">
                    {readyToAccelerate.length > 0 ? readyToAccelerate.map((topic: string, idx: number) => (
                       <div key={idx} className="flex items-center gap-3 p-2 bg-indigo-900/20 rounded-xl border border-indigo-500/10">
@@ -86,25 +90,59 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                    )) : <p className="text-[10px] text-slate-600 italic font-bold">Consolidando base...</p>}
                 </div>
              </div>
+             
+             {/* ✅ NUEVO: Métricas DRI */}
+             <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-3xl">
+                <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-4">
+                  📊 DRI Metrics
+                </h3>
+                <div className="space-y-3 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">iROI:</span>
+                    <span className="font-mono font-bold text-white">{student.dri.iROI}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Debt Exposure:</span>
+                    <span className={`font-mono font-bold ${student.dri.debtExposure > 25 ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {student.dri.debtExposure}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Precision Decay:</span>
+                    <span className={`font-mono font-bold ${student.dri.precisionDecay > 1.4 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      {student.dri.precisionDecay}x
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">KSI:</span>
+                    <span className="font-mono font-bold text-blue-400">{student.metrics.ksi}%</span>
+                  </div>
+                </div>
+             </div>
           </div>
 
           {/* COL DERECHA: GRÁFICO Y LISTA */}
           <div className="col-span-8 space-y-8">
             <div className="bg-slate-900/20 rounded-[2.5rem] border border-slate-800 p-8">
-               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-8 italic">Curva de Precisión</h3>
+               <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-8 italic">
+                 Curva de Precisión - Últimas {chartData.length} Sesiones
+               </h3>
                <ResponsiveContainer width="100%" height={250}>
                  <LineChart data={chartData} margin={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                    <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
-                   <XAxis dataKey="i" stroke="#475569" fontSize={10} />
-                   {/* Dominio ajustado a 110 para que los puntos 100% no se corten */}
-                   <YAxis domain={[0, 110]} ticks={[0, 25, 50, 75, 100]} stroke="#475569" fontSize={10} />
-                   <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '15px' }} />
-                   <Line type="monotone" dataKey="acc" stroke="#6366f1" strokeWidth={5} dot={{ r: 4, fill: '#6366f1' }} activeDot={{ r: 8 }} />
+                   <XAxis dataKey="i" stroke="#475569" fontSize={10} label={{ value: 'Session #', position: 'insideBottom', offset: -5 }} />
+                   <YAxis domain={[0, 110]} ticks={[0, 25, 50, 75, 100]} stroke="#475569" fontSize={10} label={{ value: 'Accuracy %', angle: -90, position: 'insideLeft' }} />
+                   <Tooltip 
+                     contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '15px' }}
+                     labelFormatter={(value) => `Session ${value}`}
+                     formatter={(value: any) => [`${value}%`, 'Accuracy']}
+                   />
+                   <Line type="monotone" dataKey="acc" stroke="#6366f1" strokeWidth={3} dot={{ r: 4, fill: '#6366f1' }} activeDot={{ r: 8 }} />
                  </LineChart>
                </ResponsiveContainer>
             </div>
 
-            {/* TABLA DE SESIONES RECIENTES */}
+            {/* TABLA DE SESIONES */}
             <div className="bg-slate-900/10 rounded-3xl border border-slate-800 overflow-hidden">
                <div className="p-4 bg-slate-900/40 border-b border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500">
                   Historial de Sesiones (Recientes Primero)
@@ -121,12 +159,16 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-800/50">
-                        {sortedData.map((task: any, idx: number) => (
+                        {sortedData.slice(0, 20).map((task: any, idx: number) => (
                            <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
                               <td className="p-4 text-[10px] font-mono text-slate-500">{task.date}</td>
-                              <td className="p-4 text-[11px] font-bold text-slate-300 uppercase italic truncate max-w-[250px]">{task.topic}</td>
+                              <td className="p-4 text-[11px] font-bold text-slate-300 uppercase italic truncate max-w-[250px]">
+                                {task.topic}
+                              </td>
                               <td className="p-4 text-center">
-                                 <span className={`text-[10px] font-mono font-black ${task.acc >= 80 ? 'text-emerald-500' : task.acc >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                                 <span className={`text-[10px] font-mono font-black ${
+                                   task.acc >= 80 ? 'text-emerald-500' : task.acc >= 50 ? 'text-amber-500' : 'text-red-500'
+                                 }`}>
                                     {task.acc}%
                                  </span>
                               </td>
