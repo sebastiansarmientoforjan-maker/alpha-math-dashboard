@@ -1,11 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, BarChart } from 'recharts';
 import { DRI_CONFIG } from '@/lib/dri-config';
 
 export default function StudentModal({ student, onClose }: { student: any; onClose: () => void }) {
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'history'>('overview');
 
   const tasks = student?.activity?.tasks || [];
 
@@ -15,6 +15,16 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
   const readyToAccelerate = useMemo((): string[] => {
     const topics = tasks
       .filter((t: any) => (t.questionsCorrect / (t.questions || 1)) > 0.7)
+      .map((t: any) => t.topic?.name || 'Unknown Topic');
+    return Array.from(new Set(topics)).slice(0, 3) as string[];
+  }, [tasks]);
+
+  // ==========================================
+  // STRUGGLE TOPICS (Need Intervention)
+  // ==========================================
+  const struggleTopics = useMemo((): string[] => {
+    const topics = tasks
+      .filter((t: any) => (t.questionsCorrect / (t.questions || 1)) < 0.5)
       .map((t: any) => t.topic?.name || 'Unknown Topic');
     return Array.from(new Set(topics)).slice(0, 3) as string[];
   }, [tasks]);
@@ -45,301 +55,421 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
     [...sortedData].reverse().map((d, i) => ({ ...d, i: i + 1 })), 
   [sortedData]);
 
-  const rsrDisplay = isNaN(student.metrics.lmp) ? '0%' : `${(student.metrics.lmp * 100).toFixed(0)}%`;
+  // ==========================================
+  // WEEKLY ACTIVITY PATTERN
+  // ==========================================
+  const weeklyPattern = useMemo(() => {
+    const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const pattern = daysOfWeek.map(day => ({ day, tasks: 0, xp: 0 }));
+    
+    tasks.forEach((t: any) => {
+      const date = new Date(t.completedLocal);
+      const dayIndex = (date.getDay() + 6) % 7; // Convert Sunday=0 to Monday=0
+      pattern[dayIndex].tasks++;
+      pattern[dayIndex].xp += t.xpAwarded || 0;
+    });
+    
+    return pattern;
+  }, [tasks]);
 
-  // ==========================================
-  // CALCULAR VELOCITY EN XP REALES
-  // ==========================================
+  const rsrDisplay = isNaN(student.metrics.lmp) ? '0%' : `${(student.metrics.lmp * 100).toFixed(0)}%`;
   const velocityInXP = Math.round((student.metrics.velocityScore / 100) * DRI_CONFIG.ALPHA_WEEKLY_STANDARD);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="bg-[#080808] border border-slate-800 w-full max-w-6xl h-[90vh] rounded-[2.5rem] relative z-10 flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-[#080808] border border-slate-800 w-full max-w-7xl h-[90vh] rounded-[2.5rem] relative z-10 flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* ========================================== */}
         {/* HEADER */}
         {/* ========================================== */}
-        <div className="p-8 border-b border-slate-800 flex justify-between items-start bg-slate-900/30">
-          <div className="flex gap-8 items-center">
+        <div className="p-6 border-b border-slate-800 flex justify-between items-start bg-gradient-to-b from-slate-900/50 to-transparent">
+          <div className="flex gap-6 items-center flex-1">
              {/* Velocity Badge */}
-             <div className={`w-20 h-20 rounded-full border-4 flex items-center justify-center text-2xl font-black italic ${
-               student.dri.driTier === 'RED' ? 'border-red-500 text-red-500' : 
-               student.dri.driTier === 'YELLOW' ? 'border-amber-500 text-amber-500' :
-               'border-emerald-500 text-emerald-500'
+             <div className={`w-20 h-20 rounded-2xl border-4 flex flex-col items-center justify-center text-2xl font-black italic ${
+               student.dri.driTier === 'RED' ? 'border-red-500 text-red-500 bg-red-500/10' : 
+               student.dri.driTier === 'YELLOW' ? 'border-amber-500 text-amber-500 bg-amber-500/10' :
+               'border-emerald-500 text-emerald-500 bg-emerald-500/10'
              }`}>
-               {student.metrics.velocityScore || 0}
+               <span className="text-2xl">{student.metrics.velocityScore || 0}</span>
+               <span className="text-[8px] opacity-60 uppercase tracking-wider">Velocity</span>
              </div>
              
-             <div>
-                <h2 className="text-4xl font-black text-white italic tracking-tighter uppercase">
+             <div className="flex-1">
+                <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase">
                   {student.firstName} {student.lastName}
                 </h2>
                 
-                <div className="flex gap-4 mt-2 font-black text-[10px] uppercase">
+                <div className="flex flex-wrap gap-3 mt-2 font-black text-[10px] uppercase">
                   {/* DRI Signal Badge */}
                   <span className={`px-3 py-1 rounded-full border border-current ${student.dri.driColor}`}>
                     {student.dri.driSignal}
                   </span>
                   
                   {/* Course Badge */}
-                  <span className="text-slate-500 self-center">{student.currentCourse?.name}</span>
+                  <span className="px-3 py-1 rounded-full border border-indigo-500/30 text-indigo-400 bg-indigo-500/10">
+                    {student.currentCourse?.name}
+                  </span>
                   
-                  {/* Risk Score Badge (si está disponible) */}
+                  {/* Risk Score Badge */}
                   {student.dri.riskScore !== undefined && (
                     <span className={`px-3 py-1 rounded-full border ${
-                      student.dri.riskScore >= 60 ? 'border-red-500 text-red-400' :
-                      student.dri.riskScore >= 35 ? 'border-amber-500 text-amber-400' :
-                      'border-emerald-500 text-emerald-400'
+                      student.dri.riskScore >= 60 ? 'border-red-500 text-red-400 bg-red-500/10' :
+                      student.dri.riskScore >= 35 ? 'border-amber-500 text-amber-400 bg-amber-500/10' :
+                      'border-emerald-500 text-emerald-400 bg-emerald-500/10'
                     }`}>
                       Risk: {student.dri.riskScore}/100
                     </span>
                   )}
                 </div>
                 
-                {/* Velocity en XP reales */}
-                <div className="mt-2 text-[10px] text-slate-600 font-mono">
-                  {velocityInXP} XP / {DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP semanal • 
-                  <span className={`ml-2 ${
-                    student.metrics.velocityScore >= 100 ? 'text-emerald-500' :
-                    student.metrics.velocityScore >= 80 ? 'text-amber-400' :
-                    'text-red-400'
-                  }`}>
-                    {student.metrics.velocityScore}% velocity
+                {/* Velocity Details */}
+                <div className="mt-2 flex gap-4 text-[10px] text-slate-500 font-mono">
+                  <span>
+                    <span className={`font-bold ${
+                      student.metrics.velocityScore >= 100 ? 'text-emerald-500' :
+                      student.metrics.velocityScore >= 80 ? 'text-amber-400' :
+                      'text-red-400'
+                    }`}>
+                      {velocityInXP} XP
+                    </span> / {DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP weekly
+                  </span>
+                  <span className="text-slate-700">•</span>
+                  <span>
+                    {tasks.length} total sessions
+                  </span>
+                  <span className="text-slate-700">•</span>
+                  <span>
+                    {Math.round((student.activity?.time || 0) / 3600)}h engaged
                   </span>
                 </div>
              </div>
           </div>
           
-          <button onClick={onClose} className="text-slate-600 hover:text-white text-2xl transition-colors">✕</button>
+          <button 
+            onClick={onClose} 
+            className="text-slate-600 hover:text-white text-2xl transition-colors p-2 hover:bg-slate-800 rounded-lg"
+          >
+            ✕
+          </button>
         </div>
 
-        <div className="flex-1 p-8 grid grid-cols-12 gap-10 overflow-y-auto custom-scrollbar">
-          
-          {/* ========================================== */}
-          {/* COL IZQUIERDA: DIAGNÓSTICO */}
-          {/* ========================================== */}
-          <div className="col-span-4 space-y-8">
-             
-             {/* RSR Card */}
-             <div className="p-6 bg-slate-900/40 rounded-3xl border border-slate-800 text-center shadow-inner">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                  Recent Success Rate (RSR)
-                </p>
-                <p className="text-5xl font-black text-white italic">{rsrDisplay}</p>
-                <p className="text-[9px] text-indigo-400 mt-4 font-bold uppercase italic tracking-widest">
-                  Estado: {student.metrics.stallStatus || 'Optimal'}
-                </p>
-                <p className="text-[8px] text-slate-600 mt-2">
-                  Last {DRI_CONFIG.RSR_RECENT_TASKS_COUNT} tasks • &gt;{DRI_CONFIG.RSR_SUCCESS_THRESHOLD * 100}% threshold
-                </p>
-             </div>
+        {/* ========================================== */}
+        {/* TAB NAVIGATION */}
+        {/* ========================================== */}
+        <div className="px-6 pt-4 border-b border-slate-800/50 flex gap-2">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`px-4 py-2 rounded-t-lg font-black text-[10px] uppercase tracking-widest transition-all ${
+              activeTab === 'overview'
+                ? 'bg-slate-800 text-white border-t border-x border-slate-700'
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            📊 Overview
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-4 py-2 rounded-t-lg font-black text-[10px] uppercase tracking-widest transition-all ${
+              activeTab === 'history'
+                ? 'bg-slate-800 text-white border-t border-x border-slate-700'
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            📜 History
+          </button>
+        </div>
 
-             {/* Outer Fringe (Acceleration) */}
-             <div className="bg-indigo-950/20 border border-indigo-500/30 p-6 rounded-3xl">
-                <h3 className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-4 italic">
-                  ⚡ Aceleración (Outer Fringe)
-                </h3>
-                <div className="space-y-2">
-                   {readyToAccelerate.length > 0 ? readyToAccelerate.map((topic: string, idx: number) => (
-                      <div key={idx} className="flex items-center gap-3 p-2 bg-indigo-900/20 rounded-xl border border-indigo-500/10">
-                         <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
-                         <span className="text-[10px] font-bold text-indigo-200 uppercase truncate italic">{topic}</span>
-                      </div>
-                   )) : <p className="text-[10px] text-slate-600 italic font-bold">Consolidando base...</p>}
+        {/* ========================================== */}
+        {/* CONTENT AREA */}
+        {/* ========================================== */}
+        <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+          
+          {/* OVERVIEW TAB */}
+          {activeTab === 'overview' && (
+            <div className="grid grid-cols-12 gap-6">
+              
+              {/* ========================================== */}
+              {/* LEFT COLUMN: METRICS */}
+              {/* ========================================== */}
+              <div className="col-span-4 space-y-6">
+                
+                {/* RSR Card */}
+                <div className="p-5 bg-slate-900/40 rounded-2xl border border-slate-800 text-center shadow-inner">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                    Recent Success Rate
+                  </p>
+                  <p className="text-5xl font-black text-white italic">{rsrDisplay}</p>
+                  <p className="text-[9px] text-indigo-400 mt-3 font-bold uppercase italic tracking-widest">
+                    {student.metrics.stallStatus || 'Optimal'}
+                  </p>
+                  <div className="mt-3 pt-3 border-t border-slate-800 text-[9px] text-slate-600">
+                    Last {DRI_CONFIG.RSR_RECENT_TASKS_COUNT} tasks • &gt;{DRI_CONFIG.RSR_SUCCESS_THRESHOLD * 100}% threshold
+                  </div>
                 </div>
-             </div>
-             
-             {/* DRI Metrics Card */}
-             <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-3xl">
-                <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-4">
-                  📊 DRI Metrics (Alpha Protocol)
-                </h3>
-                <div className="space-y-3 text-xs">
-                  
-                  {/* iROI */}
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">iROI:</span>
-                    {student.dri.iROI !== null ? (
-                      <span className="font-mono font-bold text-white">{student.dri.iROI}</span>
-                    ) : (
-                      <span className="text-slate-600 text-[10px]">No data</span>
-                    )}
-                  </div>
-                  
-                  {/* DER */}
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">
-                      Debt Exposure:
-                      <span className="text-[9px] text-slate-700 ml-1">(&gt;{DRI_CONFIG.DER_CRITICAL_THRESHOLD}%)</span>
-                    </span>
-                    {student.dri.debtExposure !== null ? (
-                      <span className={`font-mono font-bold ${
-                        student.dri.debtExposure > DRI_CONFIG.DER_SEVERE_THRESHOLD ? 'text-red-400' :
-                        student.dri.debtExposure > DRI_CONFIG.DER_CRITICAL_THRESHOLD ? 'text-amber-400' : 
-                        'text-emerald-400'
-                      }`}>
-                        {student.dri.debtExposure}%
-                      </span>
-                    ) : (
-                      <span className="text-slate-600 text-[10px]">Insufficient data</span>
-                    )}
-                  </div>
-                  
-                  {/* PDI */}
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">
-                      Precision Decay:
-                      <span className="text-[9px] text-slate-700 ml-1">(&gt;{DRI_CONFIG.PDI_CRITICAL_THRESHOLD})</span>
-                    </span>
-                    {student.dri.precisionDecay !== null ? (
-                      <span className={`font-mono font-bold ${
-                        student.dri.precisionDecay > DRI_CONFIG.PDI_SEVERE_THRESHOLD ? 'text-red-400' :
-                        student.dri.precisionDecay > DRI_CONFIG.PDI_CRITICAL_THRESHOLD ? 'text-amber-400' : 
-                        'text-emerald-400'
-                      }`}>
-                        {student.dri.precisionDecay}x
-                      </span>
-                    ) : (
-                      <span className="text-slate-600 text-[10px]">No data</span>
-                    )}
-                  </div>
-                  
-                  {/* KSI */}
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">
-                      KSI:
-                      <span className="text-[9px] text-slate-700 ml-1">(&lt;{DRI_CONFIG.KSI_LOW_THRESHOLD}%)</span>
-                    </span>
-                    <span className={`font-mono font-bold ${
+
+                {/* DRI Metrics Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800">
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">KSI</div>
+                    <div className={`text-2xl font-black ${
                       student.metrics.ksi < DRI_CONFIG.KSI_CRITICAL_THRESHOLD ? 'text-red-400' :
                       student.metrics.ksi < DRI_CONFIG.KSI_LOW_THRESHOLD ? 'text-amber-400' :
                       'text-blue-400'
                     }`}>
                       {student.metrics.ksi}%
-                    </span>
+                    </div>
                   </div>
                   
-                  {/* Accuracy */}
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Accuracy:</span>
-                    <span className={`font-mono font-bold ${
+                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800">
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Accuracy</div>
+                    <div className={`text-2xl font-black ${
                       (student.metrics.accuracyRate || 0) >= 70 ? 'text-emerald-400' :
                       (student.metrics.accuracyRate || 0) >= 55 ? 'text-amber-400' :
                       'text-red-400'
                     }`}>
                       {student.metrics.accuracyRate || 0}%
-                    </span>
+                    </div>
                   </div>
                   
-                  {/* Focus Integrity */}
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Focus Integrity:</span>
-                    <span className="font-mono font-bold text-purple-400">
-                      {student.metrics.focusIntegrity}%
-                    </span>
+                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800">
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">DER</div>
+                    {student.dri.debtExposure !== null ? (
+                      <div className={`text-2xl font-black ${
+                        student.dri.debtExposure > DRI_CONFIG.DER_SEVERE_THRESHOLD ? 'text-red-400' :
+                        student.dri.debtExposure > DRI_CONFIG.DER_CRITICAL_THRESHOLD ? 'text-amber-400' : 
+                        'text-emerald-400'
+                      }`}>
+                        {student.dri.debtExposure}%
+                      </div>
+                    ) : (
+                      <div className="text-sm text-slate-600">No data</div>
+                    )}
+                  </div>
+                  
+                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800">
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">PDI</div>
+                    {student.dri.precisionDecay !== null ? (
+                      <div className={`text-2xl font-black ${
+                        student.dri.precisionDecay > DRI_CONFIG.PDI_SEVERE_THRESHOLD ? 'text-red-400' :
+                        student.dri.precisionDecay > DRI_CONFIG.PDI_CRITICAL_THRESHOLD ? 'text-amber-400' : 
+                        'text-emerald-400'
+                      }`}>
+                        {student.dri.precisionDecay}x
+                      </div>
+                    ) : (
+                      <div className="text-sm text-slate-600">No data</div>
+                    )}
                   </div>
                 </div>
-             </div>
-          </div>
 
-          {/* ========================================== */}
-          {/* COL DERECHA: GRÁFICO Y TABLA */}
-          {/* ========================================== */}
-          <div className="col-span-8 space-y-8">
-            
-            {/* Gráfico de Precisión */}
-            <div className="bg-slate-900/20 rounded-[2.5rem] border border-slate-800 p-8">
-               <div className="flex justify-between items-center mb-6">
-                 <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] italic">
-                   Curva de Precisión - Últimas {chartData.length} Sesiones
-                 </h3>
-                 {chartData.length >= 5 && (
-                   <div className="text-[10px] text-slate-600 font-mono">
-                     PDI: {student.dri.precisionDecay ? 
-                       <span className={
-                         student.dri.precisionDecay > DRI_CONFIG.PDI_SEVERE_THRESHOLD ? 'text-red-400' :
-                         student.dri.precisionDecay > DRI_CONFIG.PDI_CRITICAL_THRESHOLD ? 'text-amber-400' :
-                         'text-emerald-400'
-                       }>
-                         {student.dri.precisionDecay}x
-                       </span>
-                       : 'N/A'
-                     }
+                {/* Outer Fringe */}
+                <div className="bg-indigo-950/20 border border-indigo-500/30 p-5 rounded-2xl">
+                  <h3 className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-3 italic flex items-center gap-2">
+                    <span>⚡ Ready to Accelerate</span>
+                    <span className="px-2 py-0.5 bg-indigo-500/20 rounded text-indigo-300">
+                      {readyToAccelerate.length}
+                    </span>
+                  </h3>
+                  <div className="space-y-2">
+                     {readyToAccelerate.length > 0 ? readyToAccelerate.map((topic: string, idx: number) => (
+                        <div key={idx} className="flex items-center gap-2 p-2 bg-indigo-900/20 rounded-lg border border-indigo-500/10">
+                           <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+                           <span className="text-[10px] font-bold text-indigo-200 uppercase truncate italic">{topic}</span>
+                        </div>
+                     )) : (
+                       <p className="text-[10px] text-slate-600 italic font-bold text-center py-4">
+                         Consolidando base...
+                       </p>
+                     )}
+                  </div>
+                </div>
+
+                {/* Struggle Topics */}
+                {struggleTopics.length > 0 && (
+                  <div className="bg-red-950/20 border border-red-500/30 p-5 rounded-2xl">
+                    <h3 className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-3 italic flex items-center gap-2">
+                      <span>🚨 Needs Intervention</span>
+                      <span className="px-2 py-0.5 bg-red-500/20 rounded text-red-300">
+                        {struggleTopics.length}
+                      </span>
+                    </h3>
+                    <div className="space-y-2">
+                       {struggleTopics.map((topic: string, idx: number) => (
+                          <div key={idx} className="flex items-center gap-2 p-2 bg-red-900/20 rounded-lg border border-red-500/10">
+                             <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                             <span className="text-[10px] font-bold text-red-200 uppercase truncate italic">{topic}</span>
+                          </div>
+                       ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ========================================== */}
+              {/* RIGHT COLUMN: CHARTS */}
+              {/* ========================================== */}
+              <div className="col-span-8 space-y-6">
+                
+                {/* Precision Curve */}
+                <div className="bg-slate-900/20 rounded-2xl border border-slate-800 p-6">
+                   <div className="flex justify-between items-center mb-4">
+                     <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] italic">
+                       Precision Curve
+                     </h3>
+                     {chartData.length >= 5 && student.dri.precisionDecay && (
+                       <div className="text-[10px] font-mono">
+                         PDI: 
+                         <span className={`ml-2 font-bold ${
+                           student.dri.precisionDecay > DRI_CONFIG.PDI_SEVERE_THRESHOLD ? 'text-red-400' :
+                           student.dri.precisionDecay > DRI_CONFIG.PDI_CRITICAL_THRESHOLD ? 'text-amber-400' :
+                           'text-emerald-400'
+                         }`}>
+                           {student.dri.precisionDecay}x
+                         </span>
+                       </div>
+                     )}
                    </div>
-                 )}
-               </div>
-               
-               <ResponsiveContainer width="100%" height={250}>
-                 <LineChart data={chartData} margin={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                   <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
-                   <XAxis 
-                     dataKey="i" 
-                     stroke="#475569" 
-                     fontSize={10} 
-                     label={{ value: 'Session #', position: 'insideBottom', offset: -5, fill: '#64748b' }} 
-                   />
-                   <YAxis 
-                     domain={[0, 110]} 
-                     ticks={[0, 25, 50, 75, 100]} 
-                     stroke="#475569" 
-                     fontSize={10} 
-                     label={{ value: 'Accuracy %', angle: -90, position: 'insideLeft', fill: '#64748b' }} 
-                   />
-                   <Tooltip 
-                     contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '15px' }}
-                     labelFormatter={(value) => `Session ${value}`}
-                     formatter={(value: any, name: string) => {
-                       if (name === 'acc') return [`${value}%`, 'Accuracy'];
-                       return [value, name];
-                     }}
-                   />
-                   <Line 
-                     type="monotone" 
-                     dataKey="acc" 
-                     stroke="#6366f1" 
-                     strokeWidth={3} 
-                     dot={{ r: 4, fill: '#6366f1' }} 
-                     activeDot={{ r: 8 }} 
-                   />
-                 </LineChart>
-               </ResponsiveContainer>
-            </div>
+                   
+                   <ResponsiveContainer width="100%" height={200}>
+                     <LineChart data={chartData} margin={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                       <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
+                       <XAxis 
+                         dataKey="i" 
+                         stroke="#475569" 
+                         fontSize={10} 
+                         label={{ value: 'Session #', position: 'insideBottom', offset: -5, fill: '#64748b' }} 
+                       />
+                       <YAxis 
+                         domain={[0, 110]} 
+                         ticks={[0, 25, 50, 75, 100]} 
+                         stroke="#475569" 
+                         fontSize={10} 
+                         label={{ value: 'Accuracy %', angle: -90, position: 'insideLeft', fill: '#64748b' }} 
+                       />
+                       <Tooltip 
+                         contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '15px' }}
+                         labelFormatter={(value) => `Session ${value}`}
+                         formatter={(value: any) => [`${value}%`, 'Accuracy']}
+                       />
+                       <Line 
+                         type="monotone" 
+                         dataKey="acc" 
+                         stroke="#6366f1" 
+                         strokeWidth={3} 
+                         dot={{ r: 4, fill: '#6366f1' }} 
+                         activeDot={{ r: 8 }} 
+                       />
+                     </LineChart>
+                   </ResponsiveContainer>
+                </div>
 
-            {/* Tabla de Sesiones */}
-            <div className="bg-slate-900/10 rounded-3xl border border-slate-800 overflow-hidden">
-               <div className="p-4 bg-slate-900/40 border-b border-slate-800 flex justify-between items-center">
+                {/* Weekly Activity Pattern */}
+                <div className="bg-slate-900/20 rounded-2xl border border-slate-800 p-6">
+                  <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] italic mb-4">
+                    Weekly Activity Pattern
+                  </h3>
+                  
+                  <ResponsiveContainer width="100%" height={150}>
+                    <BarChart data={weeklyPattern} margin={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="day" 
+                        stroke="#475569" 
+                        fontSize={10}
+                      />
+                      <YAxis 
+                        stroke="#475569" 
+                        fontSize={10}
+                        label={{ value: 'XP Earned', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '15px' }}
+                        formatter={(value: any, name: string) => {
+                          if (name === 'xp') return [`${value} XP`, 'Earned'];
+                          if (name === 'tasks') return [`${value} tasks`, 'Completed'];
+                          return [value, name];
+                        }}
+                      />
+                      <Bar dataKey="xp" fill="#6366f1" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  
+                  <div className="mt-3 flex justify-between text-[9px] text-slate-600">
+                    <span>Total weekly XP: <span className="text-indigo-400 font-bold">{weeklyPattern.reduce((sum, d) => sum + d.xp, 0)}</span></span>
+                    <span>Avg per active day: <span className="text-emerald-400 font-bold">
+                      {Math.round(weeklyPattern.reduce((sum, d) => sum + d.xp, 0) / weeklyPattern.filter(d => d.tasks > 0).length || 0)}
+                    </span></span>
+                  </div>
+                </div>
+
+                {/* Quick Stats */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl">
+                    <div className="text-[9px] text-purple-400 uppercase tracking-wider mb-1">Focus</div>
+                    <div className="text-2xl font-black text-purple-300">
+                      {student.metrics.focusIntegrity}%
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-xl">
+                    <div className="text-[9px] text-cyan-400 uppercase tracking-wider mb-1">iROI</div>
+                    {student.dri.iROI !== null ? (
+                      <div className="text-2xl font-black text-cyan-300">
+                        {student.dri.iROI}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-slate-600">N/A</div>
+                    )}
+                  </div>
+                  
+                  <div className="p-4 bg-pink-500/10 border border-pink-500/30 rounded-xl">
+                    <div className="text-[9px] text-pink-400 uppercase tracking-wider mb-1">Sessions</div>
+                    <div className="text-2xl font-black text-pink-300">
+                      {tasks.length}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* HISTORY TAB */}
+          {activeTab === 'history' && (
+            <div className="bg-slate-900/10 rounded-2xl border border-slate-800 overflow-hidden">
+               <div className="p-4 bg-slate-900/40 border-b border-slate-800 flex justify-between items-center sticky top-0 z-10">
                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                   Historial de Sesiones (Recientes Primero)
+                   Session History
                  </span>
                  <span className="text-[9px] text-slate-600 font-mono">
-                   Total: {sortedData.length} sessions
+                   {sortedData.length} total sessions
                  </span>
                </div>
                
-               <div className="max-h-60 overflow-y-auto custom-scrollbar">
+               <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
                   <table className="w-full text-left border-collapse">
                      <thead className="sticky top-0 bg-[#080808] z-10">
                         <tr className="text-[9px] font-black text-slate-600 uppercase border-b border-slate-800">
-                           <th className="p-4">Fecha</th>
-                           <th className="p-4">Tópico / Concepto</th>
-                           <th className="p-4 text-center">Precisión</th>
-                           <th className="p-4 text-center">Ítems</th>
-                           <th className="p-4 text-center">Tiempo</th>
+                           <th className="p-4">Date</th>
+                           <th className="p-4">Topic / Concept</th>
+                           <th className="p-4 text-center">Accuracy</th>
+                           <th className="p-4 text-center">Items</th>
+                           <th className="p-4 text-center">Time</th>
+                           <th className="p-4 text-center">XP</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-800/50">
-                        {sortedData.slice(0, 30).map((task: any, idx: number) => (
+                        {sortedData.map((task: any, idx: number) => (
                            <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
                               <td className="p-4 text-[10px] font-mono text-slate-500">{task.date}</td>
-                              <td className="p-4 text-[11px] font-bold text-slate-300 uppercase italic truncate max-w-[250px]">
+                              <td className="p-4 text-[11px] font-bold text-slate-300 uppercase italic truncate max-w-[300px]">
                                 {task.topic}
                               </td>
                               <td className="p-4 text-center">
-                                 <span className={`text-[10px] font-mono font-black ${
-                                   task.acc >= 80 ? 'text-emerald-500' : 
-                                   task.acc >= 50 ? 'text-amber-500' : 
-                                   'text-red-500'
+                                 <span className={`text-[10px] font-mono font-black px-2 py-1 rounded ${
+                                   task.acc >= 80 ? 'bg-emerald-500/20 text-emerald-400' : 
+                                   task.acc >= 50 ? 'bg-amber-500/20 text-amber-400' : 
+                                   'bg-red-500/20 text-red-400'
                                  }`}>
                                     {task.acc}%
                                  </span>
@@ -350,13 +480,16 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                               <td className="p-4 text-center text-[10px] font-mono text-indigo-400">
                                  {task.time} min
                               </td>
+                              <td className="p-4 text-center text-[10px] font-mono text-purple-400 font-bold">
+                                 {tasks[sortedData.length - 1 - idx]?.xpAwarded || 0}
+                              </td>
                            </tr>
                         ))}
                      </tbody>
                   </table>
                </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
