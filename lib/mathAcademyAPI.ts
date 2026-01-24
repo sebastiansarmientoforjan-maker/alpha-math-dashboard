@@ -21,14 +21,24 @@ export async function getStudentData(studentId: string) {
       const { activity } = await activityRes.json();
       if (activity) {
         const t = activity.totals || {};
+        
+        // SOLUCIÓN: Mapeo robusto (Snake Case -> Camel Case) para capturar el tiempo real
         activityMetrics = {
-          xpAwarded: t.xpAwarded || 0,
-          time: t.timeEngaged || 0, // Segundos crudos para lib/metrics
+          xpAwarded: t.xp_awarded ?? t.xpAwarded ?? 0,
+          time: t.time_engaged ?? t.timeEngaged ?? 0, // Captura correcta de segundos
           questions: t.questions || 0,
-          questionsCorrect: t.questionsCorrect || 0,
-          numTasks: t.numTasks || 0,
-          tasks: activity.tasks || [],
-          totals: t // Pasamos el objeto completo para capturar timeElapsed
+          questionsCorrect: t.questions_correct ?? t.questionsCorrect ?? 0,
+          numTasks: t.num_tasks ?? t.numTasks ?? 0,
+          
+          // Mapeo de tareas individuales
+          tasks: (activity.tasks || []).map((task: any) => ({
+             ...task,
+             questionsCorrect: task.questions_correct ?? task.questionsCorrect ?? 0,
+             timeTotal: task.time_total ?? task.timeTotal ?? 0,
+             smartScore: task.smart_score ?? task.smartScore ?? 0
+          })),
+          
+          totals: t 
         };
       }
     }
