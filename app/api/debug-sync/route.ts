@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   // ID de Zoey sacado de tu captura (o usa uno que sepas que tiene actividad)
-  const TEST_STUDENT_ID = '22122'; // Reemplaza con un ID real si este no es Zoey
+  const TEST_STUDENT_ID = '17191'; // Reemplaza con un ID real si este no es Zoey
 
   try {
     const rawData = await getStudentData(TEST_STUDENT_ID);
