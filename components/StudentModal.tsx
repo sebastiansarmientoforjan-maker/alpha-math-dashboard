@@ -1,13 +1,46 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, BarChart } from 'recharts';
 import { DRI_CONFIG } from '@/lib/dri-config';
 
-export default function StudentModal({ student, onClose }: { student: any; onClose: () => void }) {
+interface StudentModalProps {
+  student: any;
+  onClose: () => void;
+  onNavigate?: (direction: 'prev' | 'next') => void;
+  currentIndex?: number;
+  totalStudents?: number;
+}
+
+export default function StudentModal({ 
+  student, 
+  onClose, 
+  onNavigate,
+  currentIndex = -1,
+  totalStudents = 0
+}: StudentModalProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'history'>('overview');
 
   const tasks = student?.activity?.tasks || [];
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        onNavigate?.('next');
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        onNavigate?.('prev');
+      }
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyboard);
+    return () => window.removeEventListener('keydown', handleKeyboard);
+  }, [onNavigate, onClose]);
 
   // ==========================================
   // READY TO ACCELERATE (Outer Fringe)
@@ -30,7 +63,7 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
   }, [tasks]);
 
   // ==========================================
-  // DATOS PARA TABLA (Más reciente primero)
+  // DATA FOR TABLE (Most recent first)
   // ==========================================
   const sortedData = useMemo(() => {
     return tasks.map((t: any, i: number) => {
@@ -42,14 +75,15 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
         topic: t.topic?.name || 'Session Task',
         questions: t.questions || 0,
         correct: t.questionsCorrect || 0,
-        date: dateObj.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' }),
-        time: Math.round((t.timeTotal || 0) / 60)
+        date: dateObj.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit' }),
+        time: Math.round((t.timeTotal || 0) / 60),
+        xp: t.xpAwarded || 0
       };
     }).sort((a: any, b: any) => b.timestamp - a.timestamp);
   }, [tasks]);
 
   // ==========================================
-  // DATOS PARA GRÁFICO (Orden cronológico)
+  // DATA FOR CHART (Chronological order)
   // ==========================================
   const chartData = useMemo(() => 
     [...sortedData].reverse().map((d, i) => ({ ...d, i: i + 1 })), 
@@ -64,7 +98,7 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
     
     tasks.forEach((t: any) => {
       const date = new Date(t.completedLocal);
-      const dayIndex = (date.getDay() + 6) % 7; // Convert Sunday=0 to Monday=0
+      const dayIndex = (date.getDay() + 6) % 7;
       pattern[dayIndex].tasks++;
       pattern[dayIndex].xp += t.xpAwarded || 0;
     });
@@ -85,73 +119,88 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
         {/* ========================================== */}
         <div className="p-6 border-b border-slate-800 flex justify-between items-start bg-gradient-to-b from-slate-900/50 to-transparent">
           <div className="flex gap-6 items-center flex-1">
-             {/* Velocity Badge */}
-             <div className={`w-20 h-20 rounded-2xl border-4 flex flex-col items-center justify-center text-2xl font-black italic ${
-               student.dri.driTier === 'RED' ? 'border-red-500 text-red-500 bg-red-500/10' : 
-               student.dri.driTier === 'YELLOW' ? 'border-amber-500 text-amber-500 bg-amber-500/10' :
-               'border-emerald-500 text-emerald-500 bg-emerald-500/10'
-             }`}>
-               <span className="text-2xl">{student.metrics.velocityScore || 0}</span>
-               <span className="text-[8px] opacity-60 uppercase tracking-wider">Velocity</span>
-             </div>
-             
-             <div className="flex-1">
-                <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase">
-                  {student.firstName} {student.lastName}
-                </h2>
-                
-                <div className="flex flex-wrap gap-3 mt-2 font-black text-[10px] uppercase">
-                  {/* DRI Signal Badge */}
-                  <span className={`px-3 py-1 rounded-full border border-current ${student.dri.driColor}`}>
-                    {student.dri.driSignal}
+            {/* Velocity Badge */}
+            <div className={`w-20 h-20 rounded-2xl border-4 flex flex-col items-center justify-center text-2xl font-black italic ${
+              student.dri.driTier === 'RED' ? 'border-red-500 text-red-500 bg-red-500/10' : 
+              student.dri.driTier === 'YELLOW' ? 'border-amber-500 text-amber-500 bg-amber-500/10' :
+              'border-emerald-500 text-emerald-500 bg-emerald-500/10'
+            }`}>
+              <span className="text-2xl">{student.metrics.velocityScore || 0}</span>
+              <span className="text-[8px] opacity-60 uppercase tracking-wider">Velocity</span>
+            </div>
+            
+            <div className="flex-1">
+              <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase">
+                {student.firstName} {student.lastName}
+              </h2>
+              
+              <div className="flex flex-wrap gap-3 mt-2 font-black text-[10px] uppercase">
+                <span className={`px-3 py-1 rounded-full border border-current ${student.dri.driColor}`}>
+                  {student.dri.driSignal}
+                </span>
+                <span className="px-3 py-1 rounded-full border border-indigo-500/30 text-indigo-400 bg-indigo-500/10">
+                  {student.currentCourse?.name}
+                </span>
+                {student.dri.riskScore !== undefined && (
+                  <span className={`px-3 py-1 rounded-full border ${
+                    student.dri.riskScore >= 60 ? 'border-red-500 text-red-400 bg-red-500/10' :
+                    student.dri.riskScore >= 35 ? 'border-amber-500 text-amber-400 bg-amber-500/10' :
+                    'border-emerald-500 text-emerald-400 bg-emerald-500/10'
+                  }`}>
+                    Risk: {student.dri.riskScore}/100
                   </span>
-                  
-                  {/* Course Badge */}
-                  <span className="px-3 py-1 rounded-full border border-indigo-500/30 text-indigo-400 bg-indigo-500/10">
-                    {student.currentCourse?.name}
-                  </span>
-                  
-                  {/* Risk Score Badge */}
-                  {student.dri.riskScore !== undefined && (
-                    <span className={`px-3 py-1 rounded-full border ${
-                      student.dri.riskScore >= 60 ? 'border-red-500 text-red-400 bg-red-500/10' :
-                      student.dri.riskScore >= 35 ? 'border-amber-500 text-amber-400 bg-amber-500/10' :
-                      'border-emerald-500 text-emerald-400 bg-emerald-500/10'
-                    }`}>
-                      Risk: {student.dri.riskScore}/100
-                    </span>
-                  )}
-                </div>
-                
-                {/* Velocity Details */}
-                <div className="mt-2 flex gap-4 text-[10px] text-slate-500 font-mono">
-                  <span>
-                    <span className={`font-bold ${
-                      student.metrics.velocityScore >= 100 ? 'text-emerald-500' :
-                      student.metrics.velocityScore >= 80 ? 'text-amber-400' :
-                      'text-red-400'
-                    }`}>
-                      {velocityInXP} XP
-                    </span> / {DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP weekly
-                  </span>
-                  <span className="text-slate-700">•</span>
-                  <span>
-                    {tasks.length} total sessions
-                  </span>
-                  <span className="text-slate-700">•</span>
-                  <span>
-                    {Math.round((student.activity?.time || 0) / 3600)}h engaged
-                  </span>
-                </div>
-             </div>
+                )}
+              </div>
+              
+              <div className="mt-2 flex gap-4 text-[10px] text-slate-500 font-mono">
+                <span>
+                  <span className={`font-bold ${
+                    student.metrics.velocityScore >= 100 ? 'text-emerald-500' :
+                    student.metrics.velocityScore >= 80 ? 'text-amber-400' :
+                    'text-red-400'
+                  }`}>
+                    {velocityInXP} XP
+                  </span> / {DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP weekly
+                </span>
+                <span className="text-slate-700">•</span>
+                <span>{tasks.length} total sessions</span>
+                <span className="text-slate-700">•</span>
+                <span>{Math.round((student.activity?.time || 0) / 3600)}h engaged</span>
+              </div>
+            </div>
           </div>
           
-          <button 
-            onClick={onClose} 
-            className="text-slate-600 hover:text-white text-2xl transition-colors p-2 hover:bg-slate-800 rounded-lg"
-          >
-            ✕
-          </button>
+          {/* Navigation & Close */}
+          <div className="flex items-center gap-2">
+            {onNavigate && totalStudents > 1 && (
+              <div className="flex items-center gap-1 mr-4">
+                <button 
+                  onClick={() => onNavigate('prev')}
+                  className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center justify-center"
+                  title="Previous student (←)"
+                >
+                  ←
+                </button>
+                <span className="text-[10px] text-slate-600 font-mono px-2">
+                  {currentIndex + 1} / {totalStudents}
+                </span>
+                <button 
+                  onClick={() => onNavigate('next')}
+                  className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center justify-center"
+                  title="Next student (→)"
+                >
+                  →
+                </button>
+              </div>
+            )}
+            <button 
+              onClick={onClose} 
+              className="text-slate-600 hover:text-white text-2xl transition-colors p-2 hover:bg-slate-800 rounded-lg"
+              title="Close (Esc)"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* ========================================== */}
@@ -189,15 +238,13 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
           {activeTab === 'overview' && (
             <div className="grid grid-cols-12 gap-6">
               
-              {/* ========================================== */}
               {/* LEFT COLUMN: METRICS */}
-              {/* ========================================== */}
               <div className="col-span-4 space-y-6">
                 
                 {/* RSR Card */}
                 <div className="p-5 bg-slate-900/40 rounded-2xl border border-slate-800 text-center shadow-inner">
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                    Recent Success Rate
+                    Recent Success Rate (RSR)
                   </p>
                   <p className="text-5xl font-black text-white italic">{rsrDisplay}</p>
                   <p className="text-[9px] text-indigo-400 mt-3 font-bold uppercase italic tracking-widest">
@@ -208,21 +255,27 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                   </div>
                 </div>
 
-                {/* DRI Metrics Grid */}
+                {/* DRI Metrics Grid with expanded labels */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">KSI</div>
+                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800 group">
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">
+                      KSI
+                      <span className="hidden group-hover:inline text-indigo-400 ml-1">(Knowledge Stability)</span>
+                    </div>
                     <div className={`text-2xl font-black ${
+                      student.metrics.ksi === null ? 'text-slate-600' :
                       student.metrics.ksi < DRI_CONFIG.KSI_CRITICAL_THRESHOLD ? 'text-red-400' :
                       student.metrics.ksi < DRI_CONFIG.KSI_LOW_THRESHOLD ? 'text-amber-400' :
                       'text-blue-400'
                     }`}>
-                      {student.metrics.ksi}%
+                      {student.metrics.ksi !== null ? `${student.metrics.ksi}%` : 'N/A'}
                     </div>
                   </div>
                   
-                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Accuracy</div>
+                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800 group">
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">
+                      Accuracy
+                    </div>
                     <div className={`text-2xl font-black ${
                       (student.metrics.accuracyRate || 0) >= 70 ? 'text-emerald-400' :
                       (student.metrics.accuracyRate || 0) >= 55 ? 'text-amber-400' :
@@ -232,8 +285,11 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                     </div>
                   </div>
                   
-                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">DER</div>
+                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800 group">
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">
+                      DER
+                      <span className="hidden group-hover:inline text-indigo-400 ml-1">(Debt Exposure)</span>
+                    </div>
                     {student.dri.debtExposure !== null ? (
                       <div className={`text-2xl font-black ${
                         student.dri.debtExposure > DRI_CONFIG.DER_SEVERE_THRESHOLD ? 'text-red-400' :
@@ -247,8 +303,11 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                     )}
                   </div>
                   
-                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">PDI</div>
+                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800 group">
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">
+                      PDI
+                      <span className="hidden group-hover:inline text-indigo-400 ml-1">(Precision Decay)</span>
+                    </div>
                     {student.dri.precisionDecay !== null ? (
                       <div className={`text-2xl font-black ${
                         student.dri.precisionDecay > DRI_CONFIG.PDI_SEVERE_THRESHOLD ? 'text-red-400' :
@@ -263,7 +322,7 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                   </div>
                 </div>
 
-                {/* Outer Fringe */}
+                {/* Ready to Accelerate */}
                 <div className="bg-indigo-950/20 border border-indigo-500/30 p-5 rounded-2xl">
                   <h3 className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-3 italic flex items-center gap-2">
                     <span>⚡ Ready to Accelerate</span>
@@ -272,16 +331,16 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                     </span>
                   </h3>
                   <div className="space-y-2">
-                     {readyToAccelerate.length > 0 ? readyToAccelerate.map((topic: string, idx: number) => (
-                        <div key={idx} className="flex items-center gap-2 p-2 bg-indigo-900/20 rounded-lg border border-indigo-500/10">
-                           <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
-                           <span className="text-[10px] font-bold text-indigo-200 uppercase truncate italic">{topic}</span>
-                        </div>
-                     )) : (
-                       <p className="text-[10px] text-slate-600 italic font-bold text-center py-4">
-                         Consolidando base...
-                       </p>
-                     )}
+                    {readyToAccelerate.length > 0 ? readyToAccelerate.map((topic: string, idx: number) => (
+                      <div key={idx} className="flex items-center gap-2 p-2 bg-indigo-900/20 rounded-lg border border-indigo-500/10">
+                        <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+                        <span className="text-[10px] font-bold text-indigo-200 uppercase truncate italic">{topic}</span>
+                      </div>
+                    )) : (
+                      <p className="text-[10px] text-slate-600 italic font-bold text-center py-4">
+                        Consolidating foundation...
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -295,73 +354,71 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                       </span>
                     </h3>
                     <div className="space-y-2">
-                       {struggleTopics.map((topic: string, idx: number) => (
-                          <div key={idx} className="flex items-center gap-2 p-2 bg-red-900/20 rounded-lg border border-red-500/10">
-                             <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-                             <span className="text-[10px] font-bold text-red-200 uppercase truncate italic">{topic}</span>
-                          </div>
-                       ))}
+                      {struggleTopics.map((topic: string, idx: number) => (
+                        <div key={idx} className="flex items-center gap-2 p-2 bg-red-900/20 rounded-lg border border-red-500/10">
+                          <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                          <span className="text-[10px] font-bold text-red-200 uppercase truncate italic">{topic}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* ========================================== */}
               {/* RIGHT COLUMN: CHARTS */}
-              {/* ========================================== */}
               <div className="col-span-8 space-y-6">
                 
                 {/* Precision Curve */}
                 <div className="bg-slate-900/20 rounded-2xl border border-slate-800 p-6">
-                   <div className="flex justify-between items-center mb-4">
-                     <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] italic">
-                       Precision Curve
-                     </h3>
-                     {chartData.length >= 5 && student.dri.precisionDecay && (
-                       <div className="text-[10px] font-mono">
-                         PDI: 
-                         <span className={`ml-2 font-bold ${
-                           student.dri.precisionDecay > DRI_CONFIG.PDI_SEVERE_THRESHOLD ? 'text-red-400' :
-                           student.dri.precisionDecay > DRI_CONFIG.PDI_CRITICAL_THRESHOLD ? 'text-amber-400' :
-                           'text-emerald-400'
-                         }`}>
-                           {student.dri.precisionDecay}x
-                         </span>
-                       </div>
-                     )}
-                   </div>
-                   
-                   <ResponsiveContainer width="100%" height={200}>
-                     <LineChart data={chartData} margin={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                       <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
-                       <XAxis 
-                         dataKey="i" 
-                         stroke="#475569" 
-                         fontSize={10} 
-                         label={{ value: 'Session #', position: 'insideBottom', offset: -5, fill: '#64748b' }} 
-                       />
-                       <YAxis 
-                         domain={[0, 110]} 
-                         ticks={[0, 25, 50, 75, 100]} 
-                         stroke="#475569" 
-                         fontSize={10} 
-                         label={{ value: 'Accuracy %', angle: -90, position: 'insideLeft', fill: '#64748b' }} 
-                       />
-                       <Tooltip 
-                         contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '15px' }}
-                         labelFormatter={(value) => `Session ${value}`}
-                         formatter={(value: any) => [`${value}%`, 'Accuracy']}
-                       />
-                       <Line 
-                         type="monotone" 
-                         dataKey="acc" 
-                         stroke="#6366f1" 
-                         strokeWidth={3} 
-                         dot={{ r: 4, fill: '#6366f1' }} 
-                         activeDot={{ r: 8 }} 
-                       />
-                     </LineChart>
-                   </ResponsiveContainer>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] italic">
+                      Precision Curve
+                    </h3>
+                    {chartData.length >= 5 && student.dri.precisionDecay && (
+                      <div className="text-[10px] font-mono">
+                        PDI: 
+                        <span className={`ml-2 font-bold ${
+                          student.dri.precisionDecay > DRI_CONFIG.PDI_SEVERE_THRESHOLD ? 'text-red-400' :
+                          student.dri.precisionDecay > DRI_CONFIG.PDI_CRITICAL_THRESHOLD ? 'text-amber-400' :
+                          'text-emerald-400'
+                        }`}>
+                          {student.dri.precisionDecay}x
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={chartData} margin={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="i" 
+                        stroke="#475569" 
+                        fontSize={10} 
+                        label={{ value: 'Session #', position: 'insideBottom', offset: -5, fill: '#64748b' }} 
+                      />
+                      <YAxis 
+                        domain={[0, 110]} 
+                        ticks={[0, 25, 50, 75, 100]} 
+                        stroke="#475569" 
+                        fontSize={10} 
+                        label={{ value: 'Accuracy %', angle: -90, position: 'insideLeft', fill: '#64748b' }} 
+                      />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '15px' }}
+                        labelFormatter={(value) => `Session ${value}`}
+                        formatter={(value: any) => [`${value}%`, 'Accuracy']}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="acc" 
+                        stroke="#6366f1" 
+                        strokeWidth={3} 
+                        dot={{ r: 4, fill: '#6366f1' }} 
+                        activeDot={{ r: 8 }} 
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
 
                 {/* Weekly Activity Pattern */}
@@ -373,11 +430,7 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                   <ResponsiveContainer width="100%" height={150}>
                     <BarChart data={weeklyPattern} margin={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="day" 
-                        stroke="#475569" 
-                        fontSize={10}
-                      />
+                      <XAxis dataKey="day" stroke="#475569" fontSize={10} />
                       <YAxis 
                         stroke="#475569" 
                         fontSize={10}
@@ -398,22 +451,28 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
                   <div className="mt-3 flex justify-between text-[9px] text-slate-600">
                     <span>Total weekly XP: <span className="text-indigo-400 font-bold">{weeklyPattern.reduce((sum, d) => sum + d.xp, 0)}</span></span>
                     <span>Avg per active day: <span className="text-emerald-400 font-bold">
-                      {Math.round(weeklyPattern.reduce((sum, d) => sum + d.xp, 0) / weeklyPattern.filter(d => d.tasks > 0).length || 0)}
+                      {Math.round(weeklyPattern.reduce((sum, d) => sum + d.xp, 0) / (weeklyPattern.filter(d => d.tasks > 0).length || 1))}
                     </span></span>
                   </div>
                 </div>
 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl">
-                    <div className="text-[9px] text-purple-400 uppercase tracking-wider mb-1">Focus</div>
+                  <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl group">
+                    <div className="text-[9px] text-purple-400 uppercase tracking-wider mb-1">
+                      Focus
+                      <span className="hidden group-hover:inline text-purple-300 ml-1">(Integrity)</span>
+                    </div>
                     <div className="text-2xl font-black text-purple-300">
                       {student.metrics.focusIntegrity}%
                     </div>
                   </div>
                   
-                  <div className="p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-xl">
-                    <div className="text-[9px] text-cyan-400 uppercase tracking-wider mb-1">iROI</div>
+                  <div className="p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-xl group">
+                    <div className="text-[9px] text-cyan-400 uppercase tracking-wider mb-1">
+                      iROI
+                      <span className="hidden group-hover:inline text-cyan-300 ml-1">(Investment ROI)</span>
+                    </div>
                     {student.dri.iROI !== null ? (
                       <div className="text-2xl font-black text-cyan-300">
                         {student.dri.iROI}
@@ -437,57 +496,57 @@ export default function StudentModal({ student, onClose }: { student: any; onClo
           {/* HISTORY TAB */}
           {activeTab === 'history' && (
             <div className="bg-slate-900/10 rounded-2xl border border-slate-800 overflow-hidden">
-               <div className="p-4 bg-slate-900/40 border-b border-slate-800 flex justify-between items-center sticky top-0 z-10">
-                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                   Session History
-                 </span>
-                 <span className="text-[9px] text-slate-600 font-mono">
-                   {sortedData.length} total sessions
-                 </span>
-               </div>
-               
-               <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
-                  <table className="w-full text-left border-collapse">
-                     <thead className="sticky top-0 bg-[#080808] z-10">
-                        <tr className="text-[9px] font-black text-slate-600 uppercase border-b border-slate-800">
-                           <th className="p-4">Date</th>
-                           <th className="p-4">Topic / Concept</th>
-                           <th className="p-4 text-center">Accuracy</th>
-                           <th className="p-4 text-center">Items</th>
-                           <th className="p-4 text-center">Time</th>
-                           <th className="p-4 text-center">XP</th>
-                        </tr>
-                     </thead>
-                     <tbody className="divide-y divide-slate-800/50">
-                        {sortedData.map((task: any, idx: number) => (
-                           <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
-                              <td className="p-4 text-[10px] font-mono text-slate-500">{task.date}</td>
-                              <td className="p-4 text-[11px] font-bold text-slate-300 uppercase italic truncate max-w-[300px]">
-                                {task.topic}
-                              </td>
-                              <td className="p-4 text-center">
-                                 <span className={`text-[10px] font-mono font-black px-2 py-1 rounded ${
-                                   task.acc >= 80 ? 'bg-emerald-500/20 text-emerald-400' : 
-                                   task.acc >= 50 ? 'bg-amber-500/20 text-amber-400' : 
-                                   'bg-red-500/20 text-red-400'
-                                 }`}>
-                                    {task.acc}%
-                                 </span>
-                              </td>
-                              <td className="p-4 text-center text-[10px] font-mono text-slate-500">
-                                 {task.correct} / {task.questions}
-                              </td>
-                              <td className="p-4 text-center text-[10px] font-mono text-indigo-400">
-                                 {task.time} min
-                              </td>
-                              <td className="p-4 text-center text-[10px] font-mono text-purple-400 font-bold">
-                                 {tasks[sortedData.length - 1 - idx]?.xpAwarded || 0}
-                              </td>
-                           </tr>
-                        ))}
-                     </tbody>
-                  </table>
-               </div>
+              <div className="p-4 bg-slate-900/40 border-b border-slate-800 flex justify-between items-center sticky top-0 z-10">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  Session History
+                </span>
+                <span className="text-[9px] text-slate-600 font-mono">
+                  {sortedData.length} total sessions
+                </span>
+              </div>
+              
+              <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-[#080808] z-10">
+                    <tr className="text-[9px] font-black text-slate-600 uppercase border-b border-slate-800">
+                      <th className="p-4">Date</th>
+                      <th className="p-4">Topic / Concept</th>
+                      <th className="p-4 text-center">Accuracy</th>
+                      <th className="p-4 text-center">Items</th>
+                      <th className="p-4 text-center">Time</th>
+                      <th className="p-4 text-center">XP</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50">
+                    {sortedData.map((task: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
+                        <td className="p-4 text-[10px] font-mono text-slate-500">{task.date}</td>
+                        <td className="p-4 text-[11px] font-bold text-slate-300 uppercase italic truncate max-w-[300px]">
+                          {task.topic}
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={`text-[10px] font-mono font-black px-2 py-1 rounded ${
+                            task.acc >= 80 ? 'bg-emerald-500/20 text-emerald-400' : 
+                            task.acc >= 50 ? 'bg-amber-500/20 text-amber-400' : 
+                            'bg-red-500/20 text-red-400'
+                          }`}>
+                            {task.acc}%
+                          </span>
+                        </td>
+                        <td className="p-4 text-center text-[10px] font-mono text-slate-500">
+                          {task.correct} / {task.questions}
+                        </td>
+                        <td className="p-4 text-center text-[10px] font-mono text-indigo-400">
+                          {task.time} min
+                        </td>
+                        <td className="p-4 text-center text-[10px] font-mono text-purple-400 font-bold">
+                          {task.xp}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
