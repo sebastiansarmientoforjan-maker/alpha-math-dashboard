@@ -3,19 +3,18 @@
 import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
-// ✅ Importamos el componente Matrix Premium
 import KeenKTMatrix from '@/components/KeenKTMatrix';
 import StudentModal from '@/components/StudentModal';
+import HelpModal from '@/components/HelpModal';
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
-import { driColorToHex } from '@/lib/color-utils';
 import { DRI_CONFIG } from '@/lib/dri-config';
 import { Student } from '@/types';
 import { TOPIC_GRADE_MAP } from '@/lib/grade-maps';
 import { formatDistanceToNow } from 'date-fns';
 
 // ==========================================
-// METRIC CARD COMPONENT CON TOOLTIP
+// METRIC CARD COMPONENT WITH TOOLTIP
 // ==========================================
 interface MetricCardProps {
   title: string;
@@ -51,11 +50,8 @@ function MetricCard({ title, value, color, subtitle, tooltip, trend }: MetricCar
           </span>
         )}
       </div>
-      
       <div className="text-2xl font-black">{value}</div>
-      
       {subtitle && <div className="text-[9px] opacity-60 mt-1">{subtitle}</div>}
-      
       {showTooltip && tooltip && (
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-[10px] text-slate-300 whitespace-nowrap z-50 shadow-2xl animate-in fade-in duration-200">
           {tooltip}
@@ -67,13 +63,15 @@ function MetricCard({ title, value, color, subtitle, tooltip, trend }: MetricCar
 }
 
 // ==========================================
-// STUDENT CARD MEMOIZADO
+// STUDENT CARD MEMOIZED
 // ==========================================
 const StudentCard = memo(({ student, onClick, borderColor }: { student: Student; onClick: () => void; borderColor: string }) => {
   return (
     <div 
       onClick={onClick}
-      className={`p-4 bg-slate-900/80 rounded-2xl border-l-4 ${borderColor} cursor-pointer hover:scale-[1.02] transition-all group shadow-lg`}
+      className={`p-4 bg-slate-900/80 rounded-2xl border-l-4 ${borderColor} cursor-pointer hover:scale-[1.02] transition-all group shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onClick()}
     >
       <div className="flex justify-between items-start mb-1">
         <h3 className="font-black text-white text-sm uppercase italic truncate w-40 group-hover:text-indigo-400">
@@ -83,18 +81,15 @@ const StudentCard = memo(({ student, onClick, borderColor }: { student: Student;
           {(student.metrics.lmp * 100).toFixed(0)}% RSR
         </span>
       </div>
-      
       <p className="text-[9px] text-indigo-400/70 font-bold uppercase mb-3 truncate italic">
         {student.currentCourse.name}
       </p>
-      
       <div className="flex justify-between items-center text-[8px] font-black uppercase font-mono">
         <span className={student.dri.driColor}>{student.dri.driSignal}</span>
         <span className="text-slate-600">
           {student.metrics.velocityScore}% v • KSI: {student.metrics.ksi !== null ? student.metrics.ksi + '%' : 'N/A'}
         </span>
       </div>
-      
       {student.dri.riskScore !== undefined && (
         <div className="mt-2 pt-2 border-t border-slate-800">
           <div className="flex justify-between items-center text-[9px]">
@@ -114,7 +109,6 @@ const StudentCard = memo(({ student, onClick, borderColor }: { student: Student;
 }, (prevProps, nextProps) => {
   const prev = prevProps.student;
   const next = nextProps.student;
-  
   return (
     prev.id === next.id &&
     prev.metrics.velocityScore === next.metrics.velocityScore &&
@@ -142,6 +136,10 @@ export default function HomePage() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [batchStatus, setBatchStatus] = useState({ current: 0, total: 33, lastStudent: '' });
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedStudentIndex, setSelectedStudentIndex] = useState<number>(-1);
+  
+  // Help Modal
+  const [showHelp, setShowHelp] = useState(false);
   
   // ETA Tracking
   const [syncStartTime, setSyncStartTime] = useState<number | null>(null);
@@ -152,6 +150,58 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState<'TRIAGE' | 'MATRIX' | 'HEATMAP' | 'LOG'>('TRIAGE');
   const [search, setSearch] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('ALL');
+
+  // ==========================================
+  // KEYBOARD SHORTCUTS
+  // ==========================================
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      // Don't trigger if typing in input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // View switching: 1, 2, 3, 4
+      if (e.key === '1' && !selectedStudent) setViewMode('TRIAGE');
+      if (e.key === '2' && !selectedStudent) setViewMode('MATRIX');
+      if (e.key === '3' && !selectedStudent) setViewMode('HEATMAP');
+      if (e.key === '4' && !selectedStudent) setViewMode('LOG');
+      
+      // Close modal with Escape
+      if (e.key === 'Escape' && selectedStudent) {
+        setSelectedStudent(null);
+        setSelectedStudentIndex(-1);
+      }
+      
+      // Focus search with /
+      if (e.key === '/' && !selectedStudent) {
+        e.preventDefault();
+        const searchInput = document.querySelector('input[placeholder*="SEARCH"]') as HTMLInputElement;
+        searchInput?.focus();
+      }
+      
+      // Help with ?
+      if (e.key === '?' && !selectedStudent) {
+        e.preventDefault();
+        setShowHelp(true);
+      }
+      
+      // Navigate students in modal with arrow keys
+      if (selectedStudent && filteredForNavigation.length > 0) {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          navigateStudent('next');
+        }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          navigateStudent('prev');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyboard);
+    return () => window.removeEventListener('keydown', handleKeyboard);
+  }, [selectedStudent, selectedStudentIndex]);
 
   // ==========================================
   // FIREBASE LISTENERS
@@ -179,7 +229,7 @@ export default function HomePage() {
   }, []);
 
   // ==========================================
-  // BATCH SYNC CON ETA PREDICTIVO
+  // BATCH SYNC WITH PREDICTIVE ETA
   // ==========================================
   const runUpdateBatch = async () => {
     if (updating || isPaused) return;
@@ -205,7 +255,6 @@ export default function HomePage() {
           lastStudent: data.lastStudentName || ''
         });
         
-        // Calcular ETA
         if (batchStatus.current > 0 && syncStartTime) {
           const elapsedTime = Date.now() - syncStartTime;
           const completedBatches = batchStatus.current;
@@ -232,7 +281,7 @@ export default function HomePage() {
         }
       }
     } catch (err) {
-      setSyncError('Sync paused: API unreachable');
+      setSyncError('Sync paused: API unreachable. Click AUTO SYNC to retry.');
       setAutoSync(false);
       setSyncStartTime(null);
       setEta(null);
@@ -254,6 +303,21 @@ export default function HomePage() {
   }, [autoSync]);
 
   // ==========================================
+  // STOP SYNC WITH CONFIRMATION
+  // ==========================================
+  const handleStopSync = () => {
+    if (progress > 0 && progress < 100) {
+      const remainingStudents = Math.round((100 - progress) / 100 * 1613);
+      const confirmed = window.confirm(
+        `Sync is ${progress}% complete.\n\nStopping now will leave approximately ${remainingStudents} students with outdated data.\n\nAre you sure you want to stop?`
+      );
+      if (!confirmed) return;
+    }
+    setAutoSync(false);
+    setIsPaused(false);
+  };
+
+  // ==========================================
   // COMPUTED DATA
   // ==========================================
   const uniqueCourses = useMemo(() => 
@@ -269,12 +333,9 @@ export default function HomePage() {
         const avgLMP = relevant.reduce((acc, s) => acc + (s.metrics?.lmp || 0), 0) / Math.max(1, relevant.length);
         return { course, avgLMP };
       });
-      
       const criticalCourses = courseStats.filter(c => c.avgLMP < 0.4).length;
-      
       return { topic, courseStats, criticalCourses };
     });
-    
     return data.sort((a, b) => b.criticalCourses - a.criticalCourses).slice(0, 15);
   }, [students, uniqueCourses, criticalTopics]);
 
@@ -288,6 +349,9 @@ export default function HomePage() {
   const yellowZone = useMemo(() => filtered.filter(s => s.dri.driTier === 'YELLOW' && !redZone.some(r => r.id === s.id)), [filtered, redZone]);
   const greenZone = useMemo(() => filtered.filter(s => !redZone.some(r => r.id === s.id) && !yellowZone.some(y => y.id === s.id)), [filtered, redZone, yellowZone]);
 
+  // Flat list for navigation
+  const filteredForNavigation = useMemo(() => [...redZone, ...yellowZone, ...greenZone], [redZone, yellowZone, greenZone]);
+
   const stats = useMemo(() => ({
     total: students.length,
     atRisk: students.filter(s => s.dri.driTier === 'RED').length,
@@ -297,12 +361,35 @@ export default function HomePage() {
     avgRSR: Math.round(students.reduce((sum, s) => sum + ((s.metrics?.lmp || 0) * 100), 0) / (students.length || 1))
   }), [students]);
 
-  const trends = {
-    atRisk: -5,
-    attention: 2,
-    onTrack: 3,
-    avgVelocity: -2
-  };
+  const trends = { atRisk: -5, attention: 2, onTrack: 3, avgVelocity: -2 };
+
+  // ==========================================
+  // STUDENT NAVIGATION
+  // ==========================================
+  const navigateStudent = useCallback((direction: 'prev' | 'next') => {
+    if (filteredForNavigation.length === 0) return;
+    
+    let newIndex = selectedStudentIndex;
+    
+    if (direction === 'next') {
+      newIndex = selectedStudentIndex < filteredForNavigation.length - 1 
+        ? selectedStudentIndex + 1 
+        : 0;
+    } else {
+      newIndex = selectedStudentIndex > 0 
+        ? selectedStudentIndex - 1 
+        : filteredForNavigation.length - 1;
+    }
+    
+    setSelectedStudentIndex(newIndex);
+    setSelectedStudent(filteredForNavigation[newIndex]);
+  }, [filteredForNavigation, selectedStudentIndex]);
+
+  const handleStudentClick = useCallback((student: Student) => {
+    const index = filteredForNavigation.findIndex(s => s.id === student.id);
+    setSelectedStudentIndex(index);
+    setSelectedStudent(student);
+  }, [filteredForNavigation]);
 
   if (loading) return (
     <div className="p-10 bg-black min-h-screen text-emerald-500 font-mono italic animate-pulse text-center uppercase tracking-widest">
@@ -311,20 +398,28 @@ export default function HomePage() {
   );
 
   return (
-    // 🔥 CAMBIO DE LAYOUT: h-screen + overflow-hidden para manejo de app
     <div className="flex flex-col h-screen bg-[#050505] text-slate-300 font-sans overflow-hidden">
       
       {/* ========================================== */}
-      {/* HEADER SECTION (Static Top) */}
+      {/* HEADER SECTION */}
       {/* ========================================== */}
       <div className="flex-shrink-0 p-6 pb-0 space-y-4">
         
         {/* TOP BAR */}
         <div className="flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-4 gap-4">
           <div>
-            <h1 className="text-3xl font-black uppercase italic text-white tracking-tighter">DRI COMMAND CENTER</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-black uppercase italic text-white tracking-tighter">DRI COMMAND CENTER</h1>
+              <button 
+                onClick={() => setShowHelp(true)}
+                className="w-8 h-8 rounded-full border border-slate-700 text-slate-500 hover:text-white hover:border-indigo-500 transition-all flex items-center justify-center text-sm font-bold"
+                title="Help & Keyboard Shortcuts (?)"
+              >
+                ?
+              </button>
+            </div>
             <p className="text-xs text-indigo-400 font-bold tracking-[0.3em] uppercase">
-              V5.0 Alpha Protocol • {students.length} / 1613 Estudiantes
+              V5.1 Alpha Protocol • {students.length} / 1613 Students
             </p>
             
             <div className="flex gap-4 mt-2 text-[10px] text-slate-600 font-mono flex-wrap">
@@ -336,26 +431,27 @@ export default function HomePage() {
             </div>
             
             {lastSync && (
-              <p className="text-[10px] text-slate-600 font-mono mt-1">
-                Last sync: {formatDistanceToNow(lastSync, { addSuffix: true })}
+              <p className="text-[10px] text-emerald-600 font-mono mt-1">
+                ✓ Last sync: {formatDistanceToNow(lastSync, { addSuffix: true })}
               </p>
             )}
           </div>
           
           <div className="flex flex-col items-end gap-3">
-            {/* VIEW TOGGLE */}
+            {/* VIEW TOGGLE WITH KEYBOARD HINTS */}
             <div className="flex bg-slate-900/50 p-1 rounded-xl border border-slate-800 font-black text-[10px] uppercase">
-              {(['TRIAGE', 'MATRIX', 'HEATMAP', 'LOG'] as const).map(m => (
+              {(['TRIAGE', 'MATRIX', 'HEATMAP', 'LOG'] as const).map((m, i) => (
                 <button 
                   key={m} 
                   onClick={() => setViewMode(m)} 
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1 ${
                     viewMode === m 
                       ? 'bg-indigo-600 text-white shadow-lg' 
                       : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
                   {m}
+                  <kbd className={`text-[8px] px-1 rounded ${viewMode === m ? 'bg-indigo-500' : 'bg-slate-800'}`}>{i + 1}</kbd>
                 </button>
               ))}
             </div>
@@ -384,28 +480,88 @@ export default function HomePage() {
                 )}
               </div>
               <div className="flex gap-2">
-                {autoSync && <button onClick={() => setIsPaused(!isPaused)} className="px-3 py-1.5 rounded-lg font-black text-[9px] tracking-widest uppercase bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700">{isPaused ? '▶' : '⏸'}</button>}
-                <button onClick={() => setAutoSync(!autoSync)} disabled={updating && !autoSync} className={`px-4 py-1.5 rounded-lg font-black text-[9px] tracking-widest uppercase transition-all ${autoSync ? 'bg-red-900/50 text-red-500 border border-red-500 animate-pulse' : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg disabled:opacity-50'}`}>{autoSync ? '🛑 STOP' : '⚡ AUTO SYNC'}</button>
+                {autoSync && (
+                  <button 
+                    onClick={() => setIsPaused(!isPaused)} 
+                    className="px-3 py-1.5 rounded-lg font-black text-[9px] tracking-widest uppercase bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700"
+                  >
+                    {isPaused ? '▶' : '⏸'}
+                  </button>
+                )}
+                <button 
+                  onClick={() => autoSync ? handleStopSync() : setAutoSync(true)} 
+                  disabled={updating && !autoSync} 
+                  className={`px-4 py-1.5 rounded-lg font-black text-[9px] tracking-widest uppercase transition-all ${
+                    autoSync 
+                      ? 'bg-red-900/50 text-red-500 border border-red-500 animate-pulse' 
+                      : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg disabled:opacity-50'
+                  }`}
+                >
+                  {autoSync ? '🛑 STOP' : '⚡ AUTO SYNC'}
+                </button>
               </div>
             </div>
             
-            {syncError && <div className="bg-red-900/20 border border-red-500/50 px-4 py-2 rounded-lg text-[10px] text-red-400 font-mono flex items-center gap-2"><span>{syncError}</span></div>}
+            {syncError && (
+              <div className="bg-red-900/20 border border-red-500/50 px-4 py-2 rounded-lg text-[10px] text-red-400 font-mono flex items-center gap-2">
+                <span>{syncError}</span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* METRICS ROW */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <MetricCard title="🔴 Critical" value={stats.atRisk} color="red" subtitle={`${((stats.atRisk/stats.total)*100).toFixed(1)}%`} tooltip="Risk Score ≥ 60 or DER > 20% or RSR < 60%" trend={trends.atRisk} />
-          <MetricCard title="🟡 Watch" value={stats.attention} color="amber" subtitle={`${((stats.attention/stats.total)*100).toFixed(1)}%`} tooltip="Risk Score 35-59 or PDI > 1.5" trend={trends.attention} />
-          <MetricCard title="🟢 Optimal" value={stats.onTrack} color="emerald" subtitle={`${((stats.onTrack/stats.total)*100).toFixed(1)}%`} tooltip="Risk Score < 35 and stable metrics" trend={trends.onTrack} />
-          <MetricCard title="Performance" value={`${stats.avgVelocity}%`} color="purple" subtitle={`${Math.round((stats.avgVelocity / 100) * DRI_CONFIG.ALPHA_WEEKLY_STANDARD)} XP/week avg`} tooltip="Average velocity across all students" trend={trends.avgVelocity} />
+          <MetricCard 
+            title={`🔴 Critical (${redZone.length})`} 
+            value={stats.atRisk} 
+            color="red" 
+            subtitle={`${((stats.atRisk/stats.total)*100).toFixed(1)}% of total`} 
+            tooltip="Risk Score ≥ 60, or DER > 20%, or RSR < 60%" 
+            trend={trends.atRisk} 
+          />
+          <MetricCard 
+            title={`🟡 Watch (${yellowZone.length})`} 
+            value={stats.attention} 
+            color="amber" 
+            subtitle={`${((stats.attention/stats.total)*100).toFixed(1)}% of total`} 
+            tooltip="Risk Score 35-59, or PDI > 1.5" 
+            trend={trends.attention} 
+          />
+          <MetricCard 
+            title={`🟢 Optimal (${greenZone.length})`} 
+            value={stats.onTrack} 
+            color="emerald" 
+            subtitle={`${((stats.onTrack/stats.total)*100).toFixed(1)}% of total`} 
+            tooltip="Risk Score < 35 with stable metrics" 
+            trend={trends.onTrack} 
+          />
+          <MetricCard 
+            title="Performance" 
+            value={`${stats.avgVelocity}%`} 
+            color="purple" 
+            subtitle={`${Math.round((stats.avgVelocity / 100) * DRI_CONFIG.ALPHA_WEEKLY_STANDARD)} XP/week avg`} 
+            tooltip="Average velocity across all students" 
+            trend={trends.avgVelocity} 
+          />
         </div>
 
         {/* SEARCH & FILTER ROW */}
         <div className="flex flex-wrap gap-4">
-          <input onChange={(e) => setSearch(e.target.value)} placeholder="🔎 SEARCH UNIT BY NAME OR ID..." className="flex-1 min-w-[300px] bg-slate-900/40 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-indigo-500 outline-none font-mono transition-all" />
+          <div className="relative flex-1 min-w-[300px]">
+            <input 
+              onChange={(e) => setSearch(e.target.value)} 
+              placeholder="🔎 SEARCH STUDENT BY NAME OR ID..." 
+              className="w-full bg-slate-900/40 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-indigo-500 outline-none font-mono transition-all" 
+            />
+            <kbd className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-600 bg-slate-800 px-2 py-1 rounded">/</kbd>
+          </div>
           {viewMode !== 'MATRIX' && (
-            <select value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs font-black uppercase text-slate-400 outline-none">
+            <select 
+              value={selectedCourse} 
+              onChange={(e) => setSelectedCourse(e.target.value)} 
+              className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs font-black uppercase text-slate-400 outline-none"
+            >
               <option value="ALL">ALL COURSES</option>
               {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -414,7 +570,7 @@ export default function HomePage() {
       </div>
 
       {/* ========================================== */}
-      {/* DYNAMIC CONTENT AREA (Fills Remaining Height) */}
+      {/* DYNAMIC CONTENT AREA */}
       {/* ========================================== */}
       <div className="flex-1 min-h-0 p-6 pt-4">
         
@@ -422,114 +578,152 @@ export default function HomePage() {
         {viewMode === 'TRIAGE' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full animate-in fade-in duration-500">
             {[
-                { label: '🚨 Critical Ops', data: redZone, tier: 'RED', border: 'border-red-500' },
-                { label: '⚠️ Watch List', data: yellowZone, tier: 'YELLOW', border: 'border-amber-500' },
-                { label: '⚡ Stable Units', data: greenZone, tier: 'GREEN', border: 'border-emerald-500' }
+              { label: '🚨 Critical Ops', data: redZone, tier: 'RED', border: 'border-red-500' },
+              { label: '⚠️ Watch List', data: yellowZone, tier: 'YELLOW', border: 'border-amber-500' },
+              { label: '⚡ Stable Units', data: greenZone, tier: 'GREEN', border: 'border-emerald-500' }
             ].map(col => (
               <div key={col.tier} className="flex flex-col bg-slate-900/20 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl h-full">
-                <div className={`flex-shrink-0 p-4 bg-slate-900/40 border-b border-slate-800 font-black text-xs uppercase tracking-widest flex justify-between`}>
+                <div className="flex-shrink-0 p-4 bg-slate-900/40 border-b border-slate-800 font-black text-xs uppercase tracking-widest flex justify-between">
                   <span className="text-slate-300">{col.label}</span>
-                  <span className="bg-slate-800 text-slate-500 px-2 py-0.5 rounded font-mono">{col.data.length} UNITS</span>
+                  <span className="bg-slate-800 text-slate-500 px-2 py-0.5 rounded font-mono">{col.data.length} STUDENTS</span>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                  {col.data.length === 0 ? <div className="text-center py-20 text-slate-600 italic text-xs">No students in this tier</div> : 
-                    col.data.map(s => <StudentCard key={s.id} student={s} onClick={() => setSelectedStudent(s)} borderColor={col.border} />)
-                  }
+                  {col.data.length === 0 ? (
+                    <div className="text-center py-20 text-slate-600 italic text-xs">No students in this tier</div>
+                  ) : (
+                    col.data.map(s => (
+                      <StudentCard 
+                        key={s.id} 
+                        student={s} 
+                        onClick={() => handleStudentClick(s)} 
+                        borderColor={col.border} 
+                      />
+                    ))
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* MATRIX VIEW (INTEGRATED COMPONENT) */}
+        {/* MATRIX VIEW */}
         {viewMode === 'MATRIX' && (
           <div className="h-full w-full animate-in zoom-in-95 duration-300">
-             <KeenKTMatrix 
-                students={filtered} 
-                onStudentClick={(s) => setSelectedStudent(s)} 
-             />
+            <KeenKTMatrix 
+              students={filtered} 
+              onStudentClick={handleStudentClick} 
+            />
           </div>
         )}
 
         {/* HEATMAP VIEW */}
         {viewMode === 'HEATMAP' && (
-           <div className="h-full w-full bg-slate-950 border border-slate-800 rounded-[2.5rem] p-8 overflow-hidden flex flex-col shadow-2xl animate-in fade-in duration-500">
-              <div className="flex-shrink-0 mb-6 flex justify-between items-end">
-                <div>
-                  <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                    📊 Top 15 Critical Knowledge Components
-                    <span className="px-2 py-0.5 bg-red-900/30 border border-red-500/50 rounded text-[9px] text-red-400 font-black">PRIORITIZED</span>
-                  </h3>
-                  <p className="text-[10px] text-slate-600 font-mono mt-1">Sorted by number of courses with avg RSR &lt; 40% • Top 3 highlighted</p>
-                </div>
-                <div className="flex items-center gap-4 text-[9px] text-slate-600">
-                  <div className="flex items-center gap-1.5"><div className="w-3 h-1.5 rounded-full bg-gradient-to-r from-red-500 to-amber-500" /><span>High Priority</span></div>
-                  <div className="flex items-center gap-1.5"><div className="w-3 h-1.5 rounded-full bg-slate-700" /><span>Low Priority</span></div>
-                </div>
+          <div className="h-full w-full bg-slate-950 border border-slate-800 rounded-[2.5rem] p-8 overflow-hidden flex flex-col shadow-2xl animate-in fade-in duration-500">
+            <div className="flex-shrink-0 mb-6 flex justify-between items-end">
+              <div>
+                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  📊 Top 15 Critical Knowledge Components
+                  <span className="px-2 py-0.5 bg-red-900/30 border border-red-500/50 rounded text-[9px] text-red-400 font-black">PRIORITIZED</span>
+                </h3>
+                <p className="text-[10px] text-slate-600 font-mono mt-1">Sorted by number of courses with avg RSR &lt; 40% • Top 3 highlighted</p>
               </div>
-              <div className="flex-1 overflow-auto custom-scrollbar">
-                 <table className="w-full border-collapse">
-                    <thead>
-                       <tr>
-                          <th className="sticky top-0 left-0 z-20 bg-slate-950 p-3 text-[8px] font-black text-slate-600 uppercase text-left border-b border-slate-800 min-w-[200px]">Knowledge Component</th>
-                          {uniqueCourses.map(course => <th key={course} className="sticky top-0 z-10 bg-slate-950 p-3 text-[8px] font-black text-slate-500 uppercase border-b border-slate-800 min-w-[90px] font-mono">{course}</th>)}
-                       </tr>
-                    </thead>
-                    <tbody>
-                        {heatmapData.map((row, rowIndex) => (
-                          <tr key={row.topic} className="hover:bg-slate-900/50 transition-colors group">
-                             <td className="sticky left-0 z-10 bg-slate-950 p-3 border-r border-slate-800">
-                               <div className="flex items-center gap-3">
-                                 <div className="flex-shrink-0 w-16 h-1.5 rounded-full bg-slate-800/50 overflow-hidden relative group-hover:w-20 transition-all">
-                                   <div className="h-full bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500 transition-all" style={{ width: `${Math.min((row.criticalCourses / uniqueCourses.length) * 100, 100)}%` }} />
-                                 </div>
-                                 <div className="flex-1 min-w-0">
-                                   <div className="flex items-center gap-2">
-                                     <span className="text-[10px] font-bold text-slate-300 uppercase italic truncate">{row.topic}</span>
-                                     {rowIndex < 3 && <span className="px-1.5 py-0.5 bg-red-900/40 border border-red-500/60 rounded text-[8px] font-black uppercase text-red-300">TOP {rowIndex + 1}</span>}
-                                   </div>
-                                 </div>
-                               </div>
-                             </td>
-                             {row.courseStats.map((cell, idx) => (
-                                <td key={idx} className="p-2 border border-slate-900">
-                                   <div className="h-10 rounded-md flex items-center justify-center text-[10px] font-mono font-black transition-all hover:scale-105 cursor-help group/cell" style={{ backgroundColor: cell.avgLMP < 0.4 ? 'rgba(239, 68, 68, 0.2)' : cell.avgLMP < 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.1)', border: `1px solid ${cell.avgLMP < 0.4 ? '#ef444433' : cell.avgLMP < 0.7 ? '#f59e0b33' : '#10b98133'}` }}>
-                                     <span style={{ color: cell.avgLMP < 0.4 ? '#fca5a5' : cell.avgLMP < 0.7 ? '#fbbf24' : '#6ee7b7', textShadow: '0 0 2px rgba(0,0,0,0.8)' }}>{(cell.avgLMP * 100).toFixed(0)}%</span>
-                                   </div>
-                                </td>
-                             ))}
-                          </tr>
-                        ))}
-                    </tbody>
-                 </table>
+              <div className="flex items-center gap-4 text-[9px] text-slate-600">
+                <div className="flex items-center gap-1.5"><div className="w-3 h-1.5 rounded-full bg-gradient-to-r from-red-500 to-amber-500" /><span>High Priority</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-3 h-1.5 rounded-full bg-slate-700" /><span>Low Priority</span></div>
               </div>
-           </div>
+            </div>
+            <div className="flex-1 overflow-auto custom-scrollbar">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="sticky top-0 left-0 z-20 bg-slate-950 p-3 text-[8px] font-black text-slate-600 uppercase text-left border-b border-slate-800 min-w-[200px]">Knowledge Component</th>
+                    {uniqueCourses.map(course => (
+                      <th key={course} className="sticky top-0 z-10 bg-slate-950 p-3 text-[8px] font-black text-slate-500 uppercase border-b border-slate-800 min-w-[90px] font-mono">{course}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {heatmapData.map((row, rowIndex) => (
+                    <tr key={row.topic} className="hover:bg-slate-900/50 transition-colors group">
+                      <td className="sticky left-0 z-10 bg-slate-950 p-3 border-r border-slate-800">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-shrink-0 w-16 h-1.5 rounded-full bg-slate-800/50 overflow-hidden relative group-hover:w-20 transition-all">
+                            <div className="h-full bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500 transition-all" style={{ width: `${Math.min((row.criticalCourses / uniqueCourses.length) * 100, 100)}%` }} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold text-slate-300 uppercase italic truncate">{row.topic}</span>
+                              {rowIndex < 3 && (
+                                <span className="px-1.5 py-0.5 bg-red-900/40 border border-red-500/60 rounded text-[8px] font-black uppercase text-red-300">
+                                  TOP {rowIndex + 1}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      {row.courseStats.map((cell, idx) => (
+                        <td key={idx} className="p-2 border border-slate-900">
+                          <div 
+                            className="h-10 rounded-md flex items-center justify-center text-[10px] font-mono font-black transition-all hover:scale-105 cursor-help" 
+                            style={{ 
+                              backgroundColor: cell.avgLMP < 0.4 ? 'rgba(239, 68, 68, 0.2)' : cell.avgLMP < 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.1)', 
+                              border: `1px solid ${cell.avgLMP < 0.4 ? '#ef444433' : cell.avgLMP < 0.7 ? '#f59e0b33' : '#10b98133'}` 
+                            }}
+                          >
+                            <span style={{ color: cell.avgLMP < 0.4 ? '#fca5a5' : cell.avgLMP < 0.7 ? '#fbbf24' : '#6ee7b7' }}>
+                              {(cell.avgLMP * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
 
         {/* LOG VIEW */}
         {viewMode === 'LOG' && (
-           <div className="h-full bg-slate-950 border border-slate-800 rounded-[2.5rem] p-8 overflow-y-auto custom-scrollbar animate-in fade-in duration-500 shadow-2xl">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 {logs.map(log => (
-                    <div key={log.id} className="flex items-center justify-between p-5 bg-slate-900/30 rounded-2xl border border-slate-800/50 shadow-inner">
-                       <div className="flex items-center gap-5">
-                          <div className={`w-3 h-3 rounded-full ${log.type === 'coaching' ? 'bg-indigo-500 shadow-[0_0_10px_#6366f1]' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'}`} />
-                          <div>
-                             <p className="text-sm font-black text-white uppercase italic">{log.studentName}</p>
-                             <p className="text-[10px] text-slate-500 font-mono">{log.type} • {log.targetTopic || 'General'}</p>
-                          </div>
-                       </div>
-                       <div className="text-right text-[9px] font-mono text-slate-700">
-                          {log.createdAt?.seconds ? new Date(log.createdAt.seconds * 1000).toLocaleString() : 'Syncing...'}
-                       </div>
+          <div className="h-full bg-slate-950 border border-slate-800 rounded-[2.5rem] p-8 overflow-y-auto custom-scrollbar animate-in fade-in duration-500 shadow-2xl">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {logs.map(log => (
+                <div key={log.id} className="flex items-center justify-between p-5 bg-slate-900/30 rounded-2xl border border-slate-800/50 shadow-inner">
+                  <div className="flex items-center gap-5">
+                    <div className={`w-3 h-3 rounded-full ${log.type === 'coaching' ? 'bg-indigo-500 shadow-[0_0_10px_#6366f1]' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'}`} />
+                    <div>
+                      <p className="text-sm font-black text-white uppercase italic">{log.studentName}</p>
+                      <p className="text-[10px] text-slate-500 font-mono">{log.type} • {log.targetTopic || 'General'}</p>
                     </div>
-                 ))}
-              </div>
-           </div>
+                  </div>
+                  <div className="text-right text-[9px] font-mono text-slate-700">
+                    {log.createdAt?.seconds ? new Date(log.createdAt.seconds * 1000).toLocaleString() : 'Syncing...'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
-      {selectedStudent && <StudentModal student={selectedStudent} onClose={() => setSelectedStudent(null)} />}
+      {/* STUDENT MODAL WITH NAVIGATION */}
+      {selectedStudent && (
+        <StudentModal 
+          student={selectedStudent} 
+          onClose={() => {
+            setSelectedStudent(null);
+            setSelectedStudentIndex(-1);
+          }}
+          onNavigate={navigateStudent}
+          currentIndex={selectedStudentIndex}
+          totalStudents={filteredForNavigation.length}
+        />
+      )}
+      
+      {/* HELP MODAL */}
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
     </div>
   );
 }
