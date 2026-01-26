@@ -13,13 +13,20 @@ interface MatrixProps {
 export default function KeenKTMatrix({ students, onStudentClick }: MatrixProps) {
   const [filterTier, setFilterTier] = useState<'RED' | 'YELLOW' | 'GREEN' | null>(null);
 
-  // Procesamiento de datos con Memoización para Performance (1,613 puntos)
+  // Count by tier for filter buttons
+  const tierCounts = useMemo(() => ({
+    RED: students.filter(s => s.dri.driTier === 'RED').length,
+    YELLOW: students.filter(s => s.dri.driTier === 'YELLOW').length,
+    GREEN: students.filter(s => s.dri.driTier === 'GREEN').length,
+  }), [students]);
+
+  // Data processing with memoization for performance (1,613 points)
   const data = useMemo(() => {
     return students
       .filter(s => !filterTier || s.dri.driTier === filterTier)
       .map(s => ({
-        x: s.metrics.lmp * 100, // Mastery (Eje X)
-        y: s.metrics.ksi,       // Stability (Eje Y)
+        x: s.metrics.lmp * 100,
+        y: s.metrics.ksi,
         z: s.dri.riskScore || 50,
         name: `${s.firstName} ${s.lastName}`,
         tier: s.dri.driTier,
@@ -29,7 +36,7 @@ export default function KeenKTMatrix({ students, onStudentClick }: MatrixProps) 
       }));
   }, [students, filterTier]);
 
-  // Componente de Punto Optimizado
+  // Optimized dot component
   const CustomDot = (props: any) => {
     const { cx, cy, payload } = props;
     const isCritical = payload.tier === 'RED';
@@ -58,23 +65,31 @@ export default function KeenKTMatrix({ students, onStudentClick }: MatrixProps) 
         <div>
           <h2 className="text-xl font-black italic text-white uppercase tracking-tighter">KeenKT Strategy Matrix</h2>
           <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">
-            Visualizing {data.length} Units • Architecture RLM
+            Visualizing {data.length} Students • RLM Architecture
           </p>
         </div>
         
-        {/* Filtros de Navegación */}
+        {/* Filter buttons with counters */}
         <div className="flex gap-2 bg-black/40 p-1 rounded-full border border-slate-800">
           {(['RED', 'YELLOW', 'GREEN'] as const).map(t => (
             <button 
               key={t}
               onClick={() => setFilterTier(filterTier === t ? null : t)}
-              className={`px-4 py-1 rounded-full text-[9px] font-black transition-all ${
+              className={`px-3 py-1 rounded-full text-[9px] font-black transition-all flex items-center gap-1 ${
                 filterTier === t 
                   ? 'bg-white text-black' 
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
+              <span className={`w-2 h-2 rounded-full ${
+                t === 'RED' ? 'bg-red-500' : t === 'YELLOW' ? 'bg-amber-500' : 'bg-emerald-500'
+              }`} />
               {t}
+              <span className={`text-[8px] px-1 rounded ${
+                filterTier === t ? 'bg-black/20' : 'bg-slate-800'
+              }`}>
+                {tierCounts[t]}
+              </span>
             </button>
           ))}
         </div>
@@ -102,18 +117,29 @@ export default function KeenKTMatrix({ students, onStudentClick }: MatrixProps) 
                 if (!active || !payload?.length) return null;
                 const s = payload[0].payload.raw;
                 return (
-                  <div className="bg-slate-950 border border-slate-700 p-3 rounded-xl shadow-2xl">
+                  <div className="bg-slate-950 border border-slate-700 p-3 rounded-xl shadow-2xl min-w-[180px]">
                     <p className="text-white font-black uppercase text-[11px] mb-1">{payload[0].payload.name}</p>
                     <p className="text-indigo-400 text-[9px] mb-2 font-bold uppercase">{payload[0].payload.course}</p>
-                    <div className="space-y-1 border-t border-slate-800 pt-2">
-                       <div className="flex justify-between gap-4 text-[9px]">
-                          <span className="text-slate-500 font-bold uppercase">Risk Score</span>
-                          <span className="text-red-400 font-black">{s.dri.riskScore}</span>
-                       </div>
-                       <div className="flex justify-between gap-4 text-[9px]">
-                          <span className="text-slate-500 font-bold uppercase">PDI</span>
-                          <span className="text-white font-black">{s.dri.precisionDecay}x</span>
-                       </div>
+                    <div className="grid grid-cols-2 gap-2 border-t border-slate-800 pt-2">
+                      <div className="text-[9px]">
+                        <span className="text-slate-500">RSR</span>
+                        <span className="text-white font-bold ml-1">{(s.metrics.lmp * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="text-[9px]">
+                        <span className="text-slate-500">KSI</span>
+                        <span className="text-white font-bold ml-1">{s.metrics.ksi}%</span>
+                      </div>
+                      <div className="text-[9px]">
+                        <span className="text-slate-500">Risk</span>
+                        <span className="text-red-400 font-bold ml-1">{s.dri.riskScore}</span>
+                      </div>
+                      <div className="text-[9px]">
+                        <span className="text-slate-500">PDI</span>
+                        <span className="text-white font-bold ml-1">{s.dri.precisionDecay}x</span>
+                      </div>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-slate-800 text-[8px] text-slate-600 text-center">
+                      Click to view details
                     </div>
                   </div>
                 );
@@ -124,14 +150,14 @@ export default function KeenKTMatrix({ students, onStudentClick }: MatrixProps) 
         </ResponsiveContainer>
       </div>
 
-      {/* Leyenda de Cuadrantes */}
+      {/* Quadrant Legend */}
       <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-800 pt-4">
-          <div className="text-[8px] text-slate-600 uppercase font-bold tracking-tighter">
-            Top-Right: <span className="text-emerald-500">Mastery Flow (Optimal)</span>
-          </div>
-          <div className="text-[8px] text-slate-600 uppercase font-bold tracking-tighter">
-            Bottom-Left: <span className="text-red-500">Critical Debt (Intervene)</span>
-          </div>
+        <div className="text-[8px] text-slate-600 uppercase font-bold tracking-tighter">
+          Top-Right: <span className="text-emerald-500">Mastery Flow (Optimal)</span>
+        </div>
+        <div className="text-[8px] text-slate-600 uppercase font-bold tracking-tighter">
+          Bottom-Left: <span className="text-red-500">Critical Debt (Intervene)</span>
+        </div>
       </div>
     </div>
   );
