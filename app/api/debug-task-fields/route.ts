@@ -1,5 +1,3 @@
-// Crear archivo: app/api/debug-task-fields/route.ts
-
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -50,12 +48,10 @@ export async function GET(request: Request) {
     const activity = data?.activity || data;
     const tasks = activity?.tasks || [];
 
-    // Tomar las primeras 3 tasks y mostrar TODOS sus campos
     const sampleTasks = tasks.slice(0, 3).map((task: any, index: number) => ({
       taskIndex: index,
       allFields: Object.keys(task),
       rawData: task,
-      // Intentar encontrar campos de tiempo
       possibleTimeFields: {
         timeSpent: task.timeSpent,
         timeTotal: task.timeTotal,
@@ -73,17 +69,11 @@ export async function GET(request: Request) {
       studentId,
       dateRange: { startDate, endDate },
       totalTasks: tasks.length,
-      
-      // Estructura de totals
       totalsStructure: {
         allFields: Object.keys(activity?.totals || {}),
         rawTotals: activity?.totals
       },
-      
-      // Muestra de tasks con todos sus campos
       sampleTasks,
-      
-      // Resumen de campos encontrados en la primera task
       firstTaskAllData: tasks[0] || 'No tasks found'
     });
 
@@ -96,10 +86,6 @@ export async function GET(request: Request) {
 }
 ```
 
-## Acción Requerida
-
-1. **Crea el archivo** `app/api/debug-task-fields/route.ts` con el código de arriba
-
-2. **Haz deploy** y visita:
+Luego haz commit, push y redeploy. Una vez funcionando, visita:
 ```
-   https://TU-DOMINIO.vercel.app/api/debug-task-fields?studentId=29509
+https://TU-DOMINIO.vercel.app/api/debug-task-fields?studentId=29509
