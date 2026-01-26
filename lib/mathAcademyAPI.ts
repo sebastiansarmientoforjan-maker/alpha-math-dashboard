@@ -1,42 +1,18 @@
-/**
- * Math Academy API Wrapper
- * 
- * NOTAS DE DEBUGGING (2026-01-24):
- * - getWeekRange() DEBE ejecutarse en runtime, NO en build time
- * - Todos los fetch DEBEN tener cache: 'no-store'
- * - Agregado logging para diagnóstico
- */
-
 const API_KEY = process.env.NEXT_PUBLIC_MATH_ACADEMY_API_KEY;
 const BASE_URL = 'https://mathacademy.com/api/beta6';
 
-/**
- * Calcula el rango de fechas para la API.
- * IMPORTANTE: Esta función se ejecuta en cada request, NO en build time.
- * 
- * @returns {{ startDate: string, endDate: string }} Rango de 30 días
- */
 function getWeekRange(): { startDate: string; endDate: string } {
-  // Usar Date.now() explícitamente para evitar optimizaciones de compilador
   const now = new Date(Date.now());
   
-  // End date: mañana (para incluir hoy completo)
   const endDateObj = new Date(now.getTime());
   endDateObj.setDate(endDateObj.getDate() + 1);
   const endDate = endDateObj.toISOString().split('T')[0];
 
-  // Start date: 30 días atrás
   const startDateObj = new Date(now.getTime());
   startDateObj.setDate(startDateObj.getDate() - 30);
   const startDate = startDateObj.toISOString().split('T')[0];
 
-  // LOG para debugging - remover en producción estable
-  console.log(`[mathAcademyAPI] getWeekRange() executed at runtime:`, {
-    calculatedAt: now.toISOString(),
-    startDate,
-    endDate,
-    daysDiff: Math.round((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24))
-  });
+  console.log(`[mathAcademyAPI] getWeekRange():`, { startDate, endDate });
 
   return { startDate, endDate };
 }
@@ -48,9 +24,6 @@ export async function getStudentData(studentId: string) {
   }
 
   try {
-    // ============================================
-    // 1. FETCH PROFILE
-    // ============================================
     const profileRes = await fetch(`${BASE_URL}/students/${studentId}`, {
       headers: {
         'Accept': 'application/json',
@@ -73,15 +46,8 @@ export async function getStudentData(studentId: string) {
     }
     
     const student = profileData.student;
-    
-    // ============================================
-    // 2. CALCULAR FECHAS EN RUNTIME
-    // ============================================
     const { startDate, endDate } = getWeekRange();
 
-    // ============================================
-    // 3. FETCH ACTIVITY CON HEADERS DINÁMICOS
-    // ============================================
     const activityRes = await fetch(`${BASE_URL}/students/${studentId}/activity`, {
       method: 'GET',
       headers: {
@@ -93,12 +59,6 @@ export async function getStudentData(studentId: string) {
       },
       cache: 'no-store',
       next: { revalidate: 0 }
-    });
-
-    console.log(`[mathAcademyAPI] Activity request for ${studentId}:`, {
-      url: `${BASE_URL}/students/${studentId}/activity`,
-      headers: { 'Start-Date': startDate, 'End-Date': endDate },
-      status: activityRes.status
     });
 
     let activityMetrics = { 
@@ -123,7 +83,7 @@ export async function getStudentData(studentId: string) {
         
         if (timeEngaged === 0 && tasks.length > 0) {
           timeEngaged = tasks.reduce((acc: number, task: any) => {
-            return acc + (task.timeSpent ?? 0);
+            return acc + (task.analysis?.timeEngaged ?? 0);
           }, 0);
         }
 
@@ -141,7 +101,7 @@ export async function getStudentData(studentId: string) {
             questions: task.questions ?? 0,
             questionsCorrect: task.questionsCorrect ?? 0,
             completedLocal: task.completedLocal,
-            timeTotal: task.timeSpent ?? 0,
+            timeTotal: task.analysis?.timeEngaged ?? 0,
             smartScore: task.smartScore ?? 0,
             xpAwarded: task.xpAwarded ?? 0
           })),
@@ -156,16 +116,7 @@ export async function getStudentData(studentId: string) {
             numTasks: totals.numTasks ?? tasks.length
           }
         };
-
-        console.log(`[mathAcademyAPI] Activity data for ${studentId}:`, {
-          tasksCount: tasks.length,
-          timeEngaged,
-          xpAwarded: totals.xpAwarded ?? 0,
-          dateRange: { startDate, endDate }
-        });
       }
-    } else {
-      console.error(`[mathAcademyAPI] Activity fetch failed for ${studentId}:`, activityRes.status);
     }
 
     return { ...student, activity: activityMetrics };
