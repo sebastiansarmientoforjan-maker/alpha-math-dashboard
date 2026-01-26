@@ -84,8 +84,3 @@ export async function GET(request: Request) {
     }, { status: 500 });
   }
 }
-```
-
-Luego haz commit, push y redeploy. Una vez funcionando, visita:
-```
-https://TU-DOMINIO.vercel.app/api/debug-task-fields?studentId=29509
