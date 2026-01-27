@@ -6,6 +6,7 @@ import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestor
 import KeenKTMatrix from '@/components/KeenKTMatrix';
 import StudentModal from '@/components/StudentModal';
 import HelpModal from '@/components/HelpModal';
+import BulkActionsBar from '@/components/BulkActionsBar';
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
 import { DRI_CONFIG } from '@/lib/dri-config';
@@ -63,20 +64,48 @@ function MetricCard({ title, value, color, subtitle, tooltip, trend }: MetricCar
 }
 
 // ==========================================
-// STUDENT CARD MEMOIZED
+// STUDENT CARD MEMOIZED WITH SELECTION
 // ==========================================
-const StudentCard = memo(({ student, onClick, borderColor }: { student: Student; onClick: () => void; borderColor: string }) => {
+interface StudentCardProps {
+  student: Student;
+  onClick: () => void;
+  borderColor: string;
+  isSelected: boolean;
+  onSelect: (id: string, selected: boolean) => void;
+  selectionMode: boolean;
+}
+
+const StudentCard = memo(({ student, onClick, borderColor, isSelected, onSelect, selectionMode }: StudentCardProps) => {
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onSelect(student.id, !isSelected);
+  };
+
   return (
     <div 
       onClick={onClick}
-      className={`p-4 bg-slate-900/80 rounded-2xl border-l-4 ${borderColor} cursor-pointer hover:scale-[1.02] transition-all group shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+      className={`p-4 bg-slate-900/80 rounded-2xl border-l-4 ${borderColor} cursor-pointer hover:scale-[1.02] transition-all group shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isSelected ? 'ring-2 ring-indigo-500 bg-indigo-900/20' : ''}`}
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick()}
     >
       <div className="flex justify-between items-start mb-1">
-        <h3 className="font-black text-white text-sm uppercase italic truncate w-40 group-hover:text-indigo-400">
-          {student.firstName} {student.lastName}
-        </h3>
+        <div className="flex items-center gap-2">
+          {selectionMode && (
+            <div 
+              onClick={handleCheckboxClick}
+              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all cursor-pointer ${
+                isSelected 
+                  ? 'bg-indigo-500 border-indigo-500 text-white' 
+                  : 'border-slate-600 hover:border-indigo-400'
+              }`}
+            >
+              {isSelected && <span className="text-xs">✓</span>}
+            </div>
+          )}
+          <h3 className="font-black text-white text-sm uppercase italic truncate w-36 group-hover:text-indigo-400">
+            {student.firstName} {student.lastName}
+          </h3>
+        </div>
         <span className="text-[10px] font-mono font-bold text-slate-500 italic">
           {(student.metrics.lmp * 100).toFixed(0)}% RSR
         </span>
@@ -116,11 +145,65 @@ const StudentCard = memo(({ student, onClick, borderColor }: { student: Student;
     prev.metrics.ksi === next.metrics.ksi &&
     prev.dri.driTier === next.dri.driTier &&
     prev.dri.driSignal === next.dri.driSignal &&
-    prev.dri.riskScore === next.dri.riskScore
+    prev.dri.riskScore === next.dri.riskScore &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.selectionMode === nextProps.selectionMode
   );
 });
 
 StudentCard.displayName = 'StudentCard';
+
+// ==========================================
+// COLUMN LOADING SKELETON
+// ==========================================
+function ColumnSkeleton() {
+  return (
+    <div className="space-y-3 animate-pulse">
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="h-28 bg-slate-800/50 rounded-2xl border border-slate-800/30" />
+      ))}
+    </div>
+  );
+}
+
+// ==========================================
+// ERROR BANNER COMPONENT
+// ==========================================
+interface ErrorBannerProps {
+  message: string;
+  onRetry: () => void;
+  onDismiss: () => void;
+}
+
+function ErrorBanner({ message, onRetry, onDismiss }: ErrorBannerProps) {
+  return (
+    <div className="bg-red-900/30 border border-red-500/50 px-4 py-3 rounded-xl flex items-center justify-between gap-4 animate-in slide-in-from-top duration-300">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center text-red-400">
+          ⚠️
+        </div>
+        <div>
+          <p className="text-sm font-bold text-red-400">{message}</p>
+          <p className="text-[10px] text-red-400/70">Check your connection and try again</p>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button 
+          onClick={onRetry}
+          className="px-4 py-2 bg-red-500 hover:bg-red-400 text-white text-[10px] font-black uppercase rounded-lg transition-colors"
+        >
+          ↻ Retry
+        </button>
+        <button 
+          onClick={onDismiss}
+          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] font-black uppercase rounded-lg transition-colors"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ==========================================
 // MAIN COMPONENT
@@ -137,6 +220,13 @@ export default function HomePage() {
   const [batchStatus, setBatchStatus] = useState({ current: 0, total: 33, lastStudent: '' });
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedStudentIndex, setSelectedStudentIndex] = useState<number>(-1);
+  
+  // Column refresh states
+  const [refreshingColumns, setRefreshingColumns] = useState<Set<string>>(new Set());
+  
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
   
   // Help Modal
   const [showHelp, setShowHelp] = useState(false);
@@ -156,37 +246,47 @@ export default function HomePage() {
   // ==========================================
   useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
-      // Don't trigger if typing in input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
 
-      // View switching: 1, 2, 3, 4
       if (e.key === '1' && !selectedStudent) setViewMode('TRIAGE');
       if (e.key === '2' && !selectedStudent) setViewMode('MATRIX');
       if (e.key === '3' && !selectedStudent) setViewMode('HEATMAP');
       if (e.key === '4' && !selectedStudent) setViewMode('LOG');
       
-      // Close modal with Escape
-      if (e.key === 'Escape' && selectedStudent) {
-        setSelectedStudent(null);
-        setSelectedStudentIndex(-1);
+      if (e.key === 'Escape') {
+        if (selectedStudent) {
+          setSelectedStudent(null);
+          setSelectedStudentIndex(-1);
+        } else if (selectionMode) {
+          setSelectionMode(false);
+          setSelectedIds(new Set());
+        }
       }
       
-      // Focus search with /
       if (e.key === '/' && !selectedStudent) {
         e.preventDefault();
         const searchInput = document.querySelector('input[placeholder*="SEARCH"]') as HTMLInputElement;
         searchInput?.focus();
       }
       
-      // Help with ?
       if (e.key === '?' && !selectedStudent) {
         e.preventDefault();
         setShowHelp(true);
       }
       
-      // Navigate students in modal with arrow keys
+      // Bulk select shortcut: Ctrl/Cmd + A
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a' && viewMode === 'TRIAGE' && !selectedStudent) {
+        e.preventDefault();
+        if (!selectionMode) {
+          setSelectionMode(true);
+        }
+        // Select all visible students
+        const allIds = new Set(filteredForNavigation.map(s => s.id));
+        setSelectedIds(allIds);
+      }
+      
       if (selectedStudent && filteredForNavigation.length > 0) {
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
           e.preventDefault();
@@ -201,7 +301,7 @@ export default function HomePage() {
 
     window.addEventListener('keydown', handleKeyboard);
     return () => window.removeEventListener('keydown', handleKeyboard);
-  }, [selectedStudent, selectedStudentIndex]);
+  }, [selectedStudent, selectedStudentIndex, selectionMode, viewMode]);
 
   // ==========================================
   // FIREBASE LISTENERS
@@ -216,6 +316,9 @@ export default function HomePage() {
       }) as Student[];
       setStudents(data);
       setLoading(false);
+      
+      // Clear column refreshing states when data updates
+      setRefreshingColumns(new Set());
     });
 
     const unsubLogs = onSnapshot(
@@ -236,14 +339,18 @@ export default function HomePage() {
     setUpdating(true);
     setSyncError(null);
     
+    // Set refreshing state for all columns
+    setRefreshingColumns(new Set(['RED', 'YELLOW', 'GREEN']));
+    
     if (!syncStartTime) {
       setSyncStartTime(Date.now());
     }
     
     try {
-      const batchStartTime = Date.now();
       const res = await fetch('/api/update-students');
-      if (!res.ok) throw new Error('API failure');
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+      }
       
       const data = await res.json();
       
@@ -278,13 +385,18 @@ export default function HomePage() {
           setSyncStartTime(null);
           setEta(null);
           setAvgBatchTime(null);
+          setRefreshingColumns(new Set());
         }
+      } else {
+        throw new Error(data.error || 'Unknown error occurred');
       }
-    } catch (err) {
-      setSyncError('Sync paused: API unreachable. Click AUTO SYNC to retry.');
+    } catch (err: any) {
+      const errorMessage = err.message || 'Connection failed';
+      setSyncError(`Sync failed: ${errorMessage}`);
       setAutoSync(false);
       setSyncStartTime(null);
       setEta(null);
+      setRefreshingColumns(new Set());
     }
     
     setUpdating(false);
@@ -315,7 +427,78 @@ export default function HomePage() {
     }
     setAutoSync(false);
     setIsPaused(false);
+    setRefreshingColumns(new Set());
   };
+
+  // ==========================================
+  // RETRY SYNC
+  // ==========================================
+  const handleRetrySync = () => {
+    setSyncError(null);
+    setAutoSync(true);
+  };
+
+  // ==========================================
+  // BULK SELECTION HANDLERS
+  // ==========================================
+  const handleSelectStudent = useCallback((id: string, selected: boolean) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(id);
+      } else {
+        newSet.delete(id);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleSelectAll = useCallback((tier: 'RED' | 'YELLOW' | 'GREEN') => {
+    const tierStudents = tier === 'RED' ? redZone : tier === 'YELLOW' ? yellowZone : greenZone;
+    const tierIds = tierStudents.map(s => s.id);
+    
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      const allSelected = tierIds.every(id => newSet.has(id));
+      
+      if (allSelected) {
+        tierIds.forEach(id => newSet.delete(id));
+      } else {
+        tierIds.forEach(id => newSet.add(id));
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  }, []);
+
+  const handleExportSelected = useCallback(() => {
+    const selectedStudents = students.filter(s => selectedIds.has(s.id));
+    const csvContent = [
+      ['ID', 'Name', 'Course', 'RSR', 'KSI', 'Velocity', 'Risk Score', 'Tier'].join(','),
+      ...selectedStudents.map(s => [
+        s.id,
+        `${s.firstName} ${s.lastName}`,
+        s.currentCourse?.name || 'N/A',
+        `${(s.metrics.lmp * 100).toFixed(0)}%`,
+        s.metrics.ksi !== null ? `${s.metrics.ksi}%` : 'N/A',
+        `${s.metrics.velocityScore}%`,
+        s.dri.riskScore || 'N/A',
+        s.dri.driTier
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `students-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [selectedIds, students]);
 
   // ==========================================
   // COMPUTED DATA
@@ -349,7 +532,6 @@ export default function HomePage() {
   const yellowZone = useMemo(() => filtered.filter(s => s.dri.driTier === 'YELLOW' && !redZone.some(r => r.id === s.id)), [filtered, redZone]);
   const greenZone = useMemo(() => filtered.filter(s => !redZone.some(r => r.id === s.id) && !yellowZone.some(y => y.id === s.id)), [filtered, redZone, yellowZone]);
 
-  // Flat list for navigation
   const filteredForNavigation = useMemo(() => [...redZone, ...yellowZone, ...greenZone], [redZone, yellowZone, greenZone]);
 
   const stats = useMemo(() => ({
@@ -386,10 +568,19 @@ export default function HomePage() {
   }, [filteredForNavigation, selectedStudentIndex]);
 
   const handleStudentClick = useCallback((student: Student) => {
-    const index = filteredForNavigation.findIndex(s => s.id === student.id);
-    setSelectedStudentIndex(index);
-    setSelectedStudent(student);
-  }, [filteredForNavigation]);
+    if (selectionMode) {
+      handleSelectStudent(student.id, !selectedIds.has(student.id));
+    } else {
+      const index = filteredForNavigation.findIndex(s => s.id === student.id);
+      setSelectedStudentIndex(index);
+      setSelectedStudent(student);
+    }
+  }, [filteredForNavigation, selectionMode, selectedIds, handleSelectStudent]);
+
+  // Get selected students data
+  const selectedStudentsData = useMemo(() => 
+    students.filter(s => selectedIds.has(s.id)),
+  [students, selectedIds]);
 
   if (loading) return (
     <div className="p-10 bg-black min-h-screen text-emerald-500 font-mono italic animate-pulse text-center uppercase tracking-widest">
@@ -405,6 +596,15 @@ export default function HomePage() {
       {/* ========================================== */}
       <div className="flex-shrink-0 p-6 pb-0 space-y-4">
         
+        {/* ERROR BANNER */}
+        {syncError && (
+          <ErrorBanner 
+            message={syncError}
+            onRetry={handleRetrySync}
+            onDismiss={() => setSyncError(null)}
+          />
+        )}
+        
         {/* TOP BAR */}
         <div className="flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-4 gap-4">
           <div>
@@ -419,7 +619,7 @@ export default function HomePage() {
               </button>
             </div>
             <p className="text-xs text-indigo-400 font-bold tracking-[0.3em] uppercase">
-              V5.1 Alpha Protocol • {students.length} / 1613 Students
+              V5.2 Alpha Protocol • {students.length} / 1613 Students
             </p>
             
             <div className="flex gap-4 mt-2 text-[10px] text-slate-600 font-mono flex-wrap">
@@ -501,12 +701,6 @@ export default function HomePage() {
                 </button>
               </div>
             </div>
-            
-            {syncError && (
-              <div className="bg-red-900/20 border border-red-500/50 px-4 py-2 rounded-lg text-[10px] text-red-400 font-mono flex items-center gap-2">
-                <span>{syncError}</span>
-              </div>
-            )}
           </div>
         </div>
 
@@ -547,7 +741,7 @@ export default function HomePage() {
         </div>
 
         {/* SEARCH & FILTER ROW */}
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-wrap gap-4 items-center">
           <div className="relative flex-1 min-w-[300px]">
             <input 
               onChange={(e) => setSearch(e.target.value)} 
@@ -556,11 +750,28 @@ export default function HomePage() {
             />
             <kbd className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-600 bg-slate-800 px-2 py-1 rounded">/</kbd>
           </div>
+          
+          {viewMode === 'TRIAGE' && (
+            <button
+              onClick={() => {
+                setSelectionMode(!selectionMode);
+                if (selectionMode) setSelectedIds(new Set());
+              }}
+              className={`px-4 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all ${
+                selectionMode 
+                  ? 'bg-indigo-600 text-white' 
+                  : 'bg-slate-900 border border-slate-800 text-slate-500 hover:text-white hover:border-indigo-500'
+              }`}
+            >
+              {selectionMode ? '✓ Selection Mode ON' : '☐ Select Multiple'}
+            </button>
+          )}
+          
           {viewMode !== 'MATRIX' && (
             <select 
               value={selectedCourse} 
               onChange={(e) => setSelectedCourse(e.target.value)} 
-              className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs font-black uppercase text-slate-400 outline-none"
+              className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs font-black uppercase text-slate-400 outline-none"
             >
               <option value="ALL">ALL COURSES</option>
               {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
@@ -568,6 +779,18 @@ export default function HomePage() {
           )}
         </div>
       </div>
+
+      {/* ========================================== */}
+      {/* BULK ACTIONS BAR */}
+      {/* ========================================== */}
+      {selectionMode && selectedIds.size > 0 && (
+        <BulkActionsBar
+          selectedCount={selectedIds.size}
+          selectedStudents={selectedStudentsData}
+          onClear={handleClearSelection}
+          onExport={handleExportSelected}
+        />
+      )}
 
       {/* ========================================== */}
       {/* DYNAMIC CONTENT AREA */}
@@ -578,31 +801,63 @@ export default function HomePage() {
         {viewMode === 'TRIAGE' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full animate-in fade-in duration-500">
             {[
-              { label: '🚨 Critical Ops', data: redZone, tier: 'RED', border: 'border-red-500' },
-              { label: '⚠️ Watch List', data: yellowZone, tier: 'YELLOW', border: 'border-amber-500' },
-              { label: '⚡ Stable Units', data: greenZone, tier: 'GREEN', border: 'border-emerald-500' }
-            ].map(col => (
-              <div key={col.tier} className="flex flex-col bg-slate-900/20 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl h-full">
-                <div className="flex-shrink-0 p-4 bg-slate-900/40 border-b border-slate-800 font-black text-xs uppercase tracking-widest flex justify-between">
-                  <span className="text-slate-300">{col.label}</span>
-                  <span className="bg-slate-800 text-slate-500 px-2 py-0.5 rounded font-mono">{col.data.length} STUDENTS</span>
+              { label: '🚨 Critical Ops', data: redZone, tier: 'RED' as const, border: 'border-red-500' },
+              { label: '⚠️ Watch List', data: yellowZone, tier: 'YELLOW' as const, border: 'border-amber-500' },
+              { label: '⚡ Stable Units', data: greenZone, tier: 'GREEN' as const, border: 'border-emerald-500' }
+            ].map(col => {
+              const isRefreshing = refreshingColumns.has(col.tier);
+              const allSelected = col.data.length > 0 && col.data.every(s => selectedIds.has(s.id));
+              const someSelected = col.data.some(s => selectedIds.has(s.id));
+              
+              return (
+                <div key={col.tier} className="flex flex-col bg-slate-900/20 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl h-full">
+                  <div className="flex-shrink-0 p-4 bg-slate-900/40 border-b border-slate-800 font-black text-xs uppercase tracking-widest flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      {selectionMode && (
+                        <button
+                          onClick={() => handleSelectAll(col.tier)}
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                            allSelected 
+                              ? 'bg-indigo-500 border-indigo-500 text-white' 
+                              : someSelected
+                                ? 'bg-indigo-500/50 border-indigo-500 text-white'
+                                : 'border-slate-600 hover:border-indigo-400'
+                          }`}
+                        >
+                          {(allSelected || someSelected) && <span className="text-xs">✓</span>}
+                        </button>
+                      )}
+                      <span className="text-slate-300">{col.label}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isRefreshing && (
+                        <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                      )}
+                      <span className="bg-slate-800 text-slate-500 px-2 py-0.5 rounded font-mono">{col.data.length}</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                    {isRefreshing && col.data.length === 0 ? (
+                      <ColumnSkeleton />
+                    ) : col.data.length === 0 ? (
+                      <div className="text-center py-20 text-slate-600 italic text-xs">No students in this tier</div>
+                    ) : (
+                      col.data.map(s => (
+                        <StudentCard 
+                          key={s.id} 
+                          student={s} 
+                          onClick={() => handleStudentClick(s)} 
+                          borderColor={col.border}
+                          isSelected={selectedIds.has(s.id)}
+                          onSelect={handleSelectStudent}
+                          selectionMode={selectionMode}
+                        />
+                      ))
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                  {col.data.length === 0 ? (
-                    <div className="text-center py-20 text-slate-600 italic text-xs">No students in this tier</div>
-                  ) : (
-                    col.data.map(s => (
-                      <StudentCard 
-                        key={s.id} 
-                        student={s} 
-                        onClick={() => handleStudentClick(s)} 
-                        borderColor={col.border} 
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
