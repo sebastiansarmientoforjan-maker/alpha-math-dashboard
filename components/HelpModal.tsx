@@ -24,7 +24,7 @@ export default function HelpModal({ onClose }: HelpModalProps) {
         <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-gradient-to-b from-slate-900/50 to-transparent">
           <div>
             <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter">Help & Shortcuts</h2>
-            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mt-1">DRI Command Center V5.1</p>
+            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mt-1">DRI Command Center V5.4</p>
           </div>
           <button 
             onClick={onClose} 
@@ -50,17 +50,68 @@ export default function HelpModal({ onClose }: HelpModalProps) {
                 { key: '4', action: 'Switch to LOG view' },
                 { key: '/', action: 'Focus search input' },
                 { key: '?', action: 'Open this help modal' },
-                { key: 'Esc', action: 'Close modal / dialog' },
+                { key: 'Esc', action: 'Close modal / Exit selection' },
                 { key: '← →', action: 'Navigate students in modal' },
                 { key: 'h', action: 'Toggle compact header' },
+                { key: 'c', action: 'Clear all filters' },
+                { key: 'Ctrl+A', action: 'Select all visible students' },
+                { key: 'Ctrl+I', action: 'Log intervention (in modal)' },
               ].map(({ key, action }) => (
                 <div key={key} className="flex items-center gap-3 p-3 bg-slate-900/40 rounded-xl border border-slate-800">
-                  <kbd className="bg-slate-800 text-indigo-400 px-2 py-1 rounded text-xs font-mono font-bold min-w-[40px] text-center">
+                  <kbd className="bg-slate-800 text-indigo-400 px-2 py-1 rounded text-xs font-mono font-bold min-w-[50px] text-center">
                     {key}
                   </kbd>
                   <span className="text-[11px] text-slate-400">{action}</span>
                 </div>
               ))}
+            </div>
+          </section>
+
+          {/* New Feature: Coach Interventions */}
+          <section>
+            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+              📝 Coach Interventions
+            </h3>
+            <div className="p-4 bg-indigo-950/20 border border-indigo-500/30 rounded-xl space-y-3">
+              <p className="text-[11px] text-indigo-200">
+                Log detailed coaching sessions for any student to track interventions over time.
+              </p>
+              <div className="space-y-2 text-[10px] text-slate-400">
+                <div className="flex items-start gap-2">
+                  <span className="text-indigo-400">1.</span>
+                  <span>Click on any student card to open their profile</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-indigo-400">2.</span>
+                  <span>Click "📝 Log Intervention" button (or press Ctrl+I)</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-indigo-400">3.</span>
+                  <span>Fill in: Coach name, date, objective, what was done, outcomes, and next steps</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-indigo-400">4.</span>
+                  <span>View intervention history in the "Interventions" tab</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Persistent Filters */}
+          <section>
+            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+              🔍 Persistent Filters
+            </h3>
+            <div className="p-4 bg-purple-950/20 border border-purple-500/30 rounded-xl space-y-2">
+              <p className="text-[11px] text-purple-200">
+                Search and course filters now persist across view changes.
+              </p>
+              <ul className="text-[10px] text-slate-400 space-y-1">
+                <li>• Filters apply to TRIAGE, MATRIX, and LOG views</li>
+                <li>• Active filters shown below the search bar</li>
+                <li>• Press <kbd className="bg-slate-800 px-1 rounded">c</kbd> to clear all filters</li>
+                <li>• Click ✕ on individual filter tags to remove them</li>
+              </ul>
             </div>
           </section>
 
