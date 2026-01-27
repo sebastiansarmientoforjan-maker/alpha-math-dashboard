@@ -155,3 +155,68 @@ export interface AlertsSummary {
   };
   recentAlerts: Alert[];
 }
+// ==========================================
+// INTERVENTION TRACKING TYPES - FASE 1B
+// ==========================================
+
+export type TrackingPeriod = '2_weeks' | '4_weeks' | '8_weeks';
+export type TrackingStatus = 'active' | 'completed' | 'cancelled';
+export type TrackingOutcome = 'improved' | 'stable' | 'worsened' | 'pending';
+
+export interface MetricsSnapshot {
+  rsr: number;
+  ksi: number | null;
+  velocity: number;
+  riskScore: number;
+  der: number | null;
+  pdi: number | null;
+  tier: DRITier;
+  capturedAt: Date;
+}
+
+export interface InterventionTracking {
+  id?: string;
+  studentId: string;
+  studentName: string;
+  studentCourse: string;
+  
+  // Intervención vinculada (opcional)
+  interventionId?: string;
+  interventionType: string;
+  interventionNotes?: string;
+  
+  // Configuración del tracking
+  period: TrackingPeriod;
+  status: TrackingStatus;
+  
+  // Snapshots de métricas
+  baselineSnapshot: MetricsSnapshot;
+  weeklySnapshots: MetricsSnapshot[];
+  
+  // Resultado
+  outcome: TrackingOutcome;
+  outcomeDetails?: {
+    rsrDelta: number;
+    ksiDelta: number | null;
+    velocityDelta: number;
+    riskScoreDelta: number;
+    tierChange: string | null;
+  };
+  
+  // Metadata
+  createdAt: Date;
+  createdBy: string;
+  completedAt?: Date;
+  nextSnapshotDate: Date;
+}
+
+export interface CreateTrackingInput {
+  studentId: string;
+  studentName: string;
+  studentCourse: string;
+  interventionId?: string;
+  interventionType: string;
+  interventionNotes?: string;
+  period: TrackingPeriod;
+  createdBy: string;
+}
