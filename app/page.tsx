@@ -7,12 +7,28 @@ import KeenKTMatrix from '@/components/KeenKTMatrix';
 import StudentModal from '@/components/StudentModal';
 import HelpModal from '@/components/HelpModal';
 import BulkActionsBar from '@/components/BulkActionsBar';
+import Tooltip from '@/components/Tooltip';
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
 import { DRI_CONFIG } from '@/lib/dri-config';
 import { Student } from '@/types';
 import { TOPIC_GRADE_MAP } from '@/lib/grade-maps';
 import { formatDistanceToNow } from 'date-fns';
+
+// ==========================================
+// METRIC DEFINITIONS FOR TOOLTIPS
+// ==========================================
+const METRIC_TOOLTIPS = {
+  rsr: 'Recent Success Rate: Proportion of recent tasks with >80% accuracy',
+  ksi: 'Knowledge Stability Index: Consistency of performance over time',
+  der: 'Debt Exposure Ratio: % of K-8 topics mastered during High School',
+  pdi: 'Precision Decay Index: Ratio of recent errors to early errors',
+  iroi: 'Investment ROI: XP earned per second of engagement',
+  velocity: 'Weekly XP Progress: % of weekly XP goal achieved',
+  risk: 'Risk Score: Composite score from multiple risk factors (0-100)',
+  accuracy: 'Overall accuracy rate across all completed tasks',
+  focus: 'Focus Integrity: Measure of sustained attention during sessions',
+};
 
 // ==========================================
 // METRIC CARD COMPONENT WITH TOOLTIP
@@ -106,30 +122,40 @@ const StudentCard = memo(({ student, onClick, borderColor, isSelected, onSelect,
             {student.firstName} {student.lastName}
           </h3>
         </div>
-        <span className="text-[10px] font-mono font-bold text-slate-500 italic">
-          {(student.metrics.lmp * 100).toFixed(0)}% RSR
-        </span>
+        <Tooltip content={METRIC_TOOLTIPS.rsr}>
+          <span className="text-[10px] font-mono font-bold text-slate-500 italic cursor-help">
+            {(student.metrics.lmp * 100).toFixed(0)}% RSR
+          </span>
+        </Tooltip>
       </div>
       <p className="text-[9px] text-indigo-400/70 font-bold uppercase mb-3 truncate italic">
         {student.currentCourse.name}
       </p>
       <div className="flex justify-between items-center text-[8px] font-black uppercase font-mono">
         <span className={student.dri.driColor}>{student.dri.driSignal}</span>
-        <span className="text-slate-600">
-          {student.metrics.velocityScore}% v • KSI: {student.metrics.ksi !== null ? student.metrics.ksi + '%' : 'N/A'}
-        </span>
+        <div className="flex items-center gap-2 text-slate-600">
+          <Tooltip content={METRIC_TOOLTIPS.velocity}>
+            <span className="cursor-help">{student.metrics.velocityScore}% v</span>
+          </Tooltip>
+          <span>•</span>
+          <Tooltip content={METRIC_TOOLTIPS.ksi}>
+            <span className="cursor-help">KSI: {student.metrics.ksi !== null ? student.metrics.ksi + '%' : 'N/A'}</span>
+          </Tooltip>
+        </div>
       </div>
       {student.dri.riskScore !== undefined && (
         <div className="mt-2 pt-2 border-t border-slate-800">
           <div className="flex justify-between items-center text-[9px]">
             <span className="text-slate-600">Risk:</span>
-            <span className={`font-mono font-bold ${
-              student.dri.riskScore >= 60 ? 'text-red-400' : 
-              student.dri.riskScore >= 35 ? 'text-amber-400' : 
-              'text-emerald-400'
-            }`}>
-              {student.dri.riskScore}/100
-            </span>
+            <Tooltip content={METRIC_TOOLTIPS.risk}>
+              <span className={`font-mono font-bold cursor-help ${
+                student.dri.riskScore >= 60 ? 'text-red-400' : 
+                student.dri.riskScore >= 35 ? 'text-amber-400' : 
+                'text-emerald-400'
+              }`}>
+                {student.dri.riskScore}/100
+              </span>
+            </Tooltip>
           </div>
         </div>
       )}
@@ -206,6 +232,27 @@ function ErrorBanner({ message, onRetry, onDismiss }: ErrorBannerProps) {
 }
 
 // ==========================================
+// COMPACT HEADER TOGGLE
+// ==========================================
+function CompactHeader({ 
+  isCompact, 
+  onToggle 
+}: { 
+  isCompact: boolean; 
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className="text-[9px] text-slate-600 hover:text-slate-400 transition-colors flex items-center gap-1"
+      title={isCompact ? "Expand header" : "Compact header"}
+    >
+      {isCompact ? '⊞ Expand' : '⊟ Compact'}
+    </button>
+  );
+}
+
+// ==========================================
 // MAIN COMPONENT
 // ==========================================
 export default function HomePage() {
@@ -230,6 +277,9 @@ export default function HomePage() {
   
   // Help Modal
   const [showHelp, setShowHelp] = useState(false);
+  
+  // Compact header mode
+  const [compactHeader, setCompactHeader] = useState(false);
   
   // ETA Tracking
   const [syncStartTime, setSyncStartTime] = useState<number | null>(null);
@@ -276,13 +326,17 @@ export default function HomePage() {
         setShowHelp(true);
       }
       
+      // Toggle compact header with 'h'
+      if (e.key === 'h' && !selectedStudent) {
+        setCompactHeader(prev => !prev);
+      }
+      
       // Bulk select shortcut: Ctrl/Cmd + A
       if ((e.ctrlKey || e.metaKey) && e.key === 'a' && viewMode === 'TRIAGE' && !selectedStudent) {
         e.preventDefault();
         if (!selectionMode) {
           setSelectionMode(true);
         }
-        // Select all visible students
         const allIds = new Set(filteredForNavigation.map(s => s.id));
         setSelectedIds(allIds);
       }
@@ -316,8 +370,6 @@ export default function HomePage() {
       }) as Student[];
       setStudents(data);
       setLoading(false);
-      
-      // Clear column refreshing states when data updates
       setRefreshingColumns(new Set());
     });
 
@@ -338,8 +390,6 @@ export default function HomePage() {
     if (updating || isPaused) return;
     setUpdating(true);
     setSyncError(null);
-    
-    // Set refreshing state for all columns
     setRefreshingColumns(new Set(['RED', 'YELLOW', 'GREEN']));
     
     if (!syncStartTime) {
@@ -430,9 +480,6 @@ export default function HomePage() {
     setRefreshingColumns(new Set());
   };
 
-  // ==========================================
-  // RETRY SYNC
-  // ==========================================
   const handleRetrySync = () => {
     setSyncError(null);
     setAutoSync(true);
@@ -577,7 +624,6 @@ export default function HomePage() {
     }
   }, [filteredForNavigation, selectionMode, selectedIds, handleSelectStudent]);
 
-  // Get selected students data
   const selectedStudentsData = useMemo(() => 
     students.filter(s => selectedIds.has(s.id)),
   [students, selectedIds]);
@@ -594,7 +640,7 @@ export default function HomePage() {
       {/* ========================================== */}
       {/* HEADER SECTION */}
       {/* ========================================== */}
-      <div className="flex-shrink-0 p-6 pb-0 space-y-4">
+      <div className={`flex-shrink-0 p-6 pb-0 space-y-4 transition-all duration-300 ${compactHeader ? 'space-y-2' : ''}`}>
         
         {/* ERROR BANNER */}
         {syncError && (
@@ -605,85 +651,85 @@ export default function HomePage() {
           />
         )}
         
-        {/* TOP BAR */}
-        <div className="flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-4 gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-black uppercase italic text-white tracking-tighter">DRI COMMAND CENTER</h1>
-              <button 
-                onClick={() => setShowHelp(true)}
-                className="w-8 h-8 rounded-full border border-slate-700 text-slate-500 hover:text-white hover:border-indigo-500 transition-all flex items-center justify-center text-sm font-bold"
-                title="Help & Keyboard Shortcuts (?)"
-              >
-                ?
-              </button>
+        {/* TOP BAR - SIMPLIFIED */}
+        <div className={`flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-4 gap-4 ${compactHeader ? 'pb-2' : ''}`}>
+          <div className="flex items-center gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className={`font-black uppercase italic text-white tracking-tighter transition-all ${compactHeader ? 'text-xl' : 'text-3xl'}`}>
+                  DRI COMMAND CENTER
+                </h1>
+                <button 
+                  onClick={() => setShowHelp(true)}
+                  className="w-7 h-7 rounded-full border border-slate-700 text-slate-500 hover:text-white hover:border-indigo-500 transition-all flex items-center justify-center text-xs font-bold"
+                  title="Help & Keyboard Shortcuts (?)"
+                >
+                  ?
+                </button>
+                <CompactHeader isCompact={compactHeader} onToggle={() => setCompactHeader(!compactHeader)} />
+              </div>
+              
+              {!compactHeader && (
+                <>
+                  <p className="text-xs text-indigo-400 font-bold tracking-[0.3em] uppercase">
+                    V5.3 Alpha • {students.length} Students
+                  </p>
+                  
+                  <div className="flex gap-3 mt-1 text-[9px] text-slate-600 font-mono flex-wrap">
+                    <Tooltip content={METRIC_TOOLTIPS.rsr}>
+                      <span className="cursor-help">RSR: <span className="text-emerald-500 font-bold">{stats.avgRSR}%</span></span>
+                    </Tooltip>
+                    <span className="text-slate-700">•</span>
+                    <span>Std: <span className="text-indigo-500 font-bold">{DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP/wk</span></span>
+                  </div>
+                </>
+              )}
+              
+              {lastSync && (
+                <p className={`text-emerald-600 font-mono ${compactHeader ? 'text-[8px]' : 'text-[10px] mt-1'}`}>
+                  ✓ Synced {formatDistanceToNow(lastSync, { addSuffix: true })}
+                </p>
+              )}
             </div>
-            <p className="text-xs text-indigo-400 font-bold tracking-[0.3em] uppercase">
-              V5.2 Alpha Protocol • {students.length} / 1613 Students
-            </p>
-            
-            <div className="flex gap-4 mt-2 text-[10px] text-slate-600 font-mono flex-wrap">
-              <span>Avg RSR: <span className="text-emerald-500 font-bold">{stats.avgRSR}%</span></span>
-              <span className="text-slate-700">•</span>
-              <span>Standard: <span className="text-indigo-500 font-bold">{DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP/week</span></span>
-              <span className="text-slate-700">•</span>
-              <span>DER &gt; <span className="text-amber-500 font-bold">{DRI_CONFIG.DER_CRITICAL_THRESHOLD}%</span></span>
-            </div>
-            
-            {lastSync && (
-              <p className="text-[10px] text-emerald-600 font-mono mt-1">
-                ✓ Last sync: {formatDistanceToNow(lastSync, { addSuffix: true })}
-              </p>
-            )}
           </div>
           
-          <div className="flex flex-col items-end gap-3">
-            {/* VIEW TOGGLE WITH KEYBOARD HINTS */}
-            <div className="flex bg-slate-900/50 p-1 rounded-xl border border-slate-800 font-black text-[10px] uppercase">
+          <div className="flex flex-col items-end gap-2">
+            {/* VIEW TOGGLE */}
+            <div className={`flex bg-slate-900/50 p-1 rounded-xl border border-slate-800 font-black uppercase ${compactHeader ? 'text-[8px]' : 'text-[10px]'}`}>
               {(['TRIAGE', 'MATRIX', 'HEATMAP', 'LOG'] as const).map((m, i) => (
                 <button 
                   key={m} 
                   onClick={() => setViewMode(m)} 
-                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1 ${
+                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
                     viewMode === m 
                       ? 'bg-indigo-600 text-white shadow-lg' 
                       : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
                   {m}
-                  <kbd className={`text-[8px] px-1 rounded ${viewMode === m ? 'bg-indigo-500' : 'bg-slate-800'}`}>{i + 1}</kbd>
+                  <kbd className={`text-[7px] px-1 rounded ${viewMode === m ? 'bg-indigo-500' : 'bg-slate-800'}`}>{i + 1}</kbd>
                 </button>
               ))}
             </div>
             
-            {/* SYNC STATUS */}
-            <div className="flex gap-4 items-center bg-slate-900/40 p-3 px-4 rounded-xl border border-slate-800 relative overflow-hidden group min-w-[320px]">
-              {autoSync && <div className="absolute bottom-0 left-0 h-0.5 bg-emerald-500 transition-all duration-700 shadow-[0_0_10px_#10b981]" style={{ width: `${progress}%` }} />}
-              <div className="text-[10px] font-mono flex-1">
-                <div className="font-bold text-white flex items-center justify-between">
-                  <span>{students.length} / 1613</span>
-                  {autoSync && <span className="text-emerald-500 animate-pulse">●</span>}
-                </div>
+            {/* SYNC STATUS - COMPACT */}
+            <div className={`flex gap-3 items-center bg-slate-900/40 px-3 rounded-xl border border-slate-800 relative overflow-hidden ${compactHeader ? 'py-1.5' : 'py-2'}`}>
+              {autoSync && <div className="absolute bottom-0 left-0 h-0.5 bg-emerald-500 transition-all duration-700" style={{ width: `${progress}%` }} />}
+              <div className="text-[9px] font-mono">
+                <span className="text-white font-bold">{students.length}</span>
+                <span className="text-slate-600">/1613</span>
                 {autoSync && (
-                  <div className="text-slate-500 mt-0.5 space-y-0.5">
-                    <div className="flex justify-between items-center">
-                      <span>Batch {batchStatus.current}/{batchStatus.total}</span>
-                      <span className="text-white font-bold">{progress}%</span>
-                    </div>
-                    {batchStatus.lastStudent && <div className="text-slate-600 truncate max-w-[180px]">→ {batchStatus.lastStudent}</div>}
-                    {eta !== null && eta > 0 && (
-                      <div className="text-indigo-400 font-bold mt-1 flex items-center gap-1">
-                        <span>ETA: {Math.floor(eta / 60)}:{(eta % 60).toString().padStart(2, '0')}</span>
-                      </div>
-                    )}
-                  </div>
+                  <span className="ml-2 text-slate-500">
+                    B{batchStatus.current}/{batchStatus.total}
+                    {eta && <span className="text-indigo-400 ml-1">~{Math.floor(eta / 60)}m</span>}
+                  </span>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1">
                 {autoSync && (
                   <button 
                     onClick={() => setIsPaused(!isPaused)} 
-                    className="px-3 py-1.5 rounded-lg font-black text-[9px] tracking-widest uppercase bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700"
+                    className="px-2 py-1 rounded text-[8px] bg-slate-800 text-slate-400 hover:bg-slate-700"
                   >
                     {isPaused ? '▶' : '⏸'}
                   </button>
@@ -691,64 +737,66 @@ export default function HomePage() {
                 <button 
                   onClick={() => autoSync ? handleStopSync() : setAutoSync(true)} 
                   disabled={updating && !autoSync} 
-                  className={`px-4 py-1.5 rounded-lg font-black text-[9px] tracking-widest uppercase transition-all ${
+                  className={`px-3 py-1 rounded text-[8px] font-black uppercase transition-all ${
                     autoSync 
-                      ? 'bg-red-900/50 text-red-500 border border-red-500 animate-pulse' 
-                      : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg disabled:opacity-50'
+                      ? 'bg-red-900/50 text-red-500 border border-red-500' 
+                      : 'bg-emerald-600 text-white hover:bg-emerald-500'
                   }`}
                 >
-                  {autoSync ? '🛑 STOP' : '⚡ AUTO SYNC'}
+                  {autoSync ? 'STOP' : 'SYNC'}
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* METRICS ROW */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <MetricCard 
-            title={`🔴 Critical (${redZone.length})`} 
-            value={stats.atRisk} 
-            color="red" 
-            subtitle={`${((stats.atRisk/stats.total)*100).toFixed(1)}% of total`} 
-            tooltip="Risk Score ≥ 60, or DER > 20%, or RSR < 60%" 
-            trend={trends.atRisk} 
-          />
-          <MetricCard 
-            title={`🟡 Watch (${yellowZone.length})`} 
-            value={stats.attention} 
-            color="amber" 
-            subtitle={`${((stats.attention/stats.total)*100).toFixed(1)}% of total`} 
-            tooltip="Risk Score 35-59, or PDI > 1.5" 
-            trend={trends.attention} 
-          />
-          <MetricCard 
-            title={`🟢 Optimal (${greenZone.length})`} 
-            value={stats.onTrack} 
-            color="emerald" 
-            subtitle={`${((stats.onTrack/stats.total)*100).toFixed(1)}% of total`} 
-            tooltip="Risk Score < 35 with stable metrics" 
-            trend={trends.onTrack} 
-          />
-          <MetricCard 
-            title="Performance" 
-            value={`${stats.avgVelocity}%`} 
-            color="purple" 
-            subtitle={`${Math.round((stats.avgVelocity / 100) * DRI_CONFIG.ALPHA_WEEKLY_STANDARD)} XP/week avg`} 
-            tooltip="Average velocity across all students" 
-            trend={trends.avgVelocity} 
-          />
-        </div>
+        {/* METRICS ROW - COLLAPSIBLE */}
+        {!compactHeader && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <MetricCard 
+              title={`🔴 Critical`} 
+              value={stats.atRisk} 
+              color="red" 
+              subtitle={`${((stats.atRisk/stats.total)*100).toFixed(1)}%`} 
+              tooltip="Risk Score ≥ 60, DER > 20%, or RSR < 60%" 
+              trend={trends.atRisk} 
+            />
+            <MetricCard 
+              title={`🟡 Watch`} 
+              value={stats.attention} 
+              color="amber" 
+              subtitle={`${((stats.attention/stats.total)*100).toFixed(1)}%`} 
+              tooltip="Risk Score 35-59, or PDI > 1.5" 
+              trend={trends.attention} 
+            />
+            <MetricCard 
+              title={`🟢 Optimal`} 
+              value={stats.onTrack} 
+              color="emerald" 
+              subtitle={`${((stats.onTrack/stats.total)*100).toFixed(1)}%`} 
+              tooltip="Risk Score < 35 with stable metrics" 
+              trend={trends.onTrack} 
+            />
+            <MetricCard 
+              title="Avg Velocity" 
+              value={`${stats.avgVelocity}%`} 
+              color="purple" 
+              subtitle={`${Math.round((stats.avgVelocity / 100) * DRI_CONFIG.ALPHA_WEEKLY_STANDARD)} XP/wk`} 
+              tooltip={METRIC_TOOLTIPS.velocity}
+              trend={trends.avgVelocity} 
+            />
+          </div>
+        )}
 
         {/* SEARCH & FILTER ROW */}
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="relative flex-1 min-w-[300px]">
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="relative flex-1 min-w-[280px]">
             <input 
               onChange={(e) => setSearch(e.target.value)} 
-              placeholder="🔎 SEARCH STUDENT BY NAME OR ID..." 
-              className="w-full bg-slate-900/40 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-indigo-500 outline-none font-mono transition-all" 
+              placeholder="🔎 SEARCH STUDENT..." 
+              className={`w-full bg-slate-900/40 border border-slate-800 rounded-xl px-4 text-sm focus:border-indigo-500 outline-none font-mono transition-all ${compactHeader ? 'py-2' : 'py-3'}`}
             />
-            <kbd className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-600 bg-slate-800 px-2 py-1 rounded">/</kbd>
+            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded">/</kbd>
           </div>
           
           {viewMode === 'TRIAGE' && (
@@ -757,13 +805,13 @@ export default function HomePage() {
                 setSelectionMode(!selectionMode);
                 if (selectionMode) setSelectedIds(new Set());
               }}
-              className={`px-4 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all ${
+              className={`px-3 py-2 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all ${
                 selectionMode 
                   ? 'bg-indigo-600 text-white' 
                   : 'bg-slate-900 border border-slate-800 text-slate-500 hover:text-white hover:border-indigo-500'
               }`}
             >
-              {selectionMode ? '✓ Selection Mode ON' : '☐ Select Multiple'}
+              {selectionMode ? '✓ Selecting' : '☐ Select'}
             </button>
           )}
           
@@ -771,7 +819,7 @@ export default function HomePage() {
             <select 
               value={selectedCourse} 
               onChange={(e) => setSelectedCourse(e.target.value)} 
-              className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs font-black uppercase text-slate-400 outline-none"
+              className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none"
             >
               <option value="ALL">ALL COURSES</option>
               {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
@@ -801,9 +849,9 @@ export default function HomePage() {
         {viewMode === 'TRIAGE' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full animate-in fade-in duration-500">
             {[
-              { label: '🚨 Critical Ops', data: redZone, tier: 'RED' as const, border: 'border-red-500' },
-              { label: '⚠️ Watch List', data: yellowZone, tier: 'YELLOW' as const, border: 'border-amber-500' },
-              { label: '⚡ Stable Units', data: greenZone, tier: 'GREEN' as const, border: 'border-emerald-500' }
+              { label: '🚨 Critical', data: redZone, tier: 'RED' as const, border: 'border-red-500' },
+              { label: '⚠️ Watch', data: yellowZone, tier: 'YELLOW' as const, border: 'border-amber-500' },
+              { label: '⚡ Optimal', data: greenZone, tier: 'GREEN' as const, border: 'border-emerald-500' }
             ].map(col => {
               const isRefreshing = refreshingColumns.has(col.tier);
               const allSelected = col.data.length > 0 && col.data.every(s => selectedIds.has(s.id));
@@ -811,12 +859,12 @@ export default function HomePage() {
               
               return (
                 <div key={col.tier} className="flex flex-col bg-slate-900/20 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl h-full">
-                  <div className="flex-shrink-0 p-4 bg-slate-900/40 border-b border-slate-800 font-black text-xs uppercase tracking-widest flex justify-between items-center">
+                  <div className="flex-shrink-0 p-3 bg-slate-900/40 border-b border-slate-800 font-black text-xs uppercase tracking-widest flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       {selectionMode && (
                         <button
                           onClick={() => handleSelectAll(col.tier)}
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                          className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
                             allSelected 
                               ? 'bg-indigo-500 border-indigo-500 text-white' 
                               : someSelected
@@ -824,23 +872,23 @@ export default function HomePage() {
                                 : 'border-slate-600 hover:border-indigo-400'
                           }`}
                         >
-                          {(allSelected || someSelected) && <span className="text-xs">✓</span>}
+                          {(allSelected || someSelected) && <span className="text-[8px]">✓</span>}
                         </button>
                       )}
                       <span className="text-slate-300">{col.label}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       {isRefreshing && (
-                        <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                        <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                       )}
-                      <span className="bg-slate-800 text-slate-500 px-2 py-0.5 rounded font-mono">{col.data.length}</span>
+                      <span className="bg-slate-800 text-slate-500 px-2 py-0.5 rounded text-[9px] font-mono">{col.data.length}</span>
                     </div>
                   </div>
                   <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                     {isRefreshing && col.data.length === 0 ? (
                       <ColumnSkeleton />
                     ) : col.data.length === 0 ? (
-                      <div className="text-center py-20 text-slate-600 italic text-xs">No students in this tier</div>
+                      <div className="text-center py-20 text-slate-600 italic text-xs">No students</div>
                     ) : (
                       col.data.map(s => (
                         <StudentCard 
@@ -880,18 +928,18 @@ export default function HomePage() {
                   📊 Top 15 Critical Knowledge Components
                   <span className="px-2 py-0.5 bg-red-900/30 border border-red-500/50 rounded text-[9px] text-red-400 font-black">PRIORITIZED</span>
                 </h3>
-                <p className="text-[10px] text-slate-600 font-mono mt-1">Sorted by number of courses with avg RSR &lt; 40% • Top 3 highlighted</p>
+                <p className="text-[10px] text-slate-600 font-mono mt-1">Sorted by courses with avg RSR &lt; 40%</p>
               </div>
               <div className="flex items-center gap-4 text-[9px] text-slate-600">
-                <div className="flex items-center gap-1.5"><div className="w-3 h-1.5 rounded-full bg-gradient-to-r from-red-500 to-amber-500" /><span>High Priority</span></div>
-                <div className="flex items-center gap-1.5"><div className="w-3 h-1.5 rounded-full bg-slate-700" /><span>Low Priority</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-3 h-1.5 rounded-full bg-gradient-to-r from-red-500 to-amber-500" /><span>High</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-3 h-1.5 rounded-full bg-slate-700" /><span>Low</span></div>
               </div>
             </div>
             <div className="flex-1 overflow-auto custom-scrollbar">
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
-                    <th className="sticky top-0 left-0 z-20 bg-slate-950 p-3 text-[8px] font-black text-slate-600 uppercase text-left border-b border-slate-800 min-w-[200px]">Knowledge Component</th>
+                    <th className="sticky top-0 left-0 z-20 bg-slate-950 p-3 text-[8px] font-black text-slate-600 uppercase text-left border-b border-slate-800 min-w-[200px]">Component</th>
                     {uniqueCourses.map(course => (
                       <th key={course} className="sticky top-0 z-10 bg-slate-950 p-3 text-[8px] font-black text-slate-500 uppercase border-b border-slate-800 min-w-[90px] font-mono">{course}</th>
                     ))}
@@ -902,34 +950,34 @@ export default function HomePage() {
                     <tr key={row.topic} className="hover:bg-slate-900/50 transition-colors group">
                       <td className="sticky left-0 z-10 bg-slate-950 p-3 border-r border-slate-800">
                         <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0 w-16 h-1.5 rounded-full bg-slate-800/50 overflow-hidden relative group-hover:w-20 transition-all">
-                            <div className="h-full bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500 transition-all" style={{ width: `${Math.min((row.criticalCourses / uniqueCourses.length) * 100, 100)}%` }} />
+                          <div className="flex-shrink-0 w-16 h-1.5 rounded-full bg-slate-800/50 overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500" style={{ width: `${Math.min((row.criticalCourses / uniqueCourses.length) * 100, 100)}%` }} />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-bold text-slate-300 uppercase italic truncate">{row.topic}</span>
-                              {rowIndex < 3 && (
-                                <span className="px-1.5 py-0.5 bg-red-900/40 border border-red-500/60 rounded text-[8px] font-black uppercase text-red-300">
-                                  TOP {rowIndex + 1}
-                                </span>
-                              )}
-                            </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-slate-300 uppercase italic truncate">{row.topic}</span>
+                            {rowIndex < 3 && (
+                              <span className="px-1.5 py-0.5 bg-red-900/40 border border-red-500/60 rounded text-[8px] font-black text-red-300">
+                                #{rowIndex + 1}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>
                       {row.courseStats.map((cell, idx) => (
                         <td key={idx} className="p-2 border border-slate-900">
-                          <div 
-                            className="h-10 rounded-md flex items-center justify-center text-[10px] font-mono font-black transition-all hover:scale-105 cursor-help" 
-                            style={{ 
-                              backgroundColor: cell.avgLMP < 0.4 ? 'rgba(239, 68, 68, 0.2)' : cell.avgLMP < 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.1)', 
-                              border: `1px solid ${cell.avgLMP < 0.4 ? '#ef444433' : cell.avgLMP < 0.7 ? '#f59e0b33' : '#10b98133'}` 
-                            }}
-                          >
-                            <span style={{ color: cell.avgLMP < 0.4 ? '#fca5a5' : cell.avgLMP < 0.7 ? '#fbbf24' : '#6ee7b7' }}>
-                              {(cell.avgLMP * 100).toFixed(0)}%
-                            </span>
-                          </div>
+                          <Tooltip content={`${cell.course}: ${(cell.avgLMP * 100).toFixed(1)}% avg RSR`}>
+                            <div 
+                              className="h-10 rounded-md flex items-center justify-center text-[10px] font-mono font-black transition-all hover:scale-105 cursor-help" 
+                              style={{ 
+                                backgroundColor: cell.avgLMP < 0.4 ? 'rgba(239, 68, 68, 0.2)' : cell.avgLMP < 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.1)', 
+                                border: `1px solid ${cell.avgLMP < 0.4 ? '#ef444433' : cell.avgLMP < 0.7 ? '#f59e0b33' : '#10b98133'}` 
+                              }}
+                            >
+                              <span style={{ color: cell.avgLMP < 0.4 ? '#fca5a5' : cell.avgLMP < 0.7 ? '#fbbf24' : '#6ee7b7' }}>
+                                {(cell.avgLMP * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                          </Tooltip>
                         </td>
                       ))}
                     </tr>
@@ -963,7 +1011,7 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* STUDENT MODAL WITH NAVIGATION */}
+      {/* STUDENT MODAL */}
       {selectedStudent && (
         <StudentModal 
           student={selectedStudent} 
