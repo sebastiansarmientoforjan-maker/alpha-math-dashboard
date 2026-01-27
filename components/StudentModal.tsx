@@ -1,8 +1,70 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, BarChart } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Bar, BarChart } from 'recharts';
 import { DRI_CONFIG } from '@/lib/dri-config';
+import Tooltip from '@/components/Tooltip';
+
+// ==========================================
+// METRIC DEFINITIONS
+// ==========================================
+const METRIC_INFO = {
+  rsr: { name: 'Recent Success Rate', desc: 'Proportion of recent tasks with >80% accuracy' },
+  ksi: { name: 'Knowledge Stability Index', desc: 'Consistency of performance over time' },
+  der: { name: 'Debt Exposure Ratio', desc: '% of K-8 topics mastered during High School' },
+  pdi: { name: 'Precision Decay Index', desc: 'Ratio of recent errors to early errors' },
+  iroi: { name: 'Investment ROI', desc: 'XP earned per second of engagement' },
+  velocity: { name: 'Velocity', desc: 'Weekly XP progress toward goal' },
+  accuracy: { name: 'Accuracy', desc: 'Overall accuracy across all tasks' },
+  focus: { name: 'Focus Integrity', desc: 'Measure of sustained attention' },
+  risk: { name: 'Risk Score', desc: 'Composite score from multiple factors' },
+};
+
+// ==========================================
+// COLLAPSIBLE SECTION COMPONENT
+// ==========================================
+function CollapsibleSection({ 
+  title, 
+  icon, 
+  children, 
+  defaultOpen = true,
+  badge,
+}: { 
+  title: string; 
+  icon: string; 
+  children: React.ReactNode; 
+  defaultOpen?: boolean;
+  badge?: string | number;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="border border-slate-800 rounded-2xl overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full p-4 bg-slate-900/40 flex items-center justify-between hover:bg-slate-900/60 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span>{icon}</span>
+          <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{title}</span>
+          {badge !== undefined && (
+            <span className="px-2 py-0.5 bg-indigo-500/20 border border-indigo-500/30 rounded text-[9px] text-indigo-300 font-bold">
+              {badge}
+            </span>
+          )}
+        </div>
+        <span className={`text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}>
+          ▼
+        </span>
+      </button>
+      {isOpen && (
+        <div className="p-4 animate-in slide-in-from-top-2 duration-200">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface StudentModalProps {
   student: any;
@@ -23,7 +85,6 @@ export default function StudentModal({
 
   const tasks = student?.activity?.tasks || [];
 
-  // Keyboard navigation
   useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
@@ -43,7 +104,7 @@ export default function StudentModal({
   }, [onNavigate, onClose]);
 
   // ==========================================
-  // READY TO ACCELERATE (Outer Fringe)
+  // READY TO ACCELERATE
   // ==========================================
   const readyToAccelerate = useMemo((): string[] => {
     const topics = tasks
@@ -53,7 +114,7 @@ export default function StudentModal({
   }, [tasks]);
 
   // ==========================================
-  // STRUGGLE TOPICS (Need Intervention)
+  // STRUGGLE TOPICS
   // ==========================================
   const struggleTopics = useMemo((): string[] => {
     const topics = tasks
@@ -63,10 +124,10 @@ export default function StudentModal({
   }, [tasks]);
 
   // ==========================================
-  // DATA FOR TABLE (Most recent first)
+  // DATA FOR TABLE
   // ==========================================
   const sortedData = useMemo(() => {
-    return tasks.map((t: any, i: number) => {
+    return tasks.map((t: any) => {
       const dateObj = new Date(t.completedLocal);
       return {
         id: t.id,
@@ -82,9 +143,6 @@ export default function StudentModal({
     }).sort((a: any, b: any) => b.timestamp - a.timestamp);
   }, [tasks]);
 
-  // ==========================================
-  // DATA FOR CHART (Chronological order)
-  // ==========================================
   const chartData = useMemo(() => 
     [...sortedData].reverse().map((d, i) => ({ ...d, i: i + 1 })), 
   [sortedData]);
@@ -112,60 +170,54 @@ export default function StudentModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="bg-[#080808] border border-slate-800 w-full max-w-7xl h-[90vh] rounded-[2.5rem] relative z-10 flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-[#080808] border border-slate-800 w-full max-w-6xl h-[85vh] rounded-[2.5rem] relative z-10 flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* ========================================== */}
-        {/* HEADER */}
+        {/* HEADER - SIMPLIFIED */}
         {/* ========================================== */}
-        <div className="p-6 border-b border-slate-800 flex justify-between items-start bg-gradient-to-b from-slate-900/50 to-transparent">
-          <div className="flex gap-6 items-center flex-1">
+        <div className="p-5 border-b border-slate-800 flex justify-between items-start bg-gradient-to-b from-slate-900/50 to-transparent">
+          <div className="flex gap-4 items-center flex-1">
             {/* Velocity Badge */}
-            <div className={`w-20 h-20 rounded-2xl border-4 flex flex-col items-center justify-center text-2xl font-black italic ${
-              student.dri.driTier === 'RED' ? 'border-red-500 text-red-500 bg-red-500/10' : 
-              student.dri.driTier === 'YELLOW' ? 'border-amber-500 text-amber-500 bg-amber-500/10' :
-              'border-emerald-500 text-emerald-500 bg-emerald-500/10'
-            }`}>
-              <span className="text-2xl">{student.metrics.velocityScore || 0}</span>
-              <span className="text-[8px] opacity-60 uppercase tracking-wider">Velocity</span>
-            </div>
+            <Tooltip content={METRIC_INFO.velocity.desc}>
+              <div className={`w-16 h-16 rounded-xl border-4 flex flex-col items-center justify-center font-black italic cursor-help ${
+                student.dri.driTier === 'RED' ? 'border-red-500 text-red-500 bg-red-500/10' : 
+                student.dri.driTier === 'YELLOW' ? 'border-amber-500 text-amber-500 bg-amber-500/10' :
+                'border-emerald-500 text-emerald-500 bg-emerald-500/10'
+              }`}>
+                <span className="text-xl">{student.metrics.velocityScore || 0}</span>
+                <span className="text-[7px] opacity-60 uppercase">Vel</span>
+              </div>
+            </Tooltip>
             
             <div className="flex-1">
-              <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase">
+              <h2 className="text-2xl font-black text-white italic tracking-tighter uppercase">
                 {student.firstName} {student.lastName}
               </h2>
               
-              <div className="flex flex-wrap gap-3 mt-2 font-black text-[10px] uppercase">
-                <span className={`px-3 py-1 rounded-full border border-current ${student.dri.driColor}`}>
+              <div className="flex flex-wrap gap-2 mt-2 text-[9px] font-black uppercase">
+                <span className={`px-2 py-1 rounded-full border border-current ${student.dri.driColor}`}>
                   {student.dri.driSignal}
                 </span>
-                <span className="px-3 py-1 rounded-full border border-indigo-500/30 text-indigo-400 bg-indigo-500/10">
+                <span className="px-2 py-1 rounded-full border border-indigo-500/30 text-indigo-400 bg-indigo-500/10">
                   {student.currentCourse?.name}
                 </span>
                 {student.dri.riskScore !== undefined && (
-                  <span className={`px-3 py-1 rounded-full border ${
-                    student.dri.riskScore >= 60 ? 'border-red-500 text-red-400 bg-red-500/10' :
-                    student.dri.riskScore >= 35 ? 'border-amber-500 text-amber-400 bg-amber-500/10' :
-                    'border-emerald-500 text-emerald-400 bg-emerald-500/10'
-                  }`}>
-                    Risk: {student.dri.riskScore}/100
-                  </span>
+                  <Tooltip content={METRIC_INFO.risk.desc}>
+                    <span className={`px-2 py-1 rounded-full border cursor-help ${
+                      student.dri.riskScore >= 60 ? 'border-red-500 text-red-400 bg-red-500/10' :
+                      student.dri.riskScore >= 35 ? 'border-amber-500 text-amber-400 bg-amber-500/10' :
+                      'border-emerald-500 text-emerald-400 bg-emerald-500/10'
+                    }`}>
+                      Risk: {student.dri.riskScore}
+                    </span>
+                  </Tooltip>
                 )}
               </div>
               
-              <div className="mt-2 flex gap-4 text-[10px] text-slate-500 font-mono">
-                <span>
-                  <span className={`font-bold ${
-                    student.metrics.velocityScore >= 100 ? 'text-emerald-500' :
-                    student.metrics.velocityScore >= 80 ? 'text-amber-400' :
-                    'text-red-400'
-                  }`}>
-                    {velocityInXP} XP
-                  </span> / {DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP weekly
-                </span>
-                <span className="text-slate-700">•</span>
-                <span>{tasks.length} total sessions</span>
-                <span className="text-slate-700">•</span>
-                <span>{Math.round((student.activity?.time || 0) / 3600)}h engaged</span>
+              <div className="mt-1 flex gap-3 text-[9px] text-slate-500 font-mono">
+                <span>{velocityInXP} / {DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP/wk</span>
+                <span>•</span>
+                <span>{tasks.length} sessions</span>
               </div>
             </div>
           </div>
@@ -173,21 +225,19 @@ export default function StudentModal({
           {/* Navigation & Close */}
           <div className="flex items-center gap-2">
             {onNavigate && totalStudents > 1 && (
-              <div className="flex items-center gap-1 mr-4">
+              <div className="flex items-center gap-1 mr-3">
                 <button 
                   onClick={() => onNavigate('prev')}
-                  className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center justify-center"
-                  title="Previous student (←)"
+                  className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center justify-center text-sm"
                 >
                   ←
                 </button>
-                <span className="text-[10px] text-slate-600 font-mono px-2">
-                  {currentIndex + 1} / {totalStudents}
+                <span className="text-[9px] text-slate-600 font-mono px-2">
+                  {currentIndex + 1}/{totalStudents}
                 </span>
                 <button 
                   onClick={() => onNavigate('next')}
-                  className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center justify-center"
-                  title="Next student (→)"
+                  className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center justify-center text-sm"
                 >
                   →
                 </button>
@@ -195,8 +245,7 @@ export default function StudentModal({
             )}
             <button 
               onClick={onClose} 
-              className="text-slate-600 hover:text-white text-2xl transition-colors p-2 hover:bg-slate-800 rounded-lg"
-              title="Close (Esc)"
+              className="text-slate-600 hover:text-white text-xl transition-colors p-2 hover:bg-slate-800 rounded-lg"
             >
               ✕
             </button>
@@ -206,7 +255,7 @@ export default function StudentModal({
         {/* ========================================== */}
         {/* TAB NAVIGATION */}
         {/* ========================================== */}
-        <div className="px-6 pt-4 border-b border-slate-800/50 flex gap-2">
+        <div className="px-5 pt-3 border-b border-slate-800/50 flex gap-2">
           <button
             onClick={() => setActiveTab('overview')}
             className={`px-4 py-2 rounded-t-lg font-black text-[10px] uppercase tracking-widest transition-all ${
@@ -225,270 +274,218 @@ export default function StudentModal({
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            📜 History
+            📜 History ({sortedData.length})
           </button>
         </div>
 
         {/* ========================================== */}
         {/* CONTENT AREA */}
         {/* ========================================== */}
-        <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 p-5 overflow-y-auto custom-scrollbar">
           
-          {/* OVERVIEW TAB */}
+          {/* OVERVIEW TAB - WITH COLLAPSIBLE SECTIONS */}
           {activeTab === 'overview' && (
-            <div className="grid grid-cols-12 gap-6">
+            <div className="grid grid-cols-12 gap-5">
               
-              {/* LEFT COLUMN: METRICS */}
-              <div className="col-span-4 space-y-6">
+              {/* LEFT COLUMN */}
+              <div className="col-span-4 space-y-4">
                 
-                {/* RSR Card */}
-                <div className="p-5 bg-slate-900/40 rounded-2xl border border-slate-800 text-center shadow-inner">
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                    Recent Success Rate (RSR)
-                  </p>
-                  <p className="text-5xl font-black text-white italic">{rsrDisplay}</p>
-                  <p className="text-[9px] text-indigo-400 mt-3 font-bold uppercase italic tracking-widest">
-                    {student.metrics.stallStatus || 'Optimal'}
-                  </p>
-                  <div className="mt-3 pt-3 border-t border-slate-800 text-[9px] text-slate-600">
-                    Last {DRI_CONFIG.RSR_RECENT_TASKS_COUNT} tasks • &gt;{DRI_CONFIG.RSR_SUCCESS_THRESHOLD * 100}% threshold
-                  </div>
-                </div>
-
-                {/* DRI Metrics Grid with expanded labels */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800 group">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">
-                      KSI
-                      <span className="hidden group-hover:inline text-indigo-400 ml-1">(Knowledge Stability)</span>
-                    </div>
-                    <div className={`text-2xl font-black ${
-                      student.metrics.ksi === null ? 'text-slate-600' :
-                      student.metrics.ksi < DRI_CONFIG.KSI_CRITICAL_THRESHOLD ? 'text-red-400' :
-                      student.metrics.ksi < DRI_CONFIG.KSI_LOW_THRESHOLD ? 'text-amber-400' :
-                      'text-blue-400'
-                    }`}>
-                      {student.metrics.ksi !== null ? `${student.metrics.ksi}%` : 'N/A'}
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800 group">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">
-                      Accuracy
-                    </div>
-                    <div className={`text-2xl font-black ${
-                      (student.metrics.accuracyRate || 0) >= 70 ? 'text-emerald-400' :
-                      (student.metrics.accuracyRate || 0) >= 55 ? 'text-amber-400' :
-                      'text-red-400'
-                    }`}>
-                      {student.metrics.accuracyRate || 0}%
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800 group">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">
-                      DER
-                      <span className="hidden group-hover:inline text-indigo-400 ml-1">(Debt Exposure)</span>
-                    </div>
-                    {student.dri.debtExposure !== null ? (
-                      <div className={`text-2xl font-black ${
-                        student.dri.debtExposure > DRI_CONFIG.DER_SEVERE_THRESHOLD ? 'text-red-400' :
-                        student.dri.debtExposure > DRI_CONFIG.DER_CRITICAL_THRESHOLD ? 'text-amber-400' : 
-                        'text-emerald-400'
-                      }`}>
-                        {student.dri.debtExposure}%
-                      </div>
-                    ) : (
-                      <div className="text-sm text-slate-600">No data</div>
-                    )}
-                  </div>
-                  
-                  <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800 group">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">
-                      PDI
-                      <span className="hidden group-hover:inline text-indigo-400 ml-1">(Precision Decay)</span>
-                    </div>
-                    {student.dri.precisionDecay !== null ? (
-                      <div className={`text-2xl font-black ${
-                        student.dri.precisionDecay > DRI_CONFIG.PDI_SEVERE_THRESHOLD ? 'text-red-400' :
-                        student.dri.precisionDecay > DRI_CONFIG.PDI_CRITICAL_THRESHOLD ? 'text-amber-400' : 
-                        'text-emerald-400'
-                      }`}>
-                        {student.dri.precisionDecay}x
-                      </div>
-                    ) : (
-                      <div className="text-sm text-slate-600">No data</div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Ready to Accelerate */}
-                <div className="bg-indigo-950/20 border border-indigo-500/30 p-5 rounded-2xl">
-                  <h3 className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-3 italic flex items-center gap-2">
-                    <span>⚡ Ready to Accelerate</span>
-                    <span className="px-2 py-0.5 bg-indigo-500/20 rounded text-indigo-300">
-                      {readyToAccelerate.length}
-                    </span>
-                  </h3>
-                  <div className="space-y-2">
-                    {readyToAccelerate.length > 0 ? readyToAccelerate.map((topic: string, idx: number) => (
-                      <div key={idx} className="flex items-center gap-2 p-2 bg-indigo-900/20 rounded-lg border border-indigo-500/10">
-                        <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
-                        <span className="text-[10px] font-bold text-indigo-200 uppercase truncate italic">{topic}</span>
-                      </div>
-                    )) : (
-                      <p className="text-[10px] text-slate-600 italic font-bold text-center py-4">
-                        Consolidating foundation...
+                {/* Primary Metrics */}
+                <CollapsibleSection title="Primary Metrics" icon="📈" defaultOpen={true}>
+                  <div className="space-y-3">
+                    {/* RSR Card */}
+                    <div className="p-4 bg-slate-900/40 rounded-xl text-center">
+                      <Tooltip content={METRIC_INFO.rsr.desc}>
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 cursor-help">
+                          RSR (Recent Success Rate)
+                        </p>
+                      </Tooltip>
+                      <p className="text-4xl font-black text-white italic">{rsrDisplay}</p>
+                      <p className="text-[8px] text-indigo-400 mt-1 font-bold uppercase italic">
+                        {student.metrics.stallStatus || 'Optimal'}
                       </p>
-                    )}
-                  </div>
-                </div>
+                    </div>
 
-                {/* Struggle Topics */}
-                {struggleTopics.length > 0 && (
-                  <div className="bg-red-950/20 border border-red-500/30 p-5 rounded-2xl">
-                    <h3 className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-3 italic flex items-center gap-2">
-                      <span>🚨 Needs Intervention</span>
-                      <span className="px-2 py-0.5 bg-red-500/20 rounded text-red-300">
-                        {struggleTopics.length}
-                      </span>
-                    </h3>
-                    <div className="space-y-2">
-                      {struggleTopics.map((topic: string, idx: number) => (
-                        <div key={idx} className="flex items-center gap-2 p-2 bg-red-900/20 rounded-lg border border-red-500/10">
-                          <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-                          <span className="text-[10px] font-bold text-red-200 uppercase truncate italic">{topic}</span>
+                    {/* Mini Metrics Grid */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Tooltip content={METRIC_INFO.ksi.desc}>
+                        <div className="p-3 bg-slate-900/40 rounded-xl cursor-help">
+                          <div className="text-[8px] text-slate-500 uppercase">KSI</div>
+                          <div className={`text-lg font-black ${
+                            student.metrics.ksi === null ? 'text-slate-600' :
+                            student.metrics.ksi < DRI_CONFIG.KSI_CRITICAL_THRESHOLD ? 'text-red-400' :
+                            'text-blue-400'
+                          }`}>
+                            {student.metrics.ksi !== null ? `${student.metrics.ksi}%` : 'N/A'}
+                          </div>
                         </div>
-                      ))}
+                      </Tooltip>
+                      
+                      <Tooltip content={METRIC_INFO.accuracy.desc}>
+                        <div className="p-3 bg-slate-900/40 rounded-xl cursor-help">
+                          <div className="text-[8px] text-slate-500 uppercase">Accuracy</div>
+                          <div className={`text-lg font-black ${
+                            (student.metrics.accuracyRate || 0) >= 70 ? 'text-emerald-400' : 'text-amber-400'
+                          }`}>
+                            {student.metrics.accuracyRate || 0}%
+                          </div>
+                        </div>
+                      </Tooltip>
                     </div>
                   </div>
-                )}
+                </CollapsibleSection>
+
+                {/* Risk Factors */}
+                <CollapsibleSection title="Risk Factors" icon="⚠️" defaultOpen={student.dri.driTier !== 'GREEN'}>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Tooltip content={METRIC_INFO.der.desc}>
+                      <div className="p-3 bg-slate-900/40 rounded-xl cursor-help">
+                        <div className="text-[8px] text-slate-500 uppercase">DER</div>
+                        {student.dri.debtExposure !== null ? (
+                          <div className={`text-lg font-black ${
+                            student.dri.debtExposure > DRI_CONFIG.DER_SEVERE_THRESHOLD ? 'text-red-400' :
+                            student.dri.debtExposure > DRI_CONFIG.DER_CRITICAL_THRESHOLD ? 'text-amber-400' : 
+                            'text-emerald-400'
+                          }`}>
+                            {student.dri.debtExposure}%
+                          </div>
+                        ) : (
+                          <div className="text-sm text-slate-600">N/A</div>
+                        )}
+                      </div>
+                    </Tooltip>
+                    
+                    <Tooltip content={METRIC_INFO.pdi.desc}>
+                      <div className="p-3 bg-slate-900/40 rounded-xl cursor-help">
+                        <div className="text-[8px] text-slate-500 uppercase">PDI</div>
+                        {student.dri.precisionDecay !== null ? (
+                          <div className={`text-lg font-black ${
+                            student.dri.precisionDecay > DRI_CONFIG.PDI_SEVERE_THRESHOLD ? 'text-red-400' :
+                            student.dri.precisionDecay > DRI_CONFIG.PDI_CRITICAL_THRESHOLD ? 'text-amber-400' : 
+                            'text-emerald-400'
+                          }`}>
+                            {student.dri.precisionDecay}x
+                          </div>
+                        ) : (
+                          <div className="text-sm text-slate-600">N/A</div>
+                        )}
+                      </div>
+                    </Tooltip>
+
+                    <Tooltip content={METRIC_INFO.focus.desc}>
+                      <div className="p-3 bg-slate-900/40 rounded-xl cursor-help">
+                        <div className="text-[8px] text-slate-500 uppercase">Focus</div>
+                        <div className="text-lg font-black text-purple-300">
+                          {student.metrics.focusIntegrity}%
+                        </div>
+                      </div>
+                    </Tooltip>
+                    
+                    <Tooltip content={METRIC_INFO.iroi.desc}>
+                      <div className="p-3 bg-slate-900/40 rounded-xl cursor-help">
+                        <div className="text-[8px] text-slate-500 uppercase">iROI</div>
+                        {student.dri.iROI !== null ? (
+                          <div className="text-lg font-black text-cyan-300">
+                            {student.dri.iROI}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-slate-600">N/A</div>
+                        )}
+                      </div>
+                    </Tooltip>
+                  </div>
+                </CollapsibleSection>
+
+                {/* Topics */}
+                <CollapsibleSection 
+                  title="Topics Analysis" 
+                  icon="📚" 
+                  defaultOpen={true}
+                  badge={readyToAccelerate.length + struggleTopics.length}
+                >
+                  <div className="space-y-3">
+                    {/* Ready to Accelerate */}
+                    <div className="bg-indigo-950/20 border border-indigo-500/30 p-3 rounded-xl">
+                      <h4 className="text-[8px] font-black text-indigo-400 uppercase mb-2">⚡ Ready to Accelerate</h4>
+                      {readyToAccelerate.length > 0 ? readyToAccelerate.map((topic: string, idx: number) => (
+                        <div key={idx} className="flex items-center gap-2 p-1.5 bg-indigo-900/20 rounded mb-1">
+                          <div className="w-1 h-1 bg-indigo-500 rounded-full" />
+                          <span className="text-[9px] font-bold text-indigo-200 uppercase truncate">{topic}</span>
+                        </div>
+                      )) : (
+                        <p className="text-[9px] text-slate-600 italic text-center py-2">Consolidating...</p>
+                      )}
+                    </div>
+
+                    {/* Struggle Topics */}
+                    {struggleTopics.length > 0 && (
+                      <div className="bg-red-950/20 border border-red-500/30 p-3 rounded-xl">
+                        <h4 className="text-[8px] font-black text-red-400 uppercase mb-2">🚨 Needs Help</h4>
+                        {struggleTopics.map((topic: string, idx: number) => (
+                          <div key={idx} className="flex items-center gap-2 p-1.5 bg-red-900/20 rounded mb-1">
+                            <div className="w-1 h-1 bg-red-500 rounded-full" />
+                            <span className="text-[9px] font-bold text-red-200 uppercase truncate">{topic}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CollapsibleSection>
               </div>
 
               {/* RIGHT COLUMN: CHARTS */}
-              <div className="col-span-8 space-y-6">
+              <div className="col-span-8 space-y-4">
                 
                 {/* Precision Curve */}
-                <div className="bg-slate-900/20 rounded-2xl border border-slate-800 p-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] italic">
-                      Precision Curve
-                    </h3>
-                    {chartData.length >= 5 && student.dri.precisionDecay && (
-                      <div className="text-[10px] font-mono">
-                        PDI: 
-                        <span className={`ml-2 font-bold ${
-                          student.dri.precisionDecay > DRI_CONFIG.PDI_SEVERE_THRESHOLD ? 'text-red-400' :
-                          student.dri.precisionDecay > DRI_CONFIG.PDI_CRITICAL_THRESHOLD ? 'text-amber-400' :
-                          'text-emerald-400'
-                        }`}>
-                          {student.dri.precisionDecay}x
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <ResponsiveContainer width="100%" height={200}>
+                <CollapsibleSection title="Precision Curve" icon="📉" defaultOpen={true}>
+                  <ResponsiveContainer width="100%" height={180}>
                     <LineChart data={chartData} margin={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
                       <XAxis 
                         dataKey="i" 
                         stroke="#475569" 
-                        fontSize={10} 
-                        label={{ value: 'Session #', position: 'insideBottom', offset: -5, fill: '#64748b' }} 
+                        fontSize={9} 
                       />
                       <YAxis 
                         domain={[0, 110]} 
-                        ticks={[0, 25, 50, 75, 100]} 
+                        ticks={[0, 50, 100]} 
                         stroke="#475569" 
-                        fontSize={10} 
-                        label={{ value: 'Accuracy %', angle: -90, position: 'insideLeft', fill: '#64748b' }} 
+                        fontSize={9} 
                       />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '15px' }}
-                        labelFormatter={(value) => `Session ${value}`}
+                      <RechartsTooltip 
+                        contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '10px', fontSize: '10px' }}
                         formatter={(value: any) => [`${value}%`, 'Accuracy']}
                       />
                       <Line 
                         type="monotone" 
                         dataKey="acc" 
                         stroke="#6366f1" 
-                        strokeWidth={3} 
-                        dot={{ r: 4, fill: '#6366f1' }} 
-                        activeDot={{ r: 8 }} 
+                        strokeWidth={2} 
+                        dot={{ r: 3, fill: '#6366f1' }} 
                       />
                     </LineChart>
                   </ResponsiveContainer>
-                </div>
+                </CollapsibleSection>
 
-                {/* Weekly Activity Pattern */}
-                <div className="bg-slate-900/20 rounded-2xl border border-slate-800 p-6">
-                  <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] italic mb-4">
-                    Weekly Activity Pattern
-                  </h3>
-                  
-                  <ResponsiveContainer width="100%" height={150}>
+                {/* Weekly Activity */}
+                <CollapsibleSection title="Weekly Pattern" icon="📅" defaultOpen={false}>
+                  <ResponsiveContainer width="100%" height={120}>
                     <BarChart data={weeklyPattern} margin={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" />
-                      <XAxis dataKey="day" stroke="#475569" fontSize={10} />
-                      <YAxis 
-                        stroke="#475569" 
-                        fontSize={10}
-                        label={{ value: 'XP Earned', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                      <XAxis dataKey="day" stroke="#475569" fontSize={9} />
+                      <YAxis stroke="#475569" fontSize={9} />
+                      <RechartsTooltip 
+                        contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '10px', fontSize: '10px' }}
+                        formatter={(value: any) => [`${value} XP`, 'Earned']}
                       />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '15px' }}
-                        formatter={(value: any, name: string) => {
-                          if (name === 'xp') return [`${value} XP`, 'Earned'];
-                          if (name === 'tasks') return [`${value} tasks`, 'Completed'];
-                          return [value, name];
-                        }}
-                      />
-                      <Bar dataKey="xp" fill="#6366f1" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="xp" fill="#6366f1" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
-                  
-                  <div className="mt-3 flex justify-between text-[9px] text-slate-600">
-                    <span>Total weekly XP: <span className="text-indigo-400 font-bold">{weeklyPattern.reduce((sum, d) => sum + d.xp, 0)}</span></span>
-                    <span>Avg per active day: <span className="text-emerald-400 font-bold">
-                      {Math.round(weeklyPattern.reduce((sum, d) => sum + d.xp, 0) / (weeklyPattern.filter(d => d.tasks > 0).length || 1))}
-                    </span></span>
+                  <div className="mt-2 flex justify-between text-[8px] text-slate-600">
+                    <span>Total: <span className="text-indigo-400 font-bold">{weeklyPattern.reduce((sum, d) => sum + d.xp, 0)} XP</span></span>
+                    <span>Active days: <span className="text-emerald-400 font-bold">{weeklyPattern.filter(d => d.tasks > 0).length}/7</span></span>
                   </div>
-                </div>
-
-                {/* Quick Stats */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl group">
-                    <div className="text-[9px] text-purple-400 uppercase tracking-wider mb-1">
-                      Focus
-                      <span className="hidden group-hover:inline text-purple-300 ml-1">(Integrity)</span>
-                    </div>
-                    <div className="text-2xl font-black text-purple-300">
-                      {student.metrics.focusIntegrity}%
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-xl group">
-                    <div className="text-[9px] text-cyan-400 uppercase tracking-wider mb-1">
-                      iROI
-                      <span className="hidden group-hover:inline text-cyan-300 ml-1">(Investment ROI)</span>
-                    </div>
-                    {student.dri.iROI !== null ? (
-                      <div className="text-2xl font-black text-cyan-300">
-                        {student.dri.iROI}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-slate-600">N/A</div>
-                    )}
-                  </div>
-                  
-                  <div className="p-4 bg-pink-500/10 border border-pink-500/30 rounded-xl">
-                    <div className="text-[9px] text-pink-400 uppercase tracking-wider mb-1">Sessions</div>
-                    <div className="text-2xl font-black text-pink-300">
-                      {tasks.length}
-                    </div>
-                  </div>
-                </div>
+                </CollapsibleSection>
               </div>
             </div>
           )}
@@ -496,36 +493,27 @@ export default function StudentModal({
           {/* HISTORY TAB */}
           {activeTab === 'history' && (
             <div className="bg-slate-900/10 rounded-2xl border border-slate-800 overflow-hidden">
-              <div className="p-4 bg-slate-900/40 border-b border-slate-800 flex justify-between items-center sticky top-0 z-10">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  Session History
-                </span>
-                <span className="text-[9px] text-slate-600 font-mono">
-                  {sortedData.length} total sessions
-                </span>
-              </div>
-              
-              <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
+              <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
                 <table className="w-full text-left border-collapse">
                   <thead className="sticky top-0 bg-[#080808] z-10">
                     <tr className="text-[9px] font-black text-slate-600 uppercase border-b border-slate-800">
-                      <th className="p-4">Date</th>
-                      <th className="p-4">Topic / Concept</th>
-                      <th className="p-4 text-center">Accuracy</th>
-                      <th className="p-4 text-center">Items</th>
-                      <th className="p-4 text-center">Time</th>
-                      <th className="p-4 text-center">XP</th>
+                      <th className="p-3">Date</th>
+                      <th className="p-3">Topic</th>
+                      <th className="p-3 text-center">Acc</th>
+                      <th className="p-3 text-center">Items</th>
+                      <th className="p-3 text-center">Time</th>
+                      <th className="p-3 text-center">XP</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/50">
                     {sortedData.map((task: any, idx: number) => (
                       <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
-                        <td className="p-4 text-[10px] font-mono text-slate-500">{task.date}</td>
-                        <td className="p-4 text-[11px] font-bold text-slate-300 uppercase italic truncate max-w-[300px]">
+                        <td className="p-3 text-[10px] font-mono text-slate-500">{task.date}</td>
+                        <td className="p-3 text-[10px] font-bold text-slate-300 uppercase italic truncate max-w-[200px]">
                           {task.topic}
                         </td>
-                        <td className="p-4 text-center">
-                          <span className={`text-[10px] font-mono font-black px-2 py-1 rounded ${
+                        <td className="p-3 text-center">
+                          <span className={`text-[9px] font-mono font-black px-2 py-0.5 rounded ${
                             task.acc >= 80 ? 'bg-emerald-500/20 text-emerald-400' : 
                             task.acc >= 50 ? 'bg-amber-500/20 text-amber-400' : 
                             'bg-red-500/20 text-red-400'
@@ -533,13 +521,13 @@ export default function StudentModal({
                             {task.acc}%
                           </span>
                         </td>
-                        <td className="p-4 text-center text-[10px] font-mono text-slate-500">
-                          {task.correct} / {task.questions}
+                        <td className="p-3 text-center text-[9px] font-mono text-slate-500">
+                          {task.correct}/{task.questions}
                         </td>
-                        <td className="p-4 text-center text-[10px] font-mono text-indigo-400">
-                          {task.time} min
+                        <td className="p-3 text-center text-[9px] font-mono text-indigo-400">
+                          {task.time}m
                         </td>
-                        <td className="p-4 text-center text-[10px] font-mono text-purple-400 font-bold">
+                        <td className="p-3 text-center text-[9px] font-mono text-purple-400 font-bold">
                           {task.xp}
                         </td>
                       </tr>
