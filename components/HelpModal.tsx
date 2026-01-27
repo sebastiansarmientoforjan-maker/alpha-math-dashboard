@@ -52,6 +52,7 @@ export default function HelpModal({ onClose }: HelpModalProps) {
                 { key: '?', action: 'Open this help modal' },
                 { key: 'Esc', action: 'Close modal / dialog' },
                 { key: '← →', action: 'Navigate students in modal' },
+                { key: 'h', action: 'Toggle compact header' },
               ].map(({ key, action }) => (
                 <div key={key} className="flex items-center gap-3 p-3 bg-slate-900/40 rounded-xl border border-slate-800">
                   <kbd className="bg-slate-800 text-indigo-400 px-2 py-1 rounded text-xs font-mono font-bold min-w-[40px] text-center">
