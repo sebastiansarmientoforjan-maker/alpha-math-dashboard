@@ -9,17 +9,14 @@ import HelpModal from '@/components/HelpModal';
 import BulkActionsBar from '@/components/BulkActionsBar';
 import Tooltip from '@/components/Tooltip';
 import AlertsDropdown from '@/components/AlertsDropdown';
+import LogViewWithTabs from '@/components/LogViewWithTabs';
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
 import { DRI_CONFIG } from '@/lib/dri-config';
 import { Student } from '@/types';
 import { TOPIC_GRADE_MAP } from '@/lib/grade-maps';
 import { formatDistanceToNow } from 'date-fns';
-import LogViewWithTabs from '@/components/LogViewWithTabs'
 
-// ==========================================
-// METRIC DEFINITIONS FOR TOOLTIPS
-// ==========================================
 const METRIC_TOOLTIPS = {
   rsr: 'Recent Success Rate: Proportion of recent tasks with >80% accuracy',
   ksi: 'Knowledge Stability Index: Consistency of performance over time',
@@ -32,9 +29,6 @@ const METRIC_TOOLTIPS = {
   focus: 'Focus Integrity: Measure of sustained attention during sessions',
 };
 
-// ==========================================
-// METRIC CARD COMPONENT WITH TOOLTIP
-// ==========================================
 interface MetricCardProps {
   title: string;
   value: string | number;
@@ -81,9 +75,6 @@ function MetricCard({ title, value, color, subtitle, tooltip, trend }: MetricCar
   );
 }
 
-// ==========================================
-// STUDENT CARD MEMOIZED WITH SELECTION
-// ==========================================
 interface StudentCardProps {
   student: Student;
   onClick: () => void;
@@ -181,9 +172,6 @@ const StudentCard = memo(({ student, onClick, borderColor, isSelected, onSelect,
 
 StudentCard.displayName = 'StudentCard';
 
-// ==========================================
-// COLUMN LOADING SKELETON
-// ==========================================
 function ColumnSkeleton() {
   return (
     <div className="space-y-3 animate-pulse">
@@ -194,9 +182,6 @@ function ColumnSkeleton() {
   );
 }
 
-// ==========================================
-// ERROR BANNER COMPONENT
-// ==========================================
 interface ErrorBannerProps {
   message: string;
   onRetry: () => void;
@@ -207,65 +192,30 @@ function ErrorBanner({ message, onRetry, onDismiss }: ErrorBannerProps) {
   return (
     <div className="bg-red-900/30 border border-red-500/50 px-4 py-3 rounded-xl flex items-center justify-between gap-4 animate-in slide-in-from-top duration-300">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center text-red-400">
-          ⚠️
-        </div>
+        <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center text-red-400">⚠️</div>
         <div>
           <p className="text-sm font-bold text-red-400">{message}</p>
           <p className="text-[10px] text-red-400/70">Check your connection and try again</p>
         </div>
       </div>
       <div className="flex gap-2">
-        <button 
-          onClick={onRetry}
-          className="px-4 py-2 bg-red-500 hover:bg-red-400 text-white text-[10px] font-black uppercase rounded-lg transition-colors"
-        >
-          ↻ Retry
-        </button>
-        <button 
-          onClick={onDismiss}
-          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] font-black uppercase rounded-lg transition-colors"
-        >
-          ✕
-        </button>
+        <button onClick={onRetry} className="px-4 py-2 bg-red-500 hover:bg-red-400 text-white text-[10px] font-black uppercase rounded-lg transition-colors">↻ Retry</button>
+        <button onClick={onDismiss} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] font-black uppercase rounded-lg transition-colors">✕</button>
       </div>
     </div>
   );
 }
 
-// ==========================================
-// COMPACT HEADER TOGGLE
-// ==========================================
 function CompactHeader({ isCompact, onToggle }: { isCompact: boolean; onToggle: () => void; }) {
   return (
-    <button
-      onClick={onToggle}
-      className="text-[9px] text-slate-600 hover:text-slate-400 transition-colors flex items-center gap-1"
-      title={isCompact ? "Expand header" : "Compact header"}
-    >
+    <button onClick={onToggle} className="text-[9px] text-slate-600 hover:text-slate-400 transition-colors flex items-center gap-1" title={isCompact ? "Expand header" : "Compact header"}>
       {isCompact ? '⊞ Expand' : '⊟ Compact'}
     </button>
   );
 }
 
-// ==========================================
-// ACTIVE FILTERS INDICATOR
-// ==========================================
-function ActiveFiltersIndicator({ 
-  search, 
-  course, 
-  onClearSearch, 
-  onClearCourse,
-  onClearAll
-}: { 
-  search: string; 
-  course: string; 
-  onClearSearch: () => void; 
-  onClearCourse: () => void;
-  onClearAll: () => void;
-}) {
+function ActiveFiltersIndicator({ search, course, onClearSearch, onClearCourse, onClearAll }: { search: string; course: string; onClearSearch: () => void; onClearCourse: () => void; onClearAll: () => void; }) {
   if (!search && course === 'ALL') return null;
-
   return (
     <div className="flex items-center gap-2 text-[9px] bg-slate-900/40 px-3 py-2 rounded-xl border border-slate-800">
       <span className="text-slate-500">Active filters:</span>
@@ -281,20 +231,11 @@ function ActiveFiltersIndicator({
           <button onClick={onClearCourse} className="hover:text-white ml-1 text-[8px]">✕</button>
         </span>
       )}
-      <button 
-        onClick={onClearAll}
-        className="text-slate-500 hover:text-slate-300 ml-2"
-        title="Clear all filters (c)"
-      >
-        Clear all
-      </button>
+      <button onClick={onClearAll} className="text-slate-500 hover:text-slate-300 ml-2" title="Clear all filters (c)">Clear all</button>
     </div>
   );
 }
 
-// ==========================================
-// MAIN COMPONENT
-// ==========================================
 export default function HomePage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
@@ -307,111 +248,48 @@ export default function HomePage() {
   const [batchStatus, setBatchStatus] = useState({ current: 0, total: 33, lastStudent: '' });
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedStudentIndex, setSelectedStudentIndex] = useState<number>(-1);
-  
-  // Column refresh states
   const [refreshingColumns, setRefreshingColumns] = useState<Set<string>>(new Set());
-  
-  // Bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
-  
-  // Help Modal
   const [showHelp, setShowHelp] = useState(false);
-  
-  // Compact header mode
   const [compactHeader, setCompactHeader] = useState(false);
-  
-  // ETA Tracking
   const [syncStartTime, setSyncStartTime] = useState<number | null>(null);
   const [eta, setEta] = useState<number | null>(null);
   const [avgBatchTime, setAvgBatchTime] = useState<number | null>(null);
   const [isPaused, setIsPaused] = useState(false);
-  
   const [viewMode, setViewMode] = useState<'TRIAGE' | 'MATRIX' | 'HEATMAP' | 'LOG'>('TRIAGE');
-  
-  // ==========================================
-  // PERSISTENT FILTERS - These persist across view changes
-  // ==========================================
   const [search, setSearch] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('ALL');
 
-  // ==========================================
-  // KEYBOARD SHORTCUTS
-  // ==========================================
   useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key === '1' && !selectedStudent) setViewMode('TRIAGE');
       if (e.key === '2' && !selectedStudent) setViewMode('MATRIX');
       if (e.key === '3' && !selectedStudent) setViewMode('HEATMAP');
       if (e.key === '4' && !selectedStudent) setViewMode('LOG');
-      
       if (e.key === 'Escape') {
-        if (selectedStudent) {
-          setSelectedStudent(null);
-          setSelectedStudentIndex(-1);
-        } else if (selectionMode) {
-          setSelectionMode(false);
-          setSelectedIds(new Set());
-        }
+        if (selectedStudent) { setSelectedStudent(null); setSelectedStudentIndex(-1); }
+        else if (selectionMode) { setSelectionMode(false); setSelectedIds(new Set()); }
       }
-      
-      if (e.key === '/' && !selectedStudent) {
-        e.preventDefault();
-        const searchInput = document.querySelector('input[placeholder*="SEARCH"]') as HTMLInputElement;
-        searchInput?.focus();
-      }
-      
-      if (e.key === '?' && !selectedStudent) {
-        e.preventDefault();
-        setShowHelp(true);
-      }
-      
-      // Toggle compact header with 'h'
-      if (e.key === 'h' && !selectedStudent) {
-        setCompactHeader(prev => !prev);
-      }
-      
-      // Clear all filters with 'c'
-      if (e.key === 'c' && !selectedStudent && !e.ctrlKey && !e.metaKey) {
-        if (search || selectedCourse !== 'ALL') {
-          setSearch('');
-          setSelectedCourse('ALL');
-        }
-      }
-      
-      // Bulk select shortcut: Ctrl/Cmd + A
+      if (e.key === '/' && !selectedStudent) { e.preventDefault(); (document.querySelector('input[placeholder*="SEARCH"]') as HTMLInputElement)?.focus(); }
+      if (e.key === '?' && !selectedStudent) { e.preventDefault(); setShowHelp(true); }
+      if (e.key === 'h' && !selectedStudent) setCompactHeader(prev => !prev);
+      if (e.key === 'c' && !selectedStudent && !e.ctrlKey && !e.metaKey) { if (search || selectedCourse !== 'ALL') { setSearch(''); setSelectedCourse('ALL'); } }
       if ((e.ctrlKey || e.metaKey) && e.key === 'a' && viewMode === 'TRIAGE' && !selectedStudent) {
         e.preventDefault();
-        if (!selectionMode) {
-          setSelectionMode(true);
-        }
-        const allIds = new Set(filteredForNavigation.map(s => s.id));
-        setSelectedIds(allIds);
+        if (!selectionMode) setSelectionMode(true);
+        setSelectedIds(new Set(filteredForNavigation.map(s => s.id)));
       }
-      
       if (selectedStudent && filteredForNavigation.length > 0) {
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-          e.preventDefault();
-          navigateStudent('next');
-        }
-        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-          e.preventDefault();
-          navigateStudent('prev');
-        }
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); navigateStudent('next'); }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); navigateStudent('prev'); }
       }
     };
-
     window.addEventListener('keydown', handleKeyboard);
     return () => window.removeEventListener('keydown', handleKeyboard);
   }, [selectedStudent, selectedStudentIndex, selectionMode, viewMode, search, selectedCourse]);
 
-  // ==========================================
-  // FIREBASE LISTENERS
-  // ==========================================
   useEffect(() => {
     const unsubStudents = onSnapshot(query(collection(db, 'students')), (snapshot) => {
       const data = snapshot.docs.map(doc => {
@@ -424,196 +302,88 @@ export default function HomePage() {
       setLoading(false);
       setRefreshingColumns(new Set());
     });
-
-    const unsubLogs = onSnapshot(
-      query(collection(db, 'interventions'), orderBy('createdAt', 'desc'), limit(20)), 
-      (snapshot) => {
-        setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      }
-    );
-
+    const unsubLogs = onSnapshot(query(collection(db, 'interventions'), orderBy('createdAt', 'desc'), limit(20)), (snapshot) => {
+      setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
     return () => { unsubStudents(); unsubLogs(); };
   }, []);
 
-  // ==========================================
-  // BATCH SYNC WITH PREDICTIVE ETA
-  // ==========================================
   const runUpdateBatch = async () => {
     if (updating || isPaused) return;
     setUpdating(true);
     setSyncError(null);
     setRefreshingColumns(new Set(['RED', 'YELLOW', 'GREEN']));
-    
-    if (!syncStartTime) {
-      setSyncStartTime(Date.now());
-    }
-    
+    if (!syncStartTime) setSyncStartTime(Date.now());
     try {
       const res = await fetch('/api/update-students');
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}: ${res.statusText}`);
-      }
-      
+      if (!res.ok) throw new Error(`Server returned ${res.status}: ${res.statusText}`);
       const data = await res.json();
-      
       if (data.success) {
         setProgress(data.progress);
-        setBatchStatus({
-          current: data.currentBatch || Math.ceil(data.nextIndex / 50),
-          total: data.totalBatches || 33,
-          lastStudent: data.lastStudentName || ''
-        });
-        
+        setBatchStatus({ current: data.currentBatch || Math.ceil(data.nextIndex / 50), total: data.totalBatches || 33, lastStudent: data.lastStudentName || '' });
         if (batchStatus.current > 0 && syncStartTime) {
           const elapsedTime = Date.now() - syncStartTime;
           const completedBatches = batchStatus.current;
           const currentAvgTime = elapsedTime / completedBatches;
-          
-          setAvgBatchTime(prev => {
-            if (prev === null) return currentAvgTime;
-            return (prev * 0.7) + (currentAvgTime * 0.3);
-          });
-          
+          setAvgBatchTime(prev => prev === null ? currentAvgTime : (prev * 0.7) + (currentAvgTime * 0.3));
           const remainingBatches = batchStatus.total - completedBatches;
-          const estimatedRemaining = (avgBatchTime || currentAvgTime) * remainingBatches;
-          setEta(Math.ceil(estimatedRemaining / 1000));
+          setEta(Math.ceil((avgBatchTime || currentAvgTime) * remainingBatches / 1000));
         }
-        
-        if (autoSync && data.progress < 100) {
-          setTimeout(runUpdateBatch, 1500);
-        } else if (data.progress >= 100) {
-          setAutoSync(false);
-          setLastSync(new Date());
-          setSyncStartTime(null);
-          setEta(null);
-          setAvgBatchTime(null);
-          setRefreshingColumns(new Set());
-        }
-      } else {
-        throw new Error(data.error || 'Unknown error occurred');
-      }
+        if (autoSync && data.progress < 100) setTimeout(runUpdateBatch, 1500);
+        else if (data.progress >= 100) { setAutoSync(false); setLastSync(new Date()); setSyncStartTime(null); setEta(null); setAvgBatchTime(null); setRefreshingColumns(new Set()); }
+      } else throw new Error(data.error || 'Unknown error occurred');
     } catch (err: any) {
-      const errorMessage = err.message || 'Connection failed';
-      setSyncError(`Sync failed: ${errorMessage}`);
-      setAutoSync(false);
-      setSyncStartTime(null);
-      setEta(null);
-      setRefreshingColumns(new Set());
+      setSyncError(`Sync failed: ${err.message || 'Connection failed'}`);
+      setAutoSync(false); setSyncStartTime(null); setEta(null); setRefreshingColumns(new Set());
     }
-    
     setUpdating(false);
   };
 
-  useEffect(() => { 
-    if (autoSync && !updating && !isPaused) runUpdateBatch(); 
-  }, [autoSync, isPaused]);
+  useEffect(() => { if (autoSync && !updating && !isPaused) runUpdateBatch(); }, [autoSync, isPaused]);
+  useEffect(() => { if (!autoSync) { setSyncStartTime(null); setEta(null); setAvgBatchTime(null); } }, [autoSync]);
 
-  useEffect(() => {
-    if (!autoSync) {
-      setSyncStartTime(null);
-      setEta(null);
-      setAvgBatchTime(null);
-    }
-  }, [autoSync]);
-
-  // ==========================================
-  // STOP SYNC WITH CONFIRMATION
-  // ==========================================
   const handleStopSync = () => {
     if (progress > 0 && progress < 100) {
       const remainingStudents = Math.round((100 - progress) / 100 * 1613);
-      const confirmed = window.confirm(
-        `Sync is ${progress}% complete.\n\nStopping now will leave approximately ${remainingStudents} students with outdated data.\n\nAre you sure you want to stop?`
-      );
-      if (!confirmed) return;
+      if (!window.confirm(`Sync is ${progress}% complete.\n\nStopping now will leave approximately ${remainingStudents} students with outdated data.\n\nAre you sure you want to stop?`)) return;
     }
-    setAutoSync(false);
-    setIsPaused(false);
-    setRefreshingColumns(new Set());
+    setAutoSync(false); setIsPaused(false); setRefreshingColumns(new Set());
   };
 
-  const handleRetrySync = () => {
-    setSyncError(null);
-    setAutoSync(true);
-  };
+  const handleRetrySync = () => { setSyncError(null); setAutoSync(true); };
 
-  // ==========================================
-  // BULK SELECTION HANDLERS
-  // ==========================================
   const handleSelectStudent = useCallback((id: string, selected: boolean) => {
-    setSelectedIds(prev => {
-      const newSet = new Set(prev);
-      if (selected) {
-        newSet.add(id);
-      } else {
-        newSet.delete(id);
-      }
-      return newSet;
-    });
+    setSelectedIds(prev => { const newSet = new Set(prev); selected ? newSet.add(id) : newSet.delete(id); return newSet; });
   }, []);
 
   const handleSelectAll = useCallback((tier: 'RED' | 'YELLOW' | 'GREEN') => {
     const tierStudents = tier === 'RED' ? redZone : tier === 'YELLOW' ? yellowZone : greenZone;
     const tierIds = tierStudents.map(s => s.id);
-    
     setSelectedIds(prev => {
       const newSet = new Set(prev);
       const allSelected = tierIds.every(id => newSet.has(id));
-      
-      if (allSelected) {
-        tierIds.forEach(id => newSet.delete(id));
-      } else {
-        tierIds.forEach(id => newSet.add(id));
-      }
+      tierIds.forEach(id => allSelected ? newSet.delete(id) : newSet.add(id));
       return newSet;
     });
   }, []);
 
-  const handleClearSelection = useCallback(() => {
-    setSelectedIds(new Set());
-    setSelectionMode(false);
-  }, []);
+  const handleClearSelection = useCallback(() => { setSelectedIds(new Set()); setSelectionMode(false); }, []);
 
   const handleExportSelected = useCallback(() => {
     const selectedStudents = students.filter(s => selectedIds.has(s.id));
     const csvContent = [
       ['ID', 'Name', 'Course', 'RSR', 'KSI', 'Velocity', 'Risk Score', 'Tier'].join(','),
-      ...selectedStudents.map(s => [
-        s.id,
-        `${s.firstName} ${s.lastName}`,
-        s.currentCourse?.name || 'N/A',
-        `${(s.metrics.lmp * 100).toFixed(0)}%`,
-        s.metrics.ksi !== null ? `${s.metrics.ksi}%` : 'N/A',
-        `${s.metrics.velocityScore}%`,
-        s.dri.riskScore || 'N/A',
-        s.dri.driTier
-      ].join(','))
+      ...selectedStudents.map(s => [s.id, `${s.firstName} ${s.lastName}`, s.currentCourse?.name || 'N/A', `${(s.metrics.lmp * 100).toFixed(0)}%`, s.metrics.ksi !== null ? `${s.metrics.ksi}%` : 'N/A', `${s.metrics.velocityScore}%`, s.dri.riskScore || 'N/A', s.dri.driTier].join(','))
     ].join('\n');
-
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `students-export-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+    const a = document.createElement('a'); a.href = url; a.download = `students-export-${new Date().toISOString().split('T')[0]}.csv`; a.click();
     URL.revokeObjectURL(url);
   }, [selectedIds, students]);
 
-  // ==========================================
-  // FILTER HANDLERS
-  // ==========================================
-  const clearFilters = useCallback(() => {
-    setSearch('');
-    setSelectedCourse('ALL');
-  }, []);
+  const clearFilters = useCallback(() => { setSearch(''); setSelectedCourse('ALL'); }, []);
 
-  // ==========================================
-  // COMPUTED DATA
-  // ==========================================
-  const uniqueCourses = useMemo(() => 
-    Array.from(new Set(students.map(s => s.currentCourse?.name).filter(Boolean))).sort(), 
-  [students]);
-  
+  const uniqueCourses = useMemo(() => Array.from(new Set(students.map(s => s.currentCourse?.name).filter(Boolean))).sort(), [students]);
   const criticalTopics = Object.keys(TOPIC_GRADE_MAP);
 
   const heatmapData = useMemo(() => {
@@ -623,15 +393,11 @@ export default function HomePage() {
         const avgLMP = relevant.reduce((acc, s) => acc + (s.metrics?.lmp || 0), 0) / Math.max(1, relevant.length);
         return { course, avgLMP };
       });
-      const criticalCourses = courseStats.filter(c => c.avgLMP < 0.4).length;
-      return { topic, courseStats, criticalCourses };
+      return { topic, courseStats, criticalCourses: courseStats.filter(c => c.avgLMP < 0.4).length };
     });
     return data.sort((a, b) => b.criticalCourses - a.criticalCourses).slice(0, 15);
   }, [students, uniqueCourses, criticalTopics]);
 
-  // ==========================================
-  // FILTERED DATA - Uses persistent filters
-  // ==========================================
   const filtered = useMemo(() => students.filter(s => {
     const nameMatch = `${s.firstName} ${s.lastName} ${s.id}`.toLowerCase().includes(search.toLowerCase());
     const courseMatch = selectedCourse === 'ALL' || s.currentCourse?.name === selectedCourse;
@@ -641,7 +407,6 @@ export default function HomePage() {
   const redZone = useMemo(() => filtered.filter(s => s.dri.driTier === 'RED'), [filtered]);
   const yellowZone = useMemo(() => filtered.filter(s => s.dri.driTier === 'YELLOW' && !redZone.some(r => r.id === s.id)), [filtered, redZone]);
   const greenZone = useMemo(() => filtered.filter(s => !redZone.some(r => r.id === s.id) && !yellowZone.some(y => y.id === s.id)), [filtered, redZone, yellowZone]);
-
   const filteredForNavigation = useMemo(() => [...redZone, ...yellowZone, ...greenZone], [redZone, yellowZone, greenZone]);
 
   const stats = useMemo(() => ({
@@ -655,278 +420,101 @@ export default function HomePage() {
 
   const trends = { atRisk: -5, attention: 2, onTrack: 3, avgVelocity: -2 };
 
-  // ==========================================
-  // STUDENT NAVIGATION
-  // ==========================================
   const navigateStudent = useCallback((direction: 'prev' | 'next') => {
     if (filteredForNavigation.length === 0) return;
-    
     let newIndex = selectedStudentIndex;
-    
-    if (direction === 'next') {
-      newIndex = selectedStudentIndex < filteredForNavigation.length - 1 
-        ? selectedStudentIndex + 1 
-        : 0;
-    } else {
-      newIndex = selectedStudentIndex > 0 
-        ? selectedStudentIndex - 1 
-        : filteredForNavigation.length - 1;
-    }
-    
+    if (direction === 'next') newIndex = selectedStudentIndex < filteredForNavigation.length - 1 ? selectedStudentIndex + 1 : 0;
+    else newIndex = selectedStudentIndex > 0 ? selectedStudentIndex - 1 : filteredForNavigation.length - 1;
     setSelectedStudentIndex(newIndex);
     setSelectedStudent(filteredForNavigation[newIndex]);
   }, [filteredForNavigation, selectedStudentIndex]);
 
   const handleStudentClick = useCallback((student: Student) => {
-    if (selectionMode) {
-      handleSelectStudent(student.id, !selectedIds.has(student.id));
-    } else {
-      const index = filteredForNavigation.findIndex(s => s.id === student.id);
-      setSelectedStudentIndex(index);
-      setSelectedStudent(student);
-    }
+    if (selectionMode) handleSelectStudent(student.id, !selectedIds.has(student.id));
+    else { setSelectedStudentIndex(filteredForNavigation.findIndex(s => s.id === student.id)); setSelectedStudent(student); }
   }, [filteredForNavigation, selectionMode, selectedIds, handleSelectStudent]);
 
-  const selectedStudentsData = useMemo(() => 
-    students.filter(s => selectedIds.has(s.id)),
-  [students, selectedIds]);
+  const selectedStudentsData = useMemo(() => students.filter(s => selectedIds.has(s.id)), [students, selectedIds]);
 
-  if (loading) return (
-    <div className="p-10 bg-black min-h-screen text-emerald-500 font-mono italic animate-pulse text-center uppercase tracking-widest">
-      DRI COMMAND CENTER INITIALIZING...
-    </div>
-  );
+  if (loading) return <div className="p-10 bg-black min-h-screen text-emerald-500 font-mono italic animate-pulse text-center uppercase tracking-widest">DRI COMMAND CENTER INITIALIZING...</div>;
 
   return (
     <div className="flex flex-col h-screen bg-[#050505] text-slate-300 font-sans overflow-hidden">
-      
-      {/* ========================================== */}
-      {/* HEADER SECTION */}
-      {/* ========================================== */}
       <div className={`flex-shrink-0 p-6 pb-0 space-y-4 transition-all duration-300 ${compactHeader ? 'space-y-2' : ''}`}>
-        
-        {/* ERROR BANNER */}
-        {syncError && (
-          <ErrorBanner 
-            message={syncError}
-            onRetry={handleRetrySync}
-            onDismiss={() => setSyncError(null)}
-          />
-        )}
-        
-        {/* TOP BAR - SIMPLIFIED */}
+        {syncError && <ErrorBanner message={syncError} onRetry={handleRetrySync} onDismiss={() => setSyncError(null)} />}
         <div className={`flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-4 gap-4 ${compactHeader ? 'pb-2' : ''}`}>
           <div className="flex items-center gap-4">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className={`font-black uppercase italic text-white tracking-tighter transition-all ${compactHeader ? 'text-xl' : 'text-3xl'}`}>
-                  DRI COMMAND CENTER
-                </h1>
-                <AlertsDropdown 
-                  onStudentClick={(studentId) => {
-                    const student = students.find(s => s.id === studentId);
-                    if (student) {
-                      const index = filteredForNavigation.findIndex(s => s.id === studentId);
-                      setSelectedStudentIndex(index);
-                      setSelectedStudent(student);
-                    }
-                  }}
-                />
-                <button 
-                  onClick={() => setShowHelp(true)}
-                  className="w-7 h-7 rounded-full border border-slate-700 text-slate-500 hover:text-white hover:border-indigo-500 transition-all flex items-center justify-center text-xs font-bold"
-                  title="Help & Keyboard Shortcuts (?)"
-                >
-                  ?
-                </button>
+                <h1 className={`font-black uppercase italic text-white tracking-tighter transition-all ${compactHeader ? 'text-xl' : 'text-3xl'}`}>DRI COMMAND CENTER</h1>
+                <AlertsDropdown onStudentClick={(studentId) => {
+                  const student = students.find(s => s.id === studentId);
+                  if (student) { setSelectedStudentIndex(filteredForNavigation.findIndex(s => s.id === studentId)); setSelectedStudent(student); }
+                }} />
+                <button onClick={() => setShowHelp(true)} className="w-7 h-7 rounded-full border border-slate-700 text-slate-500 hover:text-white hover:border-indigo-500 transition-all flex items-center justify-center text-xs font-bold" title="Help & Keyboard Shortcuts (?)">?</button>
                 <CompactHeader isCompact={compactHeader} onToggle={() => setCompactHeader(!compactHeader)} />
               </div>
-              
               {!compactHeader && (
                 <>
-                  <p className="text-xs text-indigo-400 font-bold tracking-[0.3em] uppercase">
-                    V5.5 Alpha • {students.length} Students
-                  </p>
-                  
+                  <p className="text-xs text-indigo-400 font-bold tracking-[0.3em] uppercase">V5.5 Alpha • {students.length} Students</p>
                   <div className="flex gap-3 mt-1 text-[9px] text-slate-600 font-mono flex-wrap">
-                    <Tooltip content={METRIC_TOOLTIPS.rsr}>
-                      <span className="cursor-help">RSR: <span className="text-emerald-500 font-bold">{stats.avgRSR}%</span></span>
-                    </Tooltip>
+                    <Tooltip content={METRIC_TOOLTIPS.rsr}><span className="cursor-help">RSR: <span className="text-emerald-500 font-bold">{stats.avgRSR}%</span></span></Tooltip>
                     <span className="text-slate-700">•</span>
                     <span>Std: <span className="text-indigo-500 font-bold">{DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP/wk</span></span>
                   </div>
                 </>
               )}
-              
-              {lastSync && (
-                <p className={`text-emerald-600 font-mono ${compactHeader ? 'text-[8px]' : 'text-[10px] mt-1'}`}>
-                  ✓ Synced {formatDistanceToNow(lastSync, { addSuffix: true })}
-                </p>
-              )}
+              {lastSync && <p className={`text-emerald-600 font-mono ${compactHeader ? 'text-[8px]' : 'text-[10px] mt-1'}`}>✓ Synced {formatDistanceToNow(lastSync, { addSuffix: true })}</p>}
             </div>
           </div>
-          
           <div className="flex flex-col items-end gap-2">
-            {/* VIEW TOGGLE */}
             <div className={`flex bg-slate-900/50 p-1 rounded-xl border border-slate-800 font-black uppercase ${compactHeader ? 'text-[8px]' : 'text-[10px]'}`}>
               {(['TRIAGE', 'MATRIX', 'HEATMAP', 'LOG'] as const).map((m, i) => (
-                <button 
-                  key={m} 
-                  onClick={() => setViewMode(m)} 
-                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
-                    viewMode === m 
-                      ? 'bg-indigo-600 text-white shadow-lg' 
-                      : 'text-slate-500 hover:text-slate-300'
-                  }`}
-                >
-                  {m}
-                  <kbd className={`text-[7px] px-1 rounded ${viewMode === m ? 'bg-indigo-500' : 'bg-slate-800'}`}>{i + 1}</kbd>
+                <button key={m} onClick={() => setViewMode(m)} className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${viewMode === m ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>
+                  {m}<kbd className={`text-[7px] px-1 rounded ${viewMode === m ? 'bg-indigo-500' : 'bg-slate-800'}`}>{i + 1}</kbd>
                 </button>
               ))}
             </div>
-            
-            {/* SYNC STATUS - COMPACT */}
             <div className={`flex gap-3 items-center bg-slate-900/40 px-3 rounded-xl border border-slate-800 relative overflow-hidden ${compactHeader ? 'py-1.5' : 'py-2'}`}>
               {autoSync && <div className="absolute bottom-0 left-0 h-0.5 bg-emerald-500 transition-all duration-700" style={{ width: `${progress}%` }} />}
               <div className="text-[9px] font-mono">
-                <span className="text-white font-bold">{students.length}</span>
-                <span className="text-slate-600">/1613</span>
-                {autoSync && (
-                  <span className="ml-2 text-slate-500">
-                    B{batchStatus.current}/{batchStatus.total}
-                    {eta && <span className="text-indigo-400 ml-1">~{Math.floor(eta / 60)}m</span>}
-                  </span>
-                )}
+                <span className="text-white font-bold">{students.length}</span><span className="text-slate-600">/1613</span>
+                {autoSync && <span className="ml-2 text-slate-500">B{batchStatus.current}/{batchStatus.total}{eta && <span className="text-indigo-400 ml-1">~{Math.floor(eta / 60)}m</span>}</span>}
               </div>
               <div className="flex gap-1">
-                {autoSync && (
-                  <button 
-                    onClick={() => setIsPaused(!isPaused)} 
-                    className="px-2 py-1 rounded text-[8px] bg-slate-800 text-slate-400 hover:bg-slate-700"
-                  >
-                    {isPaused ? '▶' : '⏸'}
-                  </button>
-                )}
-                <button 
-                  onClick={() => autoSync ? handleStopSync() : setAutoSync(true)} 
-                  disabled={updating && !autoSync} 
-                  className={`px-3 py-1 rounded text-[8px] font-black uppercase transition-all ${
-                    autoSync 
-                      ? 'bg-red-900/50 text-red-500 border border-red-500' 
-                      : 'bg-emerald-600 text-white hover:bg-emerald-500'
-                  }`}
-                >
-                  {autoSync ? 'STOP' : 'SYNC'}
-                </button>
+                {autoSync && <button onClick={() => setIsPaused(!isPaused)} className="px-2 py-1 rounded text-[8px] bg-slate-800 text-slate-400 hover:bg-slate-700">{isPaused ? '▶' : '⏸'}</button>}
+                <button onClick={() => autoSync ? handleStopSync() : setAutoSync(true)} disabled={updating && !autoSync} className={`px-3 py-1 rounded text-[8px] font-black uppercase transition-all ${autoSync ? 'bg-red-900/50 text-red-500 border border-red-500' : 'bg-emerald-600 text-white hover:bg-emerald-500'}`}>{autoSync ? 'STOP' : 'SYNC'}</button>
               </div>
             </div>
           </div>
         </div>
-
-        {/* METRICS ROW - COLLAPSIBLE */}
         {!compactHeader && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <MetricCard 
-              title={`🔴 Critical`} 
-              value={stats.atRisk} 
-              color="red" 
-              subtitle={`${((stats.atRisk/stats.total)*100).toFixed(1)}%`} 
-              tooltip="Risk Score ≥ 60, DER > 20%, or RSR < 60%" 
-              trend={trends.atRisk} 
-            />
-            <MetricCard 
-              title={`🟡 Watch`} 
-              value={stats.attention} 
-              color="amber" 
-              subtitle={`${((stats.attention/stats.total)*100).toFixed(1)}%`} 
-              tooltip="Risk Score 35-59, or PDI > 1.5" 
-              trend={trends.attention} 
-            />
-            <MetricCard 
-              title={`🟢 Optimal`} 
-              value={stats.onTrack} 
-              color="emerald" 
-              subtitle={`${((stats.onTrack/stats.total)*100).toFixed(1)}%`} 
-              tooltip="Risk Score < 35 with stable metrics" 
-              trend={trends.onTrack} 
-            />
-            <MetricCard 
-              title="Avg Velocity" 
-              value={`${stats.avgVelocity}%`} 
-              color="purple" 
-              subtitle={`${Math.round((stats.avgVelocity / 100) * DRI_CONFIG.ALPHA_WEEKLY_STANDARD)} XP/wk`} 
-              tooltip={METRIC_TOOLTIPS.velocity}
-              trend={trends.avgVelocity} 
-            />
+            <MetricCard title="🔴 Critical" value={stats.atRisk} color="red" subtitle={`${((stats.atRisk/stats.total)*100).toFixed(1)}%`} tooltip="Risk Score ≥ 60, DER > 20%, or RSR < 60%" trend={trends.atRisk} />
+            <MetricCard title="🟡 Watch" value={stats.attention} color="amber" subtitle={`${((stats.attention/stats.total)*100).toFixed(1)}%`} tooltip="Risk Score 35-59, or PDI > 1.5" trend={trends.attention} />
+            <MetricCard title="🟢 Optimal" value={stats.onTrack} color="emerald" subtitle={`${((stats.onTrack/stats.total)*100).toFixed(1)}%`} tooltip="Risk Score < 35 with stable metrics" trend={trends.onTrack} />
+            <MetricCard title="Avg Velocity" value={`${stats.avgVelocity}%`} color="purple" subtitle={`${Math.round((stats.avgVelocity / 100) * DRI_CONFIG.ALPHA_WEEKLY_STANDARD)} XP/wk`} tooltip={METRIC_TOOLTIPS.velocity} trend={trends.avgVelocity} />
           </div>
         )}
-
-        {/* SEARCH & FILTER ROW */}
         <div className="flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-[280px]">
-            <input 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)} 
-              placeholder="🔎 SEARCH STUDENT..." 
-              className={`w-full bg-slate-900/40 border border-slate-800 rounded-xl px-4 text-sm focus:border-indigo-500 outline-none font-mono transition-all ${compactHeader ? 'py-2' : 'py-3'}`}
-            />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔎 SEARCH STUDENT..." className={`w-full bg-slate-900/40 border border-slate-800 rounded-xl px-4 text-sm focus:border-indigo-500 outline-none font-mono transition-all ${compactHeader ? 'py-2' : 'py-3'}`} />
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded">/</kbd>
           </div>
-          
           {viewMode === 'TRIAGE' && (
-            <button
-              onClick={() => {
-                setSelectionMode(!selectionMode);
-                if (selectionMode) setSelectedIds(new Set());
-              }}
-              className={`px-3 py-2 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all ${
-                selectionMode 
-                  ? 'bg-indigo-600 text-white' 
-                  : 'bg-slate-900 border border-slate-800 text-slate-500 hover:text-white hover:border-indigo-500'
-              }`}
-            >
-              {selectionMode ? '✓ Selecting' : '☐ Select'}
-            </button>
+            <button onClick={() => { setSelectionMode(!selectionMode); if (selectionMode) setSelectedIds(new Set()); }} className={`px-3 py-2 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all ${selectionMode ? 'bg-indigo-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-500 hover:text-white hover:border-indigo-500'}`}>{selectionMode ? '✓ Selecting' : '☐ Select'}</button>
           )}
-          
-          <select 
-            value={selectedCourse} 
-            onChange={(e) => setSelectedCourse(e.target.value)} 
-            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none"
-          >
+          <select value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none">
             <option value="ALL">ALL COURSES</option>
             {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-          
-          {/* Active Filters Indicator */}
-          <ActiveFiltersIndicator
-            search={search}
-            course={selectedCourse}
-            onClearSearch={() => setSearch('')}
-            onClearCourse={() => setSelectedCourse('ALL')}
-            onClearAll={clearFilters}
-          />
+          <ActiveFiltersIndicator search={search} course={selectedCourse} onClearSearch={() => setSearch('')} onClearCourse={() => setSelectedCourse('ALL')} onClearAll={clearFilters} />
         </div>
       </div>
 
-      {/* ========================================== */}
-      {/* BULK ACTIONS BAR */}
-      {/* ========================================== */}
-      {selectionMode && selectedIds.size > 0 && (
-        <BulkActionsBar
-          selectedCount={selectedIds.size}
-          selectedStudents={selectedStudentsData}
-          onClear={handleClearSelection}
-          onExport={handleExportSelected}
-        />
-      )}
+      {selectionMode && selectedIds.size > 0 && <BulkActionsBar selectedCount={selectedIds.size} selectedStudents={selectedStudentsData} onClear={handleClearSelection} onExport={handleExportSelected} />}
 
-      {/* ========================================== */}
-      {/* DYNAMIC CONTENT AREA */}
-      {/* ========================================== */}
       <div className="flex-1 min-h-0 p-6 pt-4">
-        
-        {/* TRIAGE VIEW */}
         {viewMode === 'TRIAGE' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full animate-in fade-in duration-500">
             {[
@@ -937,54 +525,26 @@ export default function HomePage() {
               const isRefreshing = refreshingColumns.has(col.tier);
               const allSelected = col.data.length > 0 && col.data.every(s => selectedIds.has(s.id));
               const someSelected = col.data.some(s => selectedIds.has(s.id));
-              
               return (
                 <div key={col.tier} className="flex flex-col bg-slate-900/20 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl h-full">
                   <div className="flex-shrink-0 p-3 bg-slate-900/40 border-b border-slate-800 font-black text-xs uppercase tracking-widest flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       {selectionMode && (
-                        <button
-                          onClick={() => handleSelectAll(col.tier)}
-                          className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
-                            allSelected 
-                              ? 'bg-indigo-500 border-indigo-500 text-white' 
-                              : someSelected
-                                ? 'bg-indigo-500/50 border-indigo-500 text-white'
-                                : 'border-slate-600 hover:border-indigo-400'
-                          }`}
-                        >
+                        <button onClick={() => handleSelectAll(col.tier)} className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${allSelected ? 'bg-indigo-500 border-indigo-500 text-white' : someSelected ? 'bg-indigo-500/50 border-indigo-500 text-white' : 'border-slate-600 hover:border-indigo-400'}`}>
                           {(allSelected || someSelected) && <span className="text-[8px]">✓</span>}
                         </button>
                       )}
                       <span className="text-slate-300">{col.label}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {isRefreshing && (
-                        <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                      )}
+                      {isRefreshing && <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />}
                       <span className="bg-slate-800 text-slate-500 px-2 py-0.5 rounded text-[9px] font-mono">{col.data.length}</span>
                     </div>
                   </div>
                   <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                    {isRefreshing && col.data.length === 0 ? (
-                      <ColumnSkeleton />
-                    ) : col.data.length === 0 ? (
-                      <div className="text-center py-20 text-slate-600 italic text-xs">
-                        {(search || selectedCourse !== 'ALL') ? 'No students match filters' : 'No students'}
-                      </div>
-                    ) : (
-                      col.data.map(s => (
-                        <StudentCard 
-                          key={s.id} 
-                          student={s} 
-                          onClick={() => handleStudentClick(s)} 
-                          borderColor={col.border}
-                          isSelected={selectedIds.has(s.id)}
-                          onSelect={handleSelectStudent}
-                          selectionMode={selectionMode}
-                        />
-                      ))
-                    )}
+                    {isRefreshing && col.data.length === 0 ? <ColumnSkeleton /> : col.data.length === 0 ? (
+                      <div className="text-center py-20 text-slate-600 italic text-xs">{(search || selectedCourse !== 'ALL') ? 'No students match filters' : 'No students'}</div>
+                    ) : col.data.map(s => <StudentCard key={s.id} student={s} onClick={() => handleStudentClick(s)} borderColor={col.border} isSelected={selectedIds.has(s.id)} onSelect={handleSelectStudent} selectionMode={selectionMode} />)}
                   </div>
                 </div>
               );
@@ -992,25 +552,13 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* MATRIX VIEW */}
-        {viewMode === 'MATRIX' && (
-          <div className="h-full w-full animate-in zoom-in-95 duration-300">
-            <KeenKTMatrix 
-              students={filtered} 
-              onStudentClick={handleStudentClick} 
-            />
-          </div>
-        )}
+        {viewMode === 'MATRIX' && <div className="h-full w-full animate-in zoom-in-95 duration-300"><KeenKTMatrix students={filtered} onStudentClick={handleStudentClick} /></div>}
 
-        {/* HEATMAP VIEW */}
         {viewMode === 'HEATMAP' && (
           <div className="h-full w-full bg-slate-950 border border-slate-800 rounded-[2.5rem] p-8 overflow-hidden flex flex-col shadow-2xl animate-in fade-in duration-500">
             <div className="flex-shrink-0 mb-6 flex justify-between items-end">
               <div>
-                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                  📊 Top 15 Critical Knowledge Components
-                  <span className="px-2 py-0.5 bg-red-900/30 border border-red-500/50 rounded text-[9px] text-red-400 font-black">PRIORITIZED</span>
-                </h3>
+                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">📊 Top 15 Critical Knowledge Components<span className="px-2 py-0.5 bg-red-900/30 border border-red-500/50 rounded text-[9px] text-red-400 font-black">PRIORITIZED</span></h3>
                 <p className="text-[10px] text-slate-600 font-mono mt-1">Sorted by courses with avg RSR &lt; 40%</p>
               </div>
               <div className="flex items-center gap-4 text-[9px] text-slate-600">
@@ -1023,9 +571,7 @@ export default function HomePage() {
                 <thead>
                   <tr>
                     <th className="sticky top-0 left-0 z-20 bg-slate-950 p-3 text-[8px] font-black text-slate-600 uppercase text-left border-b border-slate-800 min-w-[200px]">Component</th>
-                    {uniqueCourses.map(course => (
-                      <th key={course} className="sticky top-0 z-10 bg-slate-950 p-3 text-[8px] font-black text-slate-500 uppercase border-b border-slate-800 min-w-[90px] font-mono">{course}</th>
-                    ))}
+                    {uniqueCourses.map(course => <th key={course} className="sticky top-0 z-10 bg-slate-950 p-3 text-[8px] font-black text-slate-500 uppercase border-b border-slate-800 min-w-[90px] font-mono">{course}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -1033,32 +579,18 @@ export default function HomePage() {
                     <tr key={row.topic} className="hover:bg-slate-900/50 transition-colors group">
                       <td className="sticky left-0 z-10 bg-slate-950 p-3 border-r border-slate-800">
                         <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0 w-16 h-1.5 rounded-full bg-slate-800/50 overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500" style={{ width: `${Math.min((row.criticalCourses / uniqueCourses.length) * 100, 100)}%` }} />
-                          </div>
+                          <div className="flex-shrink-0 w-16 h-1.5 rounded-full bg-slate-800/50 overflow-hidden"><div className="h-full bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500" style={{ width: `${Math.min((row.criticalCourses / uniqueCourses.length) * 100, 100)}%` }} /></div>
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] font-bold text-slate-300 uppercase italic truncate">{row.topic}</span>
-                            {rowIndex < 3 && (
-                              <span className="px-1.5 py-0.5 bg-red-900/40 border border-red-500/60 rounded text-[8px] font-black text-red-300">
-                                #{rowIndex + 1}
-                              </span>
-                            )}
+                            {rowIndex < 3 && <span className="px-1.5 py-0.5 bg-red-900/40 border border-red-500/60 rounded text-[8px] font-black text-red-300">#{rowIndex + 1}</span>}
                           </div>
                         </div>
                       </td>
                       {row.courseStats.map((cell, idx) => (
                         <td key={idx} className="p-2 border border-slate-900">
                           <Tooltip content={`${cell.course}: ${(cell.avgLMP * 100).toFixed(1)}% avg RSR`}>
-                            <div 
-                              className="h-10 rounded-md flex items-center justify-center text-[10px] font-mono font-black transition-all hover:scale-105 cursor-help" 
-                              style={{ 
-                                backgroundColor: cell.avgLMP < 0.4 ? 'rgba(239, 68, 68, 0.2)' : cell.avgLMP < 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.1)', 
-                                border: `1px solid ${cell.avgLMP < 0.4 ? '#ef444433' : cell.avgLMP < 0.7 ? '#f59e0b33' : '#10b98133'}` 
-                              }}
-                            >
-                              <span style={{ color: cell.avgLMP < 0.4 ? '#fca5a5' : cell.avgLMP < 0.7 ? '#fbbf24' : '#6ee7b7' }}>
-                                {(cell.avgLMP * 100).toFixed(0)}%
-                              </span>
+                            <div className="h-10 rounded-md flex items-center justify-center text-[10px] font-mono font-black transition-all hover:scale-105 cursor-help" style={{ backgroundColor: cell.avgLMP < 0.4 ? 'rgba(239, 68, 68, 0.2)' : cell.avgLMP < 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.1)', border: `1px solid ${cell.avgLMP < 0.4 ? '#ef444433' : cell.avgLMP < 0.7 ? '#f59e0b33' : '#10b98133'}` }}>
+                              <span style={{ color: cell.avgLMP < 0.4 ? '#fca5a5' : cell.avgLMP < 0.7 ? '#fbbf24' : '#6ee7b7' }}>{(cell.avgLMP * 100).toFixed(0)}%</span>
                             </div>
                           </Tooltip>
                         </td>
@@ -1071,26 +603,10 @@ export default function HomePage() {
           </div>
         )}
 
-      {/* LOG VIEW */}
-        {viewMode === 'LOG' && (
-        <LogViewWithTabs logs={logs} />
-      )}
+        {viewMode === 'LOG' && <LogViewWithTabs logs={logs} />}
+      </div>
 
-      {/* STUDENT MODAL */}
-      {selectedStudent && (
-        <StudentModal 
-          student={selectedStudent} 
-          onClose={() => {
-            setSelectedStudent(null);
-            setSelectedStudentIndex(-1);
-          }}
-          onNavigate={navigateStudent}
-          currentIndex={selectedStudentIndex}
-          totalStudents={filteredForNavigation.length}
-        />
-      )}
-      
-      {/* HELP MODAL */}
+      {selectedStudent && <StudentModal student={selectedStudent} onClose={() => { setSelectedStudent(null); setSelectedStudentIndex(-1); }} onNavigate={navigateStudent} currentIndex={selectedStudentIndex} totalStudents={filteredForNavigation.length} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
     </div>
   );
