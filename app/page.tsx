@@ -15,6 +15,7 @@ import { DRI_CONFIG } from '@/lib/dri-config';
 import { Student } from '@/types';
 import { TOPIC_GRADE_MAP } from '@/lib/grade-maps';
 import { formatDistanceToNow } from 'date-fns';
+import LogViewWithTabs from '@/components/LogViewWithTabs'
 
 // ==========================================
 // METRIC DEFINITIONS FOR TOOLTIPS
