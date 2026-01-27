@@ -1070,53 +1070,10 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* LOG VIEW */}
+      {/* LOG VIEW */}
         {viewMode === 'LOG' && (
-          <div className="h-full bg-slate-950 border border-slate-800 rounded-[2.5rem] p-8 overflow-y-auto custom-scrollbar animate-in fade-in duration-500 shadow-2xl">
-            <div className="mb-6">
-              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                📝 Recent Coaching Interventions
-                <span className="px-2 py-0.5 bg-indigo-900/30 border border-indigo-500/50 rounded text-[9px] text-indigo-400 font-black">{logs.length}</span>
-              </h3>
-              <p className="text-[10px] text-slate-600 font-mono mt-1">Click a student card to log new interventions</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {logs.map(log => (
-                <div key={log.id} className="p-5 bg-slate-900/30 rounded-2xl border border-slate-800/50 shadow-inner hover:border-slate-700 transition-colors">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full ${log.type === 'coaching' ? 'bg-indigo-500 shadow-[0_0_10px_#6366f1]' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'}`} />
-                      <div>
-                        <p className="text-sm font-black text-white uppercase italic">{log.studentName}</p>
-                        <p className="text-[10px] text-slate-500 font-mono">{log.coachName || 'Unknown Coach'}</p>
-                      </div>
-                    </div>
-                    <div className="text-right text-[9px] font-mono text-slate-700">
-                      {log.createdAt?.seconds ? new Date(log.createdAt.seconds * 1000).toLocaleDateString() : 'Syncing...'}
-                    </div>
-                  </div>
-                  {log.objective && (
-                    <p className="text-[10px] text-indigo-400 font-bold mb-2">{log.objective}</p>
-                  )}
-                  {log.whatWasDone && (
-                    <p className="text-[10px] text-slate-400 line-clamp-2">{log.whatWasDone}</p>
-                  )}
-                  {log.nextSteps && (
-                    <div className="mt-2 pt-2 border-t border-slate-800">
-                      <p className="text-[9px] text-amber-400">→ {log.nextSteps.substring(0, 60)}...</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {logs.length === 0 && (
-                <div className="col-span-2 text-center py-20 text-slate-600 italic text-xs">
-                  No interventions logged yet. Click on a student to start logging coaching sessions.
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+        <LogViewWithTabs logs={logs} />
+      )}
 
       {/* STUDENT MODAL */}
       {selectedStudent && (
