@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import { DRI_CONFIG } from '@/lib/dri-config';
 import Tooltip from '@/components/Tooltip';
 import CoachInterventionModal from '@/components/CoachInterventionModal';
+import TrackImpactModal from '@/components/TrackImpactModal';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
 
@@ -86,6 +87,7 @@ export default function StudentModal({
 }: StudentModalProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'interventions'>('overview');
   const [showInterventionModal, setShowInterventionModal] = useState(false);
+  const [showTrackImpact, setShowTrackImpact] = useState(false);
   const [interventionSaved, setInterventionSaved] = useState(false);
   const [studentInterventions, setStudentInterventions] = useState<any[]>([]);
 
@@ -110,7 +112,7 @@ export default function StudentModal({
   useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
       // Don't handle if intervention modal is open
-      if (showInterventionModal) return;
+      if (showInterventionModal || showTrackImpact) return;
       
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         e.preventDefault();
@@ -131,7 +133,7 @@ export default function StudentModal({
     };
     window.addEventListener('keydown', handleKeyboard);
     return () => window.removeEventListener('keydown', handleKeyboard);
-  }, [onNavigate, onClose, showInterventionModal]);
+  }, [onNavigate, onClose, showInterventionModal, showTrackImpact]);
 
   // Reset saved indicator when student changes
   useEffect(() => {
@@ -276,13 +278,20 @@ export default function StudentModal({
             
             {/* Action Buttons & Navigation */}
             <div className="flex items-center gap-2">
-              {/* Log Intervention Button */}
+              {/* Action Buttons */}
               <button
                 onClick={() => setShowInterventionModal(true)}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase rounded-xl transition-colors flex items-center gap-2"
                 title="Log Intervention (Ctrl+I)"
               >
                 📝 Log Intervention
+              </button>
+              <button
+                onClick={() => setShowTrackImpact(true)}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black uppercase rounded-xl transition-colors flex items-center gap-2"
+                title="Track Impact"
+              >
+                📈 Track Impact
               </button>
               
               {onNavigate && totalStudents > 1 && (
@@ -757,6 +766,15 @@ export default function StudentModal({
           student={student}
           onClose={() => setShowInterventionModal(false)}
           onSuccess={handleInterventionSuccess}
+        />
+      )}
+
+      {/* Track Impact Modal */}
+      {showTrackImpact && (
+        <TrackImpactModal
+          student={student}
+          onClose={() => setShowTrackImpact(false)}
+          onSuccess={() => setShowTrackImpact(false)}
         />
       )}
     </>
