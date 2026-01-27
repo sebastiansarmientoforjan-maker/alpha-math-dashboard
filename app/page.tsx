@@ -234,13 +234,7 @@ function ErrorBanner({ message, onRetry, onDismiss }: ErrorBannerProps) {
 // ==========================================
 // COMPACT HEADER TOGGLE
 // ==========================================
-function CompactHeader({ 
-  isCompact, 
-  onToggle 
-}: { 
-  isCompact: boolean; 
-  onToggle: () => void;
-}) {
+function CompactHeader({ isCompact, onToggle }: { isCompact: boolean; onToggle: () => void; }) {
   return (
     <button
       onClick={onToggle}
@@ -249,6 +243,50 @@ function CompactHeader({
     >
       {isCompact ? '⊞ Expand' : '⊟ Compact'}
     </button>
+  );
+}
+
+// ==========================================
+// ACTIVE FILTERS INDICATOR
+// ==========================================
+function ActiveFiltersIndicator({ 
+  search, 
+  course, 
+  onClearSearch, 
+  onClearCourse,
+  onClearAll
+}: { 
+  search: string; 
+  course: string; 
+  onClearSearch: () => void; 
+  onClearCourse: () => void;
+  onClearAll: () => void;
+}) {
+  if (!search && course === 'ALL') return null;
+
+  return (
+    <div className="flex items-center gap-2 text-[9px] bg-slate-900/40 px-3 py-2 rounded-xl border border-slate-800">
+      <span className="text-slate-500">Active filters:</span>
+      {search && (
+        <span className="px-2 py-0.5 bg-indigo-500/20 border border-indigo-500/30 rounded-full text-indigo-300 flex items-center gap-1">
+          "{search.length > 15 ? search.substring(0, 15) + '...' : search}"
+          <button onClick={onClearSearch} className="hover:text-white ml-1 text-[8px]">✕</button>
+        </span>
+      )}
+      {course !== 'ALL' && (
+        <span className="px-2 py-0.5 bg-purple-500/20 border border-purple-500/30 rounded-full text-purple-300 flex items-center gap-1">
+          {course}
+          <button onClick={onClearCourse} className="hover:text-white ml-1 text-[8px]">✕</button>
+        </span>
+      )}
+      <button 
+        onClick={onClearAll}
+        className="text-slate-500 hover:text-slate-300 ml-2"
+        title="Clear all filters (c)"
+      >
+        Clear all
+      </button>
+    </div>
   );
 }
 
@@ -288,6 +326,10 @@ export default function HomePage() {
   const [isPaused, setIsPaused] = useState(false);
   
   const [viewMode, setViewMode] = useState<'TRIAGE' | 'MATRIX' | 'HEATMAP' | 'LOG'>('TRIAGE');
+  
+  // ==========================================
+  // PERSISTENT FILTERS - These persist across view changes
+  // ==========================================
   const [search, setSearch] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('ALL');
 
@@ -331,6 +373,14 @@ export default function HomePage() {
         setCompactHeader(prev => !prev);
       }
       
+      // Clear all filters with 'c'
+      if (e.key === 'c' && !selectedStudent && !e.ctrlKey && !e.metaKey) {
+        if (search || selectedCourse !== 'ALL') {
+          setSearch('');
+          setSelectedCourse('ALL');
+        }
+      }
+      
       // Bulk select shortcut: Ctrl/Cmd + A
       if ((e.ctrlKey || e.metaKey) && e.key === 'a' && viewMode === 'TRIAGE' && !selectedStudent) {
         e.preventDefault();
@@ -355,7 +405,7 @@ export default function HomePage() {
 
     window.addEventListener('keydown', handleKeyboard);
     return () => window.removeEventListener('keydown', handleKeyboard);
-  }, [selectedStudent, selectedStudentIndex, selectionMode, viewMode]);
+  }, [selectedStudent, selectedStudentIndex, selectionMode, viewMode, search, selectedCourse]);
 
   // ==========================================
   // FIREBASE LISTENERS
@@ -548,6 +598,14 @@ export default function HomePage() {
   }, [selectedIds, students]);
 
   // ==========================================
+  // FILTER HANDLERS
+  // ==========================================
+  const clearFilters = useCallback(() => {
+    setSearch('');
+    setSelectedCourse('ALL');
+  }, []);
+
+  // ==========================================
   // COMPUTED DATA
   // ==========================================
   const uniqueCourses = useMemo(() => 
@@ -569,6 +627,9 @@ export default function HomePage() {
     return data.sort((a, b) => b.criticalCourses - a.criticalCourses).slice(0, 15);
   }, [students, uniqueCourses, criticalTopics]);
 
+  // ==========================================
+  // FILTERED DATA - Uses persistent filters
+  // ==========================================
   const filtered = useMemo(() => students.filter(s => {
     const nameMatch = `${s.firstName} ${s.lastName} ${s.id}`.toLowerCase().includes(search.toLowerCase());
     const courseMatch = selectedCourse === 'ALL' || s.currentCourse?.name === selectedCourse;
@@ -672,7 +733,7 @@ export default function HomePage() {
               {!compactHeader && (
                 <>
                   <p className="text-xs text-indigo-400 font-bold tracking-[0.3em] uppercase">
-                    V5.3 Alpha • {students.length} Students
+                    V5.4 Alpha • {students.length} Students
                   </p>
                   
                   <div className="flex gap-3 mt-1 text-[9px] text-slate-600 font-mono flex-wrap">
@@ -792,6 +853,7 @@ export default function HomePage() {
         <div className="flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-[280px]">
             <input 
+              value={search}
               onChange={(e) => setSearch(e.target.value)} 
               placeholder="🔎 SEARCH STUDENT..." 
               className={`w-full bg-slate-900/40 border border-slate-800 rounded-xl px-4 text-sm focus:border-indigo-500 outline-none font-mono transition-all ${compactHeader ? 'py-2' : 'py-3'}`}
@@ -815,16 +877,23 @@ export default function HomePage() {
             </button>
           )}
           
-          {viewMode !== 'MATRIX' && (
-            <select 
-              value={selectedCourse} 
-              onChange={(e) => setSelectedCourse(e.target.value)} 
-              className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none"
-            >
-              <option value="ALL">ALL COURSES</option>
-              {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          )}
+          <select 
+            value={selectedCourse} 
+            onChange={(e) => setSelectedCourse(e.target.value)} 
+            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none"
+          >
+            <option value="ALL">ALL COURSES</option>
+            {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          
+          {/* Active Filters Indicator */}
+          <ActiveFiltersIndicator
+            search={search}
+            course={selectedCourse}
+            onClearSearch={() => setSearch('')}
+            onClearCourse={() => setSelectedCourse('ALL')}
+            onClearAll={clearFilters}
+          />
         </div>
       </div>
 
@@ -888,7 +957,9 @@ export default function HomePage() {
                     {isRefreshing && col.data.length === 0 ? (
                       <ColumnSkeleton />
                     ) : col.data.length === 0 ? (
-                      <div className="text-center py-20 text-slate-600 italic text-xs">No students</div>
+                      <div className="text-center py-20 text-slate-600 italic text-xs">
+                        {(search || selectedCourse !== 'ALL') ? 'No students match filters' : 'No students'}
+                      </div>
                     ) : (
                       col.data.map(s => (
                         <StudentCard 
@@ -991,21 +1062,46 @@ export default function HomePage() {
         {/* LOG VIEW */}
         {viewMode === 'LOG' && (
           <div className="h-full bg-slate-950 border border-slate-800 rounded-[2.5rem] p-8 overflow-y-auto custom-scrollbar animate-in fade-in duration-500 shadow-2xl">
+            <div className="mb-6">
+              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                📝 Recent Coaching Interventions
+                <span className="px-2 py-0.5 bg-indigo-900/30 border border-indigo-500/50 rounded text-[9px] text-indigo-400 font-black">{logs.length}</span>
+              </h3>
+              <p className="text-[10px] text-slate-600 font-mono mt-1">Click a student card to log new interventions</p>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {logs.map(log => (
-                <div key={log.id} className="flex items-center justify-between p-5 bg-slate-900/30 rounded-2xl border border-slate-800/50 shadow-inner">
-                  <div className="flex items-center gap-5">
-                    <div className={`w-3 h-3 rounded-full ${log.type === 'coaching' ? 'bg-indigo-500 shadow-[0_0_10px_#6366f1]' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'}`} />
-                    <div>
-                      <p className="text-sm font-black text-white uppercase italic">{log.studentName}</p>
-                      <p className="text-[10px] text-slate-500 font-mono">{log.type} • {log.targetTopic || 'General'}</p>
+                <div key={log.id} className="p-5 bg-slate-900/30 rounded-2xl border border-slate-800/50 shadow-inner hover:border-slate-700 transition-colors">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${log.type === 'coaching' ? 'bg-indigo-500 shadow-[0_0_10px_#6366f1]' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'}`} />
+                      <div>
+                        <p className="text-sm font-black text-white uppercase italic">{log.studentName}</p>
+                        <p className="text-[10px] text-slate-500 font-mono">{log.coachName || 'Unknown Coach'}</p>
+                      </div>
+                    </div>
+                    <div className="text-right text-[9px] font-mono text-slate-700">
+                      {log.createdAt?.seconds ? new Date(log.createdAt.seconds * 1000).toLocaleDateString() : 'Syncing...'}
                     </div>
                   </div>
-                  <div className="text-right text-[9px] font-mono text-slate-700">
-                    {log.createdAt?.seconds ? new Date(log.createdAt.seconds * 1000).toLocaleString() : 'Syncing...'}
-                  </div>
+                  {log.objective && (
+                    <p className="text-[10px] text-indigo-400 font-bold mb-2">{log.objective}</p>
+                  )}
+                  {log.whatWasDone && (
+                    <p className="text-[10px] text-slate-400 line-clamp-2">{log.whatWasDone}</p>
+                  )}
+                  {log.nextSteps && (
+                    <div className="mt-2 pt-2 border-t border-slate-800">
+                      <p className="text-[9px] text-amber-400">→ {log.nextSteps.substring(0, 60)}...</p>
+                    </div>
+                  )}
                 </div>
               ))}
+              {logs.length === 0 && (
+                <div className="col-span-2 text-center py-20 text-slate-600 italic text-xs">
+                  No interventions logged yet. Click on a student to start logging coaching sessions.
+                </div>
+              )}
             </div>
           </div>
         )}
