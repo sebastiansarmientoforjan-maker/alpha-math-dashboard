@@ -8,13 +8,13 @@ import StudentModal from '@/components/StudentModal';
 import HelpModal from '@/components/HelpModal';
 import BulkActionsBar from '@/components/BulkActionsBar';
 import Tooltip from '@/components/Tooltip';
+import AlertsDropdown from '@/components/AlertsDropdown';
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
 import { DRI_CONFIG } from '@/lib/dri-config';
 import { Student } from '@/types';
 import { TOPIC_GRADE_MAP } from '@/lib/grade-maps';
 import { formatDistanceToNow } from 'date-fns';
-import AlertsDropdown from '@/components/AlertsDropdown';
 
 // ==========================================
 // METRIC DEFINITIONS FOR TOOLTIPS
@@ -717,36 +717,34 @@ export default function HomePage() {
         <div className={`flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-4 gap-4 ${compactHeader ? 'pb-2' : ''}`}>
           <div className="flex items-center gap-4">
             <div>
-             <div className="flex items-center gap-3">
-  <h1 className={`font-black uppercase italic text-white tracking-tighter transition-all ${compactHeader ? 'text-xl' : 'text-3xl'}`}>
-    DRI COMMAND CENTER
-  </h1>
-  <AlertsDropdown 
-    onStudentClick={(studentId) => {
-      const student = students.find(s => s.id === studentId);
-      if (student) {
-        const index = filteredForNavigation.findIndex(s => s.id === studentId);
-        setSelectedStudentIndex(index);
-        setSelectedStudent(student);
-      }
-    }}
-  />
-  <button 
-    onClick={() => setShowHelp(true)}
-    className="w-7 h-7 rounded-full border border-slate-700 text-slate-500 hover:text-white hover:border-indigo-500 transition-all flex items-center justify-center text-xs font-bold"
-    title="Help & Keyboard Shortcuts (?)"
-  >
-    ?
-  </button>
-  <CompactHeader isCompact={compactHeader} onToggle={() => setCompactHeader(!compactHeader)} />
-</div>
+              <div className="flex items-center gap-3">
+                <h1 className={`font-black uppercase italic text-white tracking-tighter transition-all ${compactHeader ? 'text-xl' : 'text-3xl'}`}>
+                  DRI COMMAND CENTER
+                </h1>
+                <AlertsDropdown 
+                  onStudentClick={(studentId) => {
+                    const student = students.find(s => s.id === studentId);
+                    if (student) {
+                      const index = filteredForNavigation.findIndex(s => s.id === studentId);
+                      setSelectedStudentIndex(index);
+                      setSelectedStudent(student);
+                    }
+                  }}
+                />
+                <button 
+                  onClick={() => setShowHelp(true)}
+                  className="w-7 h-7 rounded-full border border-slate-700 text-slate-500 hover:text-white hover:border-indigo-500 transition-all flex items-center justify-center text-xs font-bold"
+                  title="Help & Keyboard Shortcuts (?)"
+                >
+                  ?
+                </button>
                 <CompactHeader isCompact={compactHeader} onToggle={() => setCompactHeader(!compactHeader)} />
               </div>
               
               {!compactHeader && (
                 <>
                   <p className="text-xs text-indigo-400 font-bold tracking-[0.3em] uppercase">
-                    V5.4 Alpha • {students.length} Students
+                    V5.5 Alpha • {students.length} Students
                   </p>
                   
                   <div className="flex gap-3 mt-1 text-[9px] text-slate-600 font-mono flex-wrap">
