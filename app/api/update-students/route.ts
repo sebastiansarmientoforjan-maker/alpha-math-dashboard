@@ -4,7 +4,8 @@ import { doc, writeBatch, getDoc, setDoc, collection, addDoc, serverTimestamp } 
 import { getStudentData } from '@/lib/mathAcademyAPI';
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
-import studentIds from '@/lib/student_ids.json'; 
+import studentIds from '@/lib/student_ids.json';
+import { DRITier, AlertMetricsSnapshot, AlertPreviousMetrics } from '@/types';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -12,37 +13,6 @@ export const revalidate = 0;
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-type DRITier = 'RED' | 'YELLOW' | 'GREEN';
-
-interface TierChangeAlert {
-  studentId: string;
-  studentName: string;
-  studentCourse: string;
-  previousTier: DRITier;
-  newTier: DRITier;
-  direction: 'improved' | 'worsened';
-  metricsSnapshot: {
-    rsr: number;
-    ksi: number | null;
-    velocity: number;
-    riskScore: number;
-    der: number | null;
-    pdi: number | null;
-  };
-  previousMetrics: {
-    rsr: number;
-    ksi: number | null;
-    velocity: number;
-    riskScore: number;
-  };
-  acknowledged: boolean;
-  acknowledgedAt: null;
-  acknowledgedBy: null;
-  emailSent: boolean;
-  emailSentAt: null;
-  createdAt: ReturnType<typeof serverTimestamp>;
-  syncBatchId: string;
-}
 
 function getChangeDirection(previousTier: DRITier, newTier: DRITier): 'improved' | 'worsened' {
   const tierOrder: Record<DRITier, number> = { 'RED': 0, 'YELLOW': 1, 'GREEN': 2 };
@@ -60,10 +30,11 @@ async function createTierChangeAlert(
   previousMetrics: any,
   syncBatchId: string
 ): Promise<void> {
-  const alert: TierChangeAlert = {
+ const alert = {
     studentId,
     studentName,
     studentCourse,
+    type: 'tier_change' as const,
     previousTier,
     newTier,
     direction: getChangeDirection(previousTier, newTier),
@@ -74,13 +45,14 @@ async function createTierChangeAlert(
       riskScore: currentDRI.riskScore || 0,
       der: currentDRI.debtExposure,
       pdi: currentDRI.precisionDecay,
-    },
+    } as AlertMetricsSnapshot,
     previousMetrics: {
       rsr: previousMetrics?.lmp || 0,
       ksi: previousMetrics?.ksi || null,
       velocity: previousMetrics?.velocityScore || 0,
       riskScore: previousMetrics?.riskScore || 0,
-    },
+    } as AlertPreviousMetrics,
+    status: 'pending' as const,
     acknowledged: false,
     acknowledgedAt: null,
     acknowledgedBy: null,
@@ -89,7 +61,6 @@ async function createTierChangeAlert(
     createdAt: serverTimestamp(),
     syncBatchId,
   };
-
   try {
     await addDoc(collection(db, 'alerts'), alert);
     console.log(`[ALERT] Tier change: ${studentName} ${previousTier} → ${newTier}`);
