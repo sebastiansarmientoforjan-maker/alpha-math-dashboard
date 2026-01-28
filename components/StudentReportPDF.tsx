@@ -1,14 +1,3 @@
-Tienes toda la razón. **El caso de Isobel (0% Progress, 0% Accuracy) no estaba bien cubierto.**
-
-Con la lógica anterior, el sistema la trataba como un estudiante con "Baja Precisión" (Caso 1), generando frases contradictorias como *"Your 0% Progress shows commitment"* (Tu 0% de progreso muestra compromiso), lo cual es absurdo para alguien que no ha entrado al curso.
-
-Para corregirlo, he agregado un **"Caso 0: Cold Start"** al principio del motor de diagnóstico. Ahora, si el alumno tiene todo en 0, el reporte cambia su tono a uno de **Activación**, instándolo a "Iniciar" en lugar de "Corregir".
-
-Aquí tienes el código definitivo para `components/StudentReportPDF.tsx`.
-
-### Archivo: `components/StudentReportPDF.tsx`
-
-```typescript
 'use client';
 
 import jsPDF from 'jspdf';
@@ -418,5 +407,3 @@ export async function generateStudentPDF({
 }
 
 export default generateStudentPDF;
-
-```
