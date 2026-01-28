@@ -11,26 +11,41 @@ interface StudentReportOptions {
   includeRecommendations?: boolean;
 }
 
-// Type Casting para evitar errores de compilación con jsPDF-AutoTable
+// Type Casting para jsPDF-AutoTable
 type RGBColor = [number, number, number];
 
 const COLORS = {
   navy: [18, 67, 109] as RGBColor,          // #12436D (Brand Blue)
   accentOrange: [216, 67, 21] as RGBColor,  // #D84315 (Rhythm/Attention)
   positiveGreen: [27, 94, 32] as RGBColor,  // #1B5E20 (Mastery/Success)
-  lightGreen: [232, 245, 233] as RGBColor,  // #E8F5E9 (ROI Box Background)
-  textMain: [26, 26, 26] as RGBColor,       // #1A1A1A (Primary Text)
-  textGrey: [97, 97, 97] as RGBColor,       // #616161 (Secondary Text)
-  softBg: [248, 249, 250] as RGBColor,      // #F8F9FA (KPI Box Background)
+  limeHighlight: [163, 230, 53] as RGBColor, // #a3e635 (Verde Lima)
+  lightGreen: [232, 245, 233] as RGBColor,  // #E8F5E9 (ROI Box)
+  textMain: [26, 26, 26] as RGBColor,       // #1A1A1A
+  textGrey: [97, 97, 97] as RGBColor,       // #616161
+  softBg: [248, 249, 250] as RGBColor,      // #F8F9FA
   white: [255, 255, 255] as RGBColor,
 };
 
 // ==========================================
-// 1. LOGIC ENGINE (Nueva Lógica Integrada)
+// 1. LOGIC ENGINE (Context-Aware)
 // ==========================================
 function generateDiagnosis(student: Student) {
   const accuracy = student.metrics.accuracyRate || 0;
   const velocity = student.metrics.velocityScore || 0;
+  
+  // 1. Detección de Contexto del Curso
+  const courseName = student.currentCourse?.name || 'Math';
+  let contextLabel = `Mastering ${courseName}`; // Default: "Mastering Algebra 1"
+  let contextGoal = 'complete mastery';         // Default goal
+
+  // Personalización por Tipo de Curso
+  if (courseName.includes('SAT')) {
+    contextLabel = 'The SAT';
+    contextGoal = 'a 700+ score';
+  } else if (courseName.includes('AP ') || courseName.includes('Calculus')) {
+    contextLabel = 'The AP Exam';
+    contextGoal = 'a 5 score';
+  }
 
   let data = {
     headline: { part1: '', highlight: '', part2: '', highlight2: '' },
@@ -41,131 +56,106 @@ function generateDiagnosis(student: Student) {
     expectedOutcome: ''
   };
 
-  // BLOQUE 1: COLD START (Velocity 0, Acc 0)
-  // Diagnosis: Static Friction. ROI = 0.
+  // CASO 0: COLD START (0/0)
   if (velocity === 0 && accuracy === 0) {
-      data.headline = { 
-        part1: 'STATUS:', highlight: 'ZERO MOMENTUM', 
-        part2: 'DETECTED.', highlight2: 'IMMEDIATE ACTION REQUIRED' 
-      };
-      
-      data.executiveDiagnosis = `${student.firstName} is currently in a state of Zero-Output. No cognitive data is being generated, rendering learning ROI null. The system cannot optimize what does not move.`;
-      
-      data.momentumGap = {
-        title: 'THE STATIC FRICTION TRAP',
-        intro: 'Current velocity is strictly zero. We are fighting inertia, not content difficulty.',
-        points: [
-            'Zero data points generated this cycle.',
-            'Opportunity cost of inaction is compounding daily.',
-            'Feedback loops are currently severed.'
-        ]
-      };
-      
-      data.driInsight = '"Direct Responsible Individual (DRI) must override hesitation. The goal is not correctness today, it is simply completion. Bias for action is mandatory."';
-      
-      data.protocol = [
-          { title: 'IGNITION PROTOCOL', description: 'Complete 3 micro-tasks regardless of confidence level. Force the system to register activity.' },
-          { title: 'REMOVE BARRIERS', description: 'Identify the single technical or emotional blocker preventing login/start and eliminate it.' }
-      ];
-      
-      data.expectedOutcome = 'Shift from metrics 0/0 to >1/>1. Re-establishment of data flow and initial velocity calibration.';
+    data.headline = { 
+      part1: `${student.firstName}, you have `, highlight: 'Potential', 
+      part2: 'Now we need ', highlight2: 'Activation' 
+    };
+    data.executiveDiagnosis = `Your 0% Activity shows latent potential. However, metrics are currently flat. My instruction is clear: we must establish a baseline immediately to optimize your path in ${courseName}.`;
+    data.momentumGap = { 
+      title: 'The Static Friction Trap', 
+      intro: 'In physics, static friction is stronger than kinetic friction. The hardest part is simply starting.',
+      points: [
+        'Zero Data: Without initial performance data, we cannot build a custom roadmap for you.',
+        'Opportunity Cost: Every day without logging in creates a larger gap to close later.'
+      ] 
+    };
+    data.driInsight = `"${student.firstName}: The goal is not correctness today, it is simply completion. Bias for action is mandatory. Let's get you on the board."`;
+    data.protocol = [
+      { title: 'Ignition Protocol', description: 'Log in today and complete exactly 20 minutes of work, regardless of the outcome.' },
+      { title: 'Remove Barriers', description: 'Identify the single technical or emotional blocker preventing login and eliminate it.' }
+    ];
+    data.expectedOutcome = `Executing this instruction will generate your initial metrics, allowing us to move from "Unknown" to a strategic plan in the next evaluation cycle.`;
   }
 
-  // BLOQUE 2: CRITICAL ACCURACY (Accuracy < 60)
-  // Diagnosis: High Cognitive Debt. Scaling Errors.
+  // CASO 1: BAJA PRECISIÓN (<60%)
   else if (accuracy < 60) {
-      data.headline = { 
-        part1: 'ALERT:', highlight: 'KNOWLEDGE DEBT', 
-        part2: 'EXCEEDS LIMITS.', highlight2: 'QUALITY CONTROL STOP' 
-      };
-      
-      data.executiveDiagnosis = `System detects critical instability. ${student.firstName} is operating below the 60% mastery floor. Continuing at this pace is simply scaling error production. We are accumulating "Educational Debt" that will require expensive remediation later.`;
-      
-      data.momentumGap = {
-        title: 'THE "GAMING" VS "GRINDING" DILEMMA',
-        intro: 'Velocity is irrelevant when Accuracy is critical. Inputs are not translating into retained mastery.',
-        points: [
-            'Concept gaps are being bypassed, not solved.',
-            'High probability of "guessing" behavior to inflate velocity.',
-            'Foundational logic requires immediate debugging.'
-        ]
-      };
-      
-      data.driInsight = '"Stop the line. Do not praise speed. The metric to watch is Accuracy. If we do not fix the foundation now, the structure will collapse under high-velocity demands."';
-      
-      data.protocol = [
-          { title: 'DEEP DIVE MODE', description: 'Cut velocity target by 50%. Mandate "Explain it to me" sessions for every error.' },
-          { title: 'ERROR AUTOPSY', description: 'Analyze the last 5 errors. Is it a logic bug or a focus bug? Fix the root cause.' }
-      ];
-      
-      data.expectedOutcome = 'Stabilize Accuracy to >75% before permitting Velocity increases. Elimination of "false positive" progress.';
+    data.headline = { 
+      part1: `${student.firstName}, you have the `, highlight: 'Effort', 
+      part2: 'Now we need ', highlight2: 'Precision' 
+    };
+    data.executiveDiagnosis = `Your ${velocity}% Progress shows commitment. However, your ${accuracy}% Accuracy indicates we need to slow down and solidify foundations before advancing.`;
+    data.momentumGap = { 
+      title: 'The Precision Gap', 
+      intro: 'Neuroscience proves that accuracy is the prerequisite for speed. Moving fast with errors creates negative learning loops.',
+      points: [
+        'Speed vs Accuracy: Moving fast without understanding creates knowledge debt that compounds over time.',
+        'Foundation First: Mastering fundamentals now prevents struggle with advanced topics later.'
+      ] 
+    };
+    data.driInsight = `"${student.firstName}: Speed without accuracy is wasted effort. Let's build your foundation strong so your progress becomes permanent."`;
+    data.protocol = [
+      { title: 'The Slow-Down Protocol', description: 'Reduce daily volume by 20% but increase focus on understanding each problem completely.' },
+      { title: 'The Review Loop', description: 'Before starting new material, spend 10 minutes reviewing concepts from the previous session until they feel automatic.' }
+    ];
+    data.expectedOutcome = `Executing this instruction will raise your accuracy to ${Math.min(accuracy + 15, 85)}% within two weeks, creating a stable foundation for accelerated progress.`;
   } 
-    
-  // BLOQUE 3: LOW VELOCITY (Velocity < 50, pero Acc >= 60)
-  // Diagnosis: Low Throughput. ROI Failure. (Perfectionist Trap)
+  
+  // CASO 2: BAJO RITMO (Velocity < 50)
   else if (velocity < 50) {
-      data.headline = { 
-        part1: 'METRIC:', highlight: 'VELOCITY BOTTLENECK', 
-        part2: 'IDENTIFIED.', highlight2: 'UNLOCK THROUGHPUT' 
-      };
-      
-      data.executiveDiagnosis = `${student.firstName} is delivering quality, but at an unscalable rate. The "Perfectionism Tax" is high—spending excessive time verifying answers that are likely already correct. We are leaving compounded learning gains on the table.`;
-      
-      data.momentumGap = {
-        title: 'THE ANALYSIS PARALYSIS',
-        intro: 'Accuracy is safe, but Volume is critical for mastery retention and neural adaptation.',
-        points: [
-            'Time-on-task ROI is suboptimal.',
-            'Hesitation between problems is creating "Cognitive Drag".',
-            'Fear of failure is capping total XP output.'
-        ]
-      };
-      
-      data.driInsight = '"Push for Good Enough. The student needs permission to fail in exchange for speed. We need to increase the data sample size to truly test their mastery limits."';
-      
-      data.protocol = [
-          { title: 'SPRINT INTERVALS', description: 'Set a timer: 10 problems in 10 minutes. Accuracy is secondary; volume is primary.' },
-          { title: 'TRUST THE GUT', description: 'If you are 80% sure, submit. Bypass the triple-check habit.' }
-      ];
-      
-      data.expectedOutcome = 'Double the Velocity score (>80) while maintaining Accuracy >80%. Transition from "Safe" to "High Performance".';
-  }
+    data.headline = { 
+      part1: `${student.firstName}, you have the `, highlight: 'Accuracy', 
+      part2: 'Now we need your ', highlight2: 'Rhythm' 
+    };
+    data.executiveDiagnosis = `Your ${accuracy}% Accuracy confirms mastery. However, your ${velocity}% Progress is the current bottleneck. My instruction is clear: adjust +15 minutes daily to activate your momentum.`;
     
-  // BLOQUE 4: ELSE (High Performance / Cruiser)
-  // Diagnosis: Flow State / Alpha Maintenance.
+    data.momentumGap = { 
+      title: 'The Momentum Gap', 
+      intro: `Neuroscience proves that frequency is the engine of technical retention. At ${velocity}% progress, you are intellectually capable but rhythmically vulnerable.`,
+      points: [
+        'Cognitive Friction: Without daily practice, your brain slows down under exam pressure.',
+        // AQUI SE APLICA EL CONTEXTO DINÁMICO
+        `Endurance Deficit: ${contextLabel} is a marathon. Your rhythm currently only prepares you for a sprint.`
+      ] 
+    };
+    data.driInsight = `"${student.firstName}: If we do not close the volume gap now, your ${accuracy}% accuracy will remain potential rather than performance. Consistency is the only multiplier that matters."`;
+    data.protocol = [
+      { title: "The 15' Volume Power-Up", description: 'Add exactly 15 minutes of focused practice to your current session. More problems solved = Higher Score.' },
+      { title: 'Active Error Armoring', description: "Spend the first 3 minutes of your session reviewing yesterday's errors. Never repeat the same mistake." }
+    ];
+    // ROI TAMBIÉN DINÁMICO
+    data.expectedOutcome = `Executing this directive aims to reach a standard of 125 XP per week. Achieving this will stabilize your technical base and maximize the probability of securing ${contextGoal} projection for the next evaluation cycle.`;
+  }
+  
+  // CASO 3: EXCELENCIA
   else {
-      data.headline = { 
-        part1: 'STATUS:', highlight: 'ALPHA FLOW STATE', 
-        part2: 'ACTIVE.', highlight2: 'MAXIMIZE AGENCY' 
-      };
-      
-      data.executiveDiagnosis = `${student.firstName} is operating at Peak Performance. Metrics indicate high retention and optimal velocity. The risk now is not failure, but stagnation (Cruising). The system must pivot from "Support" to "Challenge".`;
-      
-      data.momentumGap = {
-        title: 'SUSTAINING THE PEAK',
-        intro: 'Standard curriculum may no longer provide sufficient friction for growth.',
-        points: [
-            'Current trajectory leads to early mastery.',
-            'Potential for boredom if challenge density is not increased.',
-            'Opportunity to shift focus to meta-skills (teaching, leadership).'
-        ]
-      };
-      
-      data.driInsight = '"Laissez-faire leadership with high standards. Do not micromanage. Validate the win, then raise the bar immediately to prevent complacency."';
-      
-      data.protocol = [
-          { title: 'THE TEACHER TEST', description: 'Challenge the student to explain a complex concept to a peer. Mastery is proven by teaching.' },
-          { title: 'AGENCY UNLOCK', description: 'Allow self-selection of the next advanced module. Test autonomy.' }
-      ];
-      
-      data.expectedOutcome = 'Maintain current metrics while reducing "Time to Mastery". Preparation for next-level curriculum deployment.';
+    data.headline = { 
+      part1: `${student.firstName}, you have `, highlight: 'Excellence', 
+      part2: 'Now we need to ', highlight2: 'Maintain It' 
+    };
+    data.executiveDiagnosis = `Strong performance across the board: ${accuracy}% Accuracy and ${velocity}% Velocity. The focus now is optimization and challenge.`;
+    data.momentumGap = { 
+      title: 'The Excellence Standard', 
+      intro: 'Top performers sustain growth through progressive overload to avoid stagnation.',
+      points: [
+        'Plateau Prevention: Even top performers need progressive challenge to continue growing.',
+        'Leadership Opportunity: Your success can help reinforcing your own understanding.'
+      ] 
+    };
+    data.driInsight = `"${student.firstName}: You've earned this position. Now let's push further. The goal isn't just success—it's mastery."`;
+    data.protocol = [
+      { title: 'The Challenge Protocol', description: 'Attempt 2-3 problems above your current level each session. Struggle is growth.' },
+      { title: 'The Teaching Test', description: 'Find opportunities to explain concepts to peers to test your mastery.' }
+    ];
+    data.expectedOutcome = `Maintaining this trajectory will position you for top-tier performance and open doors to advanced opportunities.`;
   }
 
   return data;
 }
 
 // ==========================================
-// 2. RENDER ENGINE (Visual Layout)
+// 2. RENDER ENGINE (Professional Layout)
 // ==========================================
 export async function generateStudentPDF({ 
   student, 
@@ -183,7 +173,7 @@ export async function generateStudentPDF({
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 12; // Standard margin
+  const margin = 12; 
   const diag = generateDiagnosis(student);
   
   const dateObj = new Date();
@@ -193,9 +183,9 @@ export async function generateStudentPDF({
   const addFooter = (pageNum: number) => {
     doc.setPage(pageNum);
     
-    // Bottom Signature Block (Solo página 1)
+    // SIGNATURE BLOCK (Solo página 1)
     if (pageNum === 1) {
-      const sigY = pageHeight - 25;
+      const sigY = pageHeight - 32; 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(...(COLORS.textMain));
@@ -212,19 +202,14 @@ export async function generateStudentPDF({
     doc.setLineWidth(0.1);
     
     const footY = pageHeight - 12;
-    
-    // Left: Name
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(...(COLORS.textMain));
     doc.text(student.firstName.toUpperCase(), margin, footY);
     
-    // Center: Report Type
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...(COLORS.textGrey));
     doc.text('High Performance Report - Math Academy Data', pageWidth / 2, footY, { align: 'center' });
-    
-    // Right: Date
     doc.text(reportDate, pageWidth - margin, footY, { align: 'right' });
   };
 
@@ -243,28 +228,24 @@ export async function generateStudentPDF({
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255); 
   
-  // Line 1
   const line1Y = margin + 22;
   doc.text(diag.headline.part1, margin + 8, line1Y);
   const w1 = doc.getTextWidth(diag.headline.part1);
-  doc.setTextColor(180, 240, 180); // Highlight 1 (Greenish)
+  doc.setTextColor(...(COLORS.limeHighlight)); // Verde Lima Brillante
   doc.text(diag.headline.highlight, margin + 8 + w1, line1Y);
 
-  // Line 2
   const line2Y = margin + 32;
   doc.setTextColor(255, 255, 255);
   doc.text(diag.headline.part2, margin + 8, line2Y);
   const w2 = doc.getTextWidth(diag.headline.part2);
-  doc.setTextColor(...(COLORS.accentOrange)); // Highlight 2 (Orange)
-  doc.text(diag.headline.highlight2, margin + 8 + w2, line2Y);
+  doc.setTextColor(...(COLORS.accentOrange)); 
+  doc.text(diag.headline.highlight2 + '.', margin + 8 + w2, line2Y);
 
-  // Diagnosis Text
   const diagY = margin + 42;
   doc.setTextColor(240, 240, 240); 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  const diagText = `Executive Diagnosis: ${diag.executiveDiagnosis}`;
-  const splitDiag = doc.splitTextToSize(diagText, pageWidth - margin * 2 - 16);
+  const splitDiag = doc.splitTextToSize(`Executive Diagnosis: ${diag.executiveDiagnosis}`, pageWidth - margin * 2 - 16);
   doc.text(splitDiag, margin + 8, diagY);
 
   // 2. KPI BOXES
@@ -302,45 +283,37 @@ export async function generateStudentPDF({
     doc.setLineWidth(0.1);
     doc.roundedRect(x, yPos, kpiW, kpiH, 2, 2, 'FD');
     
-    // Super Heading
     doc.setTextColor(100, 100, 100); 
-    doc.setFontSize(6);
-    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6); doc.setFont('helvetica', 'bold');
     doc.text(kpi.label, x + kpiW/2, yPos + 5, { align: 'center' });
 
-    // Number
     doc.setFontSize(22);
     doc.setTextColor(...(kpi.col));
     doc.text(kpi.val, x + kpiW / 2, yPos + 15, { align: 'center' });
 
-    // Subtitle
     doc.setFontSize(8);
     doc.setTextColor(30, 30, 30);
     doc.text(kpi.sub, x + kpiW / 2, yPos + 22, { align: 'center' });
 
-    // Description
     doc.setFontSize(6);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...(COLORS.textGrey));
     doc.text(kpi.desc, x + kpiW / 2, yPos + 27, { align: 'center' });
   });
 
-  // 3. SCIENTIFIC DIAGNOSIS & DRI INSIGHT
+  // 3. MOMENTUM GAP & INSIGHT
   yPos += 40;
   const colGap = 10;
   const col1W = (pageWidth - margin * 2 - colGap) * 0.55; 
   const col2X = margin + col1W + colGap;
   const col2W = pageWidth - margin - col2X;
 
-  // -- LEFT COLUMN --
   doc.setTextColor(...(COLORS.navy));
-  doc.setFontSize(11); 
-  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11); doc.setFont('helvetica', 'bold');
   doc.text(diag.momentumGap.title, margin, yPos);
   
   let textY = yPos + 7;
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   doc.setTextColor(...(COLORS.textMain));
   
   if (diag.momentumGap.intro) {
@@ -354,53 +327,43 @@ export async function generateStudentPDF({
     doc.text('•', margin, textY);
     
     doc.setTextColor(...(COLORS.textMain));
-    // Check for "Title:" pattern to bold it
     const parts = point.split(':');
-    let addedHeight = 0;
-    
     if (parts.length > 1) {
         doc.setFont('helvetica', 'bold');
         doc.text(parts[0] + ':', margin + 4, textY);
-        doc.setFont('helvetica', 'normal');
-        // Hack for simple inline mimic: print full line regular over it? No.
-        // Just print the rest.
-        const titleW = doc.getTextWidth(parts[0] + ': ');
-        const restText = doc.splitTextToSize(parts.slice(1).join(':').trim(), col1W - 6 - titleW);
+        const prefixW = doc.getTextWidth(parts[0] + ': ');
         
-        doc.text(restText[0], margin + 4 + titleW, textY);
+        doc.setFont('helvetica', 'normal');
+        const restText = doc.splitTextToSize(parts.slice(1).join(':').trim(), col1W - 6 - prefixW);
+        doc.text(restText[0], margin + 4 + prefixW, textY);
         if (restText.length > 1) {
            doc.text(restText.slice(1), margin + 4, textY + 4);
-           addedHeight = (restText.length) * 4;
+           textY += (restText.length * 4);
         } else {
-           addedHeight = 4;
+           textY += 4;
         }
     } else {
         const bulletText = doc.splitTextToSize(point, col1W - 6);
         doc.text(bulletText, margin + 4, textY);
-        addedHeight = bulletText.length * 4;
+        textY += bulletText.length * 4;
     }
-    textY += addedHeight + 2;
+    textY += 2;
   });
 
-  // -- RIGHT COLUMN --
-  doc.setDrawColor(220, 220, 220);
-  doc.setLineWidth(0.2);
+  // Vertical Divider
+  doc.setDrawColor(220, 220, 220); doc.setLineWidth(0.2);
   doc.line(col2X - (colGap/2), yPos, col2X - (colGap/2), textY + 5);
 
   doc.setTextColor(...(COLORS.navy));
-  doc.setFontSize(11); 
-  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11); doc.setFont('helvetica', 'bold');
   doc.text('DRI Insight', col2X, yPos);
   
-  doc.setTextColor(...(COLORS.textMain));
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(...(COLORS.textMain)); doc.setFontSize(9); doc.setFont('helvetica', 'italic');
   const quoteLines = doc.splitTextToSize(diag.driInsight, col2W);
   doc.text(quoteLines, col2X, yPos + 8);
   
   const quoteH = quoteLines.length * 4.5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
   doc.text(`- ${driName}`, col2X, yPos + 8 + quoteH + 2);
 
   // 4. PROTOCOL
@@ -413,25 +376,23 @@ export async function generateStudentPDF({
     
     yPos += 8;
     diag.protocol.forEach((step, i) => {
-      // Number
+      // Badge
       const numSize = 8;
       doc.setFillColor(...(COLORS.navy));
       doc.roundedRect(margin, yPos - 3, numSize, 6, 1, 1, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(8); doc.setFont('helvetica', 'bold');
+      doc.setTextColor(255, 255, 255); doc.setFontSize(8); doc.setFont('helvetica', 'bold');
       doc.text(`0${i+1}`, margin + (numSize/2), yPos + 1, { align: 'center' });
       
       // Title
       const contentX = margin + numSize + 4;
       doc.setTextColor(...(COLORS.textMain));
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold');
       doc.text(step.title + ':', contentX, yPos);
       
       // Description
       doc.setFont('helvetica', 'normal');
       const titleW = doc.getTextWidth(step.title + ': ');
-      const descLines = doc.splitTextToSize(step.description, pageWidth - contentX - titleW - margin);
+      const descLines = doc.splitTextToSize(step.description, pageWidth - contentX - margin - titleWidth);
       
       doc.text(descLines[0], contentX + titleW, yPos);
       if (descLines.length > 1) {
@@ -458,22 +419,17 @@ export async function generateStudentPDF({
     const roiLines = doc.splitTextToSize(diag.expectedOutcome, pageWidth - margin * 2 - (boxPad * 2));
     doc.text(roiLines, margin + boxPad, yPos + 10);
     
-    // Link
     const ctaY = yPos + 10 + (roiLines.length * 4) + 2;
     doc.setTextColor(...(COLORS.navy));
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8); doc.setFont('helvetica', 'bold');
     doc.textWithLink('Schedule your coaching session here to unblock!', margin + boxPad, ctaY, { url: 'https://calendly.com/alpha-hs/coaching-session' });
   }
 
   addFooter(1);
 
-  // ==========================================
-  // PAGE 2: EVIDENCE
-  // ==========================================
+  // --- PAGE 2: EVIDENCE ---
   if (interventions.length > 0) {
     doc.addPage();
-    
     doc.setFillColor(...(COLORS.softBg));
     doc.rect(0, 0, pageWidth, 30, 'F');
     doc.setTextColor(...(COLORS.navy));
@@ -491,20 +447,9 @@ export async function generateStudentPDF({
         inv.whatWasDone,
         inv.nextSteps || '-'
       ]),
-      headStyles: { 
-        fillColor: COLORS.navy as RGBColor, 
-        fontSize: 8, 
-        fontStyle: 'bold',
-        halign: 'left'
-      },
-      bodyStyles: { 
-        fontSize: 8, 
-        textColor: COLORS.textMain as RGBColor,
-        cellPadding: 3
-      },
-      alternateRowStyles: { 
-        fillColor: [248, 250, 252] as RGBColor 
-      },
+      headStyles: { fillColor: COLORS.navy as RGBColor, fontSize: 8, fontStyle: 'bold', halign: 'left' },
+      bodyStyles: { fontSize: 8, textColor: COLORS.textMain as RGBColor, cellPadding: 3 },
+      alternateRowStyles: { fillColor: [248, 250, 252] as RGBColor },
       columnStyles: {
         0: { cellWidth: 25 },
         1: { cellWidth: 40 },
