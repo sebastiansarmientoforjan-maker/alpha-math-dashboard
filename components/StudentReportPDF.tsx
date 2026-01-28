@@ -3,7 +3,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// --- TYPES (Mocked for context) ---
+// --- TYPES ---
 export interface Student {
   firstName: string;
   lastName: string;
@@ -24,15 +24,16 @@ interface StudentReportOptions {
 
 type RGBColor = [number, number, number];
 
-// --- PALETA DE AUTORIDAD EDUCATIVA ---
+// --- PALETA DE AUTORIDAD (OPTIMIZADA PARA IMPRESIÓN/PANTALLA) ---
 const COLORS = {
-  navy: [18, 67, 109] as RGBColor,          // #12436D (Confianza/Autoridad)
-  accentOrange: [216, 67, 21] as RGBColor,  // #D84315 (Acción/Urgencia - "Rhythm")
-  positiveGreen: [27, 94, 32] as RGBColor,  // #1B5E20 (Logro/Maestría - "Accuracy")
-  lightGreen: [232, 245, 233] as RGBColor,  // #E8F5E9 (Fondo ROI)
-  textMain: [26, 26, 26] as RGBColor,       // #1A1A1A (Texto Principal - Negro Suave)
-  textGrey: [97, 97, 97] as RGBColor,       // #616161 (Contexto / Etiquetas)
-  softBg: [248, 249, 250] as RGBColor,      // #F8F9FA
+  navy: [18, 67, 109] as RGBColor,          // #12436D (Authority)
+  accentOrange: [216, 67, 21] as RGBColor,  // #D84315 (Action)
+  positiveGreen: [27, 94, 32] as RGBColor,  // #1B5E20 (Mastery)
+  lightGreen: [240, 247, 240] as RGBColor,  // #F0F7F0 (ROI Box - Softer)
+  textMain: [20, 20, 20] as RGBColor,       // #141414 (Rich Black)
+  textGrey: [85, 85, 85] as RGBColor,       // #555555 (Editorial Grey)
+  hairline: [220, 220, 220] as RGBColor,    // #DCDCDC (Dividers)
+  softBg: [250, 250, 250] as RGBColor,      // #FAFAFA (KPI Background - Very subtle)
   white: [255, 255, 255] as RGBColor,
 };
 
@@ -164,7 +165,7 @@ function generateDiagnosis(student: Student) {
 }
 
 // ==========================================
-// 2. RENDER ENGINE (Editorial / Clean White Layout)
+// 2. RENDER ENGINE (World-Class Editorial Standards)
 // ==========================================
 export async function generateStudentPDF({ 
   student, 
@@ -182,7 +183,11 @@ export async function generateStudentPDF({
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 12; 
+  
+  // AUDIT FIX 1: Generous Margins for "Premium" feel (was 12mm)
+  const margin = 16; 
+  const contentWidth = pageWidth - (margin * 2);
+  
   const diag = generateDiagnosis(student);
   
   const dateObj = new Date();
@@ -192,98 +197,104 @@ export async function generateStudentPDF({
   const addFooter = (pageNum: number) => {
     doc.setPage(pageNum);
     
-    // SIGNATURE BLOCK (Solo página 1)
+    // SIGNATURE BLOCK (First Page Only)
     if (pageNum === 1) {
-      const sigY = pageHeight - 32; 
+      const sigY = pageHeight - 34; // Higher up for breathing room
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
+      doc.setFontSize(9);
       doc.setTextColor(...(COLORS.textMain));
-      doc.text(driName, pageWidth - margin, sigY, { align: 'right' });
+      // Tracking for Name
+      doc.text(driName, pageWidth - margin, sigY, { align: 'right', charSpace: 0.5 });
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
+      doc.setFontSize(8);
       doc.setTextColor(...(COLORS.textGrey));
       doc.text('HS Math DRI', pageWidth - margin, sigY + 4, { align: 'right' });
       doc.text('Alpha High Performance Team', pageWidth - margin, sigY + 8, { align: 'right' });
     }
 
-    doc.setDrawColor(200, 200, 200); 
+    // FOOTER LINE (AUDIT FIX 2: Anchor Line)
+    const footY = pageHeight - 14;
+    doc.setDrawColor(...(COLORS.hairline)); 
     doc.setLineWidth(0.1);
+    doc.line(margin, footY - 4, pageWidth - margin, footY - 4);
     
-    const footY = pageHeight - 12;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(7); // Micro-typography
     doc.setTextColor(...(COLORS.textMain));
-    doc.text(student.firstName.toUpperCase(), margin, footY);
+    doc.text(student.firstName.toUpperCase(), margin, footY, { charSpace: 1 });
     
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...(COLORS.textGrey));
-    doc.text('Strategic Performance Report', pageWidth / 2, footY, { align: 'center' });
+    doc.text('STRATEGIC PERFORMANCE REPORT', pageWidth / 2, footY, { align: 'center', charSpace: 1 });
     doc.text(reportDate, pageWidth - margin, footY, { align: 'right' });
   };
 
   // --- PAGE 1 CONTENT ---
   
-  // 1. HERO HEADER (Editorial Style - No Box)
-  // Eyebrow Label
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal'); // Normal weight for the label
+  // 1. HERO HEADER (Clean Editorial)
+  // AUDIT FIX 3: Micro-tracking for Labels (CharSpace)
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'bold'); 
   doc.setTextColor(...(COLORS.textGrey));
-  doc.text('DRI MESSAGE | HS MATH DRI', margin, margin + 4);
+  doc.text('DRI MESSAGE | HS MATH DRI', margin, margin + 4, { charSpace: 1.2 });
 
-  // Headline Lines
-  doc.setFontSize(24);
+  // Headline
+  doc.setFontSize(26); // Larger impact
   doc.setFont('helvetica', 'bold');
   
-  // Line 1
-  const line1Y = margin + 16;
-  doc.setTextColor(...(COLORS.textMain)); // Black text
+  const line1Y = margin + 18;
+  doc.setTextColor(...(COLORS.textMain));
   doc.text(diag.headline.part1, margin, line1Y);
   
   const w1 = doc.getTextWidth(diag.headline.part1);
-  doc.setTextColor(...(COLORS.positiveGreen)); // GREEN highlight (Accuracy/Potential)
+  doc.setTextColor(...(COLORS.positiveGreen)); 
   doc.text(diag.headline.highlight + '.', margin + w1, line1Y);
 
-  // Line 2
-  const line2Y = margin + 27;
-  doc.setTextColor(...(COLORS.textMain)); // Black text
+  const line2Y = margin + 30;
+  doc.setTextColor(...(COLORS.textMain));
   doc.text(diag.headline.part2, margin, line2Y);
   
   const w2 = doc.getTextWidth(diag.headline.part2);
-  doc.setTextColor(...(COLORS.accentOrange)); // ORANGE highlight (Rhythm/Activation)
+  doc.setTextColor(...(COLORS.accentOrange)); 
   doc.text(diag.headline.highlight2 + '.', margin + w2, line2Y);
 
-  // 2. STRATEGIC DIAGNOSIS (Justified Block)
-  const diagY = margin + 42;
+  // SEPARATOR LINE 1
+  const sep1Y = margin + 38;
+  doc.setDrawColor(...(COLORS.hairline));
+  doc.setLineWidth(0.1);
+  doc.line(margin, sep1Y, pageWidth - margin, sep1Y);
+
+  // 2. STRATEGIC DIAGNOSIS (Justified Block with High Leading)
+  const diagY = sep1Y + 10;
   
   doc.setTextColor(...(COLORS.textGrey)); 
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal'); // Label in grey
-  doc.text('Executive Diagnosis:', margin, diagY);
+  doc.setFontSize(9); // Consistent label size
+  doc.setFont('helvetica', 'bold'); 
+  doc.text('STRATEGIC DIAGNOSIS:', margin, diagY, { charSpace: 0.5 });
   
-  const labelWidth = doc.getTextWidth('Executive Diagnosis: ');
-  const diagTextX = margin + labelWidth + 2; 
-  const diagTextMaxWidth = pageWidth - margin * 2 - labelWidth - 2;
+  const labelWidth = doc.getTextWidth('STRATEGIC DIAGNOSIS:') + 2; // + tracking adjust
+  const diagTextX = margin + labelWidth + 4; // More breathing room
+  const diagTextMaxWidth = pageWidth - margin - diagTextX;
 
-  doc.setTextColor(...(COLORS.textMain)); // Body text in Black
+  doc.setTextColor(...(COLORS.textMain)); 
   doc.setFont('helvetica', 'normal');
   
-  // JUSTIFIED ALIGNMENT
+  // AUDIT FIX 4: High Leading (1.35) for Authority
   doc.text(diag.strategicDiagnosis, diagTextX, diagY, {
     maxWidth: diagTextMaxWidth,
     align: 'justify',
-    lineHeightFactor: 1.3 // Increased leading for "8K" readability
+    lineHeightFactor: 1.35 
   });
   
-  // Calculate height used by diagnosis to push KPIs down
   const diagLines = doc.splitTextToSize(diag.strategicDiagnosis, diagTextMaxWidth);
-  const diagHeight = diagLines.length * 4.5; 
+  const diagHeight = diagLines.length * 5; // Approx height with new leading
 
-  // 3. KPI BOXES
-  let yPos = diagY + diagHeight + 10; // Dynamic spacing
-  const kpiGap = 4;
-  const kpiW = (pageWidth - (margin * 2) - (kpiGap * 2)) / 3;
-  const kpiH = 32;
+  // 3. KPI BOXES (Aligned Grid)
+  let yPos = diagY + diagHeight + 12; 
+  const kpiGap = 6; // Wider gaps
+  const kpiW = (contentWidth - (kpiGap * 2)) / 3;
+  const kpiH = 36; // Taller boxes
 
   const kpis = [
     { 
@@ -309,41 +320,55 @@ export async function generateStudentPDF({
   kpis.forEach((kpi, i) => {
     const x = margin + i * (kpiW + kpiGap);
     
+    // Background
     doc.setFillColor(...(COLORS.softBg));
-    doc.setDrawColor(230, 230, 230);
+    doc.setDrawColor(240, 240, 240); // Very subtle border
     doc.setLineWidth(0.1);
-    doc.roundedRect(x, yPos, kpiW, kpiH, 2, 2, 'FD');
+    doc.roundedRect(x, yPos, kpiW, kpiH, 1, 1, 'FD');
     
-    doc.setTextColor(100, 100, 100); 
+    // AUDIT FIX 5: Accent Bar (Power Line)
+    doc.setDrawColor(...(kpi.col));
+    doc.setLineWidth(0.8);
+    doc.line(x + 2, yPos, x + kpiW - 2, yPos); // Top accent
+    
+    // Content
+    doc.setTextColor(120, 120, 120); 
     doc.setFontSize(6); doc.setFont('helvetica', 'bold');
-    doc.text(kpi.label, x + kpiW/2, yPos + 5, { align: 'center' });
+    doc.text(kpi.label, x + kpiW/2, yPos + 8, { align: 'center', charSpace: 1 });
 
-    doc.setFontSize(22);
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(...(kpi.col));
-    doc.text(kpi.val, x + kpiW / 2, yPos + 15, { align: 'center' });
+    doc.text(kpi.val, x + kpiW / 2, yPos + 18, { align: 'center' });
 
     doc.setFontSize(8);
-    doc.setTextColor(30, 30, 30);
-    doc.text(kpi.sub, x + kpiW / 2, yPos + 22, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(40, 40, 40);
+    doc.text(kpi.sub, x + kpiW / 2, yPos + 25, { align: 'center' });
 
     doc.setFontSize(6);
-    doc.setFont('helvetica', 'normal');
     doc.setTextColor(...(COLORS.textGrey));
-    doc.text(kpi.desc, x + kpiW / 2, yPos + 27, { align: 'center' });
+    doc.text(kpi.desc, x + kpiW / 2, yPos + 30, { align: 'center' });
   });
 
+  // SEPARATOR LINE 2
+  const sep2Y = yPos + kpiH + 12;
+  doc.setDrawColor(...(COLORS.hairline));
+  doc.setLineWidth(0.1);
+  doc.line(margin, sep2Y, pageWidth - margin, sep2Y);
+
   // 4. MOMENTUM GAP & INSIGHT
-  yPos += 45; // Increased spacing
-  const colGap = 10;
-  const col1W = (pageWidth - margin * 2 - colGap) * 0.55; 
+  yPos = sep2Y + 10;
+  const colGap = 12;
+  const col1W = (contentWidth - colGap) * 0.55; 
   const col2X = margin + col1W + colGap;
   const col2W = pageWidth - margin - col2X;
 
   doc.setTextColor(...(COLORS.navy));
-  doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-  doc.text(diag.momentumGap.title, margin, yPos);
+  doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+  doc.text(diag.momentumGap.title.toUpperCase(), margin, yPos, { charSpace: 0.5 });
   
-  let textY = yPos + 7;
+  let textY = yPos + 8;
   doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   doc.setTextColor(...(COLORS.textMain));
   
@@ -351,10 +376,10 @@ export async function generateStudentPDF({
     doc.text(diag.momentumGap.intro, margin, textY, {
         maxWidth: col1W,
         align: 'justify',
-        lineHeightFactor: 1.2
+        lineHeightFactor: 1.35
     });
     const lines = doc.splitTextToSize(diag.momentumGap.intro, col1W);
-    textY += (lines.length * 4.5) + 3;
+    textY += (lines.length * 5) + 4;
   }
 
   diag.momentumGap.points.forEach(point => {
@@ -373,104 +398,108 @@ export async function generateStudentPDF({
         doc.text(parts.slice(1).join(':').trim(), margin + 4 + prefixW, textY, {
             maxWidth: descMaxWidth,
             align: 'justify',
-            lineHeightFactor: 1.2
+            lineHeightFactor: 1.35
         });
         
         const lines = doc.splitTextToSize(parts.slice(1).join(':').trim(), descMaxWidth);
-        textY += (lines.length * 4.5);
+        textY += (lines.length * 5);
     } else {
         const bulletMaxWidth = col1W - 6;
         doc.text(point, margin + 4, textY, {
             maxWidth: bulletMaxWidth,
             align: 'justify',
-            lineHeightFactor: 1.2
+            lineHeightFactor: 1.35
         });
         const lines = doc.splitTextToSize(point, bulletMaxWidth);
-        textY += lines.length * 4.5;
+        textY += lines.length * 5;
     }
-    textY += 2;
+    textY += 3; // Extra paragraph spacing
   });
 
-  // Vertical Divider
-  doc.setDrawColor(220, 220, 220); doc.setLineWidth(0.2);
+  // Vertical Divider (Subtle)
+  doc.setDrawColor(...(COLORS.hairline));
+  doc.setLineWidth(0.1);
   doc.line(col2X - (colGap/2), yPos, col2X - (colGap/2), textY + 5);
 
+  // COACH INSIGHT
   doc.setTextColor(...(COLORS.navy));
-  doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-  doc.text('Coach Insight', col2X, yPos);
+  doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+  doc.text('COACH INSIGHT', col2X, yPos, { charSpace: 0.5 });
   
   doc.setTextColor(...(COLORS.textMain)); doc.setFontSize(9); doc.setFont('helvetica', 'italic');
   
   const quoteLines = doc.splitTextToSize(diag.coachInsight, col2W);
-  doc.text(quoteLines, col2X, yPos + 8);
+  doc.text(quoteLines, col2X, yPos + 8, { lineHeightFactor: 1.4 });
   
-  const quoteH = quoteLines.length * 4.5;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-  doc.text(`- ${driName}`, col2X, yPos + 8 + quoteH + 2);
-
   // 5. PROTOCOL
   if (includeRecommendations) {
-    yPos = Math.max(textY, yPos + 8 + quoteH + 15) + 5;
+    yPos = Math.max(textY, yPos + (quoteLines.length * 6) + 20) + 5;
     
+    // SEPARATOR LINE 3
+    doc.setDrawColor(...(COLORS.hairline));
+    doc.line(margin, yPos - 8, pageWidth - margin, yPos - 8);
+
     doc.setTextColor(...(COLORS.navy));
-    doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-    doc.text('Strategic Protocol: Immediate Actions', margin, yPos);
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+    doc.text('STRATEGIC PROTOCOL: IMMEDIATE ACTIONS', margin, yPos, { charSpace: 0.5 });
     
-    yPos += 8;
+    yPos += 10;
     diag.protocol.forEach((step, i) => {
-      // Badge
-      const numSize = 8;
-      doc.setFillColor(...(COLORS.navy));
-      doc.roundedRect(margin, yPos - 3, numSize, 6, 1, 1, 'F');
-      doc.setTextColor(255, 255, 255); doc.setFontSize(8); doc.setFont('helvetica', 'bold');
-      doc.text(`0${i+1}`, margin + (numSize/2), yPos + 1, { align: 'center' });
+      // Badge (Clean Outline instead of Fill for Editorial look)
+      const numSize = 6;
+      doc.setDrawColor(...(COLORS.navy));
+      doc.setLineWidth(0.2);
+      doc.circle(margin + (numSize/2), yPos - 1, numSize/2); // Circle outline
+      
+      doc.setTextColor(...(COLORS.navy)); doc.setFontSize(7); doc.setFont('helvetica', 'bold');
+      doc.text(`${i+1}`, margin + (numSize/2), yPos + 1.5, { align: 'center' });
       
       // Title
-      const contentX = margin + numSize + 4;
+      const contentX = margin + numSize + 6;
       doc.setTextColor(...(COLORS.textMain));
       doc.setFontSize(9); doc.setFont('helvetica', 'bold');
       doc.text(step.title, contentX, yPos);
       
       // Description
-      const descY = yPos + 4.5;
+      const descY = yPos + 5;
       const descMaxWidth = pageWidth - contentX - margin;
       
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(50, 50, 50); 
+      doc.setTextColor(...(COLORS.textGrey)); 
       doc.text(step.description, contentX, descY, {
           maxWidth: descMaxWidth,
           align: 'justify',
-          lineHeightFactor: 1.2
+          lineHeightFactor: 1.3
       });
       
       const lines = doc.splitTextToSize(step.description, descMaxWidth);
-      yPos += 4.5 + (lines.length * 4.5) + 4; 
+      yPos += 5 + (lines.length * 4.5) + 6; 
     });
 
-    // 6. ROI BOX
-    yPos += 2;
+    // 6. ROI BOX (Minimalist)
+    yPos += 4;
     doc.setFillColor(...(COLORS.lightGreen));
     doc.setDrawColor(...(COLORS.positiveGreen));
-    doc.setLineWidth(0.3);
-    doc.roundedRect(margin, yPos, pageWidth - margin * 2, 22, 2, 2, 'FD');
+    doc.setLineWidth(0.1); // Very thin border
+    doc.roundedRect(margin, yPos, contentWidth, 24, 1, 1, 'FD');
     
-    const boxPad = 4;
+    const boxPad = 6;
     doc.setTextColor(...(COLORS.positiveGreen)); 
-    doc.setFontSize(8); doc.setFont('helvetica', 'bold');
-    doc.text('PROJECTED OUTCOME (LEARNING ROI)', margin + boxPad, yPos + 5);
+    doc.setFontSize(7); doc.setFont('helvetica', 'bold');
+    doc.text('PROJECTED OUTCOME (ROI)', margin + boxPad, yPos + 6, { charSpace: 0.8 });
     
-    doc.setTextColor(20, 60, 20); 
+    doc.setTextColor(20, 40, 20); 
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
     
-    const roiMaxWidth = pageWidth - margin * 2 - (boxPad * 2);
-    doc.text(diag.expectedOutcome, margin + boxPad, yPos + 10, {
+    const roiMaxWidth = contentWidth - (boxPad * 2);
+    doc.text(diag.expectedOutcome, margin + boxPad, yPos + 12, {
         maxWidth: roiMaxWidth,
         align: 'justify',
-        lineHeightFactor: 1.2
+        lineHeightFactor: 1.3
     });
     
     const roiLines = doc.splitTextToSize(diag.expectedOutcome, roiMaxWidth);
-    const ctaY = yPos + 10 + (roiLines.length * 4.5) + 2;
+    const ctaY = yPos + 12 + (roiLines.length * 4.5) + 4;
     
     doc.setTextColor(...(COLORS.navy));
     doc.setFontSize(8); doc.setFont('helvetica', 'bold');
@@ -482,16 +511,18 @@ export async function generateStudentPDF({
   // --- PAGE 2: EVIDENCE ---
   if (interventions.length > 0) {
     doc.addPage();
-    doc.setFillColor(...(COLORS.softBg));
-    doc.rect(0, 0, pageWidth, 30, 'F');
-    doc.setTextColor(...(COLORS.navy));
-    doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-    doc.text('Performance Log & Evidence', margin, 18);
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
-    doc.text(`Tracking history for ${student.firstName} ${student.lastName}`, margin, 24);
+    // Header for Page 2
+    doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...(COLORS.textGrey));
+    doc.text('PERFORMANCE LOG | HS MATH DRI', margin, margin + 4, { charSpace: 1 });
+    
+    doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.setTextColor(...(COLORS.textMain));
+    doc.text('Evidence & Tracking', margin, margin + 14);
+    
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(...(COLORS.textGrey));
+    doc.text(`History for ${student.firstName} ${student.lastName}`, margin, margin + 20);
 
     autoTable(doc, {
-      startY: 35,
+      startY: margin + 28,
       head: [['Date', 'Objective', 'Action Taken', 'Next Steps']],
       body: interventions.map(inv => [
         inv.interventionDate?.toDate?.().toLocaleDateString() || new Date(inv.interventionDate).toLocaleDateString(),
@@ -499,16 +530,42 @@ export async function generateStudentPDF({
         inv.whatWasDone,
         inv.nextSteps || '-'
       ]),
-      headStyles: { fillColor: COLORS.navy as RGBColor, fontSize: 8, fontStyle: 'bold', halign: 'left' },
-      bodyStyles: { fontSize: 8, textColor: COLORS.textMain as RGBColor, cellPadding: 3 },
-      alternateRowStyles: { fillColor: [248, 250, 252] as RGBColor },
+      // Minimalist Table Style
+      theme: 'grid',
+      headStyles: { 
+        fillColor: [255, 255, 255] as RGBColor, 
+        textColor: COLORS.textMain as RGBColor, 
+        fontSize: 7, 
+        fontStyle: 'bold', 
+        halign: 'left',
+        lineWidth: 0,
+        lineColor: [255, 255, 255] as RGBColor // No borders on header
+      },
+      bodyStyles: { 
+        fontSize: 8, 
+        textColor: COLORS.textGrey as RGBColor, 
+        cellPadding: 4,
+        lineColor: [230, 230, 230] as RGBColor,
+        lineWidth: 0.1
+      },
+      alternateRowStyles: { fillColor: [252, 252, 252] as RGBColor },
       columnStyles: {
-        0: { cellWidth: 25 },
+        0: { cellWidth: 25, fontStyle: 'bold' },
         1: { cellWidth: 40 },
         2: { cellWidth: 'auto' },
         3: { cellWidth: 45 }
       },
-      margin: { left: margin, right: margin }
+      margin: { left: margin, right: margin },
+      // Custom Header Underline
+      didDrawPage: (data) => {
+         const y = data.cursor?.y || 0;
+         // Draw heavy line under header
+         if (data.pageNumber === 2) { // Logic to find header y is tricky in autotable hooks, simpler to just use fixed y from startY
+             doc.setDrawColor(...(COLORS.textMain));
+             doc.setLineWidth(0.3);
+             doc.line(margin, margin + 28 + 6, pageWidth - margin, margin + 28 + 6);
+         }
+      }
     });
 
     addFooter(2);
