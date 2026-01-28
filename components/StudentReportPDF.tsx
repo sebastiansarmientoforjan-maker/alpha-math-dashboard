@@ -7,6 +7,7 @@ interface StudentReportOptions {
   student: Student;
   interventions?: any[];
   driName?: string;
+  includeRecommendations?: boolean; // Actualizado: Propiedad agregada
 }
 
 // ==========================================
@@ -155,6 +156,7 @@ export async function generateStudentPDF({
   student, 
   interventions = [], 
   driName = 'Sebastian Sarmiento',
+  includeRecommendations = false, // Actualizado: Desestructuración con valor por defecto
 }: StudentReportOptions): Promise<void> {
   
   const doc = new jsPDF();
