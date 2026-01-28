@@ -35,8 +35,8 @@ function generateDiagnosis(student: Student) {
   
   // 1. Detección de Contexto del Curso
   const courseName = student.currentCourse?.name || 'Math';
-  let contextLabel = `Mastering ${courseName}`; // Default: "Mastering Algebra 1"
-  let contextGoal = 'complete mastery';         // Default goal
+  let contextLabel = `Mastering ${courseName}`;
+  let contextGoal = 'complete mastery';
 
   // Personalización por Tipo de Curso
   if (courseName.includes('SAT')) {
@@ -115,7 +115,6 @@ function generateDiagnosis(student: Student) {
       intro: `Neuroscience proves that frequency is the engine of technical retention. At ${velocity}% progress, you are intellectually capable but rhythmically vulnerable.`,
       points: [
         'Cognitive Friction: Without daily practice, your brain slows down under exam pressure.',
-        // AQUI SE APLICA EL CONTEXTO DINÁMICO
         `Endurance Deficit: ${contextLabel} is a marathon. Your rhythm currently only prepares you for a sprint.`
       ] 
     };
@@ -124,7 +123,6 @@ function generateDiagnosis(student: Student) {
       { title: "The 15' Volume Power-Up", description: 'Add exactly 15 minutes of focused practice to your current session. More problems solved = Higher Score.' },
       { title: 'Active Error Armoring', description: "Spend the first 3 minutes of your session reviewing yesterday's errors. Never repeat the same mistake." }
     ];
-    // ROI TAMBIÉN DINÁMICO
     data.expectedOutcome = `Executing this directive aims to reach a standard of 125 XP per week. Achieving this will stabilize your technical base and maximize the probability of securing ${contextGoal} projection for the next evaluation cycle.`;
   }
   
@@ -392,7 +390,7 @@ export async function generateStudentPDF({
       // Description
       doc.setFont('helvetica', 'normal');
       const titleW = doc.getTextWidth(step.title + ': ');
-      const descLines = doc.splitTextToSize(step.description, pageWidth - contentX - margin - titleWidth);
+      const descLines = doc.splitTextToSize(step.description, pageWidth - contentX - margin - titleW);
       
       doc.text(descLines[0], contentX + titleW, yPos);
       if (descLines.length > 1) {
