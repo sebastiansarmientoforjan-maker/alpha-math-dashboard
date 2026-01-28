@@ -106,7 +106,7 @@ function generateRecommendations(student: Student): { text: string; priority: 'h
   }
 
   // DER-based (Foundation gaps)
-  if (metrics.der && metrics.der > 20) {
+  if (dri.debtExposure && dri.debtExposure > 20) {
     recommendations.push({ 
       text: 'Strengthening foundational skills will make advanced topics easier to master.',
       priority: 'medium'
