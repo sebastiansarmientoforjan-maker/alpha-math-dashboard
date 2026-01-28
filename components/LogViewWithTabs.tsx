@@ -98,28 +98,29 @@ export default function LogViewWithTabs({ logs }: LogViewWithTabsProps) {
   };
 
   // Export PDF real con jsPDF
-  const handleExportPDF = async () => {
+  const handleExportPDF = async (mode: 'completed' | 'current') => {
     setExporting(true);
     
     try {
-      const completedTrackings = filteredTrackings.filter(t => t.status === 'completed');
       const reportDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const isCurrentState = mode === 'current';
+      const trackingsToExport = isCurrentState ? filteredTrackings : filteredTrackings.filter(t => t.status === 'completed');
       
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       
       // Header
-      doc.setFillColor(79, 70, 229);
+      doc.setFillColor(isCurrentState ? 147 : 79, 70, 229); // purple for current, indigo for completed
       doc.rect(0, 0, pageWidth, 40, 'F');
       
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(24);
       doc.setFont('helvetica', 'bold');
-      doc.text('DRI Impact Report', pageWidth / 2, 20, { align: 'center' });
+      doc.text(isCurrentState ? 'DRI Current State Report' : 'DRI Impact Report', pageWidth / 2, 20, { align: 'center' });
       
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Generated: ${reportDate} | ${completedTrackings.length} completed trackings`, pageWidth / 2, 32, { align: 'center' });
+      doc.text(`Generated: ${reportDate} | ${trackingsToExport.length} trackings`, pageWidth / 2, 32, { align: 'center' });
       
       // Summary Stats
       doc.setTextColor(30, 41, 59);
@@ -158,48 +159,69 @@ export default function LogViewWithTabs({ logs }: LogViewWithTabsProps) {
         doc.text(item.label.toUpperCase(), x + boxWidth / 2, boxY + 16, { align: 'center' });
       });
       
-      // Table
+      // Table Title
       doc.setTextColor(30, 41, 59);
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.text('Completed Trackings', 14, 95);
+      doc.text(isCurrentState ? 'All Trackings (Current State)' : 'Completed Trackings', 14, 95);
       
-      if (completedTrackings.length === 0) {
+      if (trackingsToExport.length === 0) {
         doc.setFontSize(10);
         doc.setFont('helvetica', 'italic');
         doc.setTextColor(148, 163, 184);
-        doc.text('No completed trackings to display', pageWidth / 2, 110, { align: 'center' });
+        doc.text('No trackings to display', pageWidth / 2, 110, { align: 'center' });
       } else {
-        const headers = ['Student', 'Course', 'Type', 'Period', 'Outcome'];
-        selectedMetrics.forEach(metricKey => {
-          const metric = AVAILABLE_METRICS.find(m => m.key === metricKey);
-          if (metric) headers.push(metric.label + ' Δ');
-        });
+        // Headers para current state incluyen status y baseline
+        const headers = isCurrentState 
+          ? ['Student', 'Course', 'Type', 'Status', 'Progress', 'Baseline RSR', 'Baseline Risk']
+          : ['Student', 'Course', 'Type', 'Period', 'Outcome'];
         
-        const rows = completedTrackings.map(t => {
-          const row: string[] = [
-            t.studentName,
-            t.studentCourse,
-            t.interventionType,
-            t.period.replace('_', ' '),
-            t.outcome.toUpperCase(),
-          ];
-          
+        if (!isCurrentState) {
           selectedMetrics.forEach(metricKey => {
-            if (t.outcomeDetails) {
-              switch (metricKey) {
-                case 'rsr': row.push(formatDelta(t.outcomeDetails.rsrDelta, '%')); break;
-                case 'ksi': row.push(formatDelta(t.outcomeDetails.ksiDelta, '%')); break;
-                case 'velocity': row.push(formatDelta(t.outcomeDetails.velocityDelta, '%')); break;
-                case 'riskScore': row.push(formatDelta(t.outcomeDetails.riskScoreDelta)); break;
-                case 'tier': row.push(t.outcomeDetails.tierChange || '—'); break;
-                default: row.push('—');
-              }
-            } else {
-              row.push('—');
-            }
+            const metric = AVAILABLE_METRICS.find(m => m.key === metricKey);
+            if (metric) headers.push(metric.label + ' Δ');
           });
-          return row;
+        }
+        
+        const rows = trackingsToExport.map(t => {
+          if (isCurrentState) {
+            const progress = t.weeklySnapshots?.length || 0;
+            const totalWeeks = parseInt(t.period.split('_')[0]);
+            const progressStr = t.status === 'completed' ? 'Done' : `${progress}/${totalWeeks} wks`;
+            return [
+              t.studentName,
+              t.studentCourse,
+              t.interventionType,
+              t.status.toUpperCase(),
+              progressStr,
+              `${t.baselineSnapshot?.rsr || 0}%`,
+              String(t.baselineSnapshot?.riskScore || 0),
+            ];
+          } else {
+            const row: string[] = [
+              t.studentName,
+              t.studentCourse,
+              t.interventionType,
+              t.period.replace('_', ' '),
+              t.outcome.toUpperCase(),
+            ];
+            
+            selectedMetrics.forEach(metricKey => {
+              if (t.outcomeDetails) {
+                switch (metricKey) {
+                  case 'rsr': row.push(formatDelta(t.outcomeDetails.rsrDelta, '%')); break;
+                  case 'ksi': row.push(formatDelta(t.outcomeDetails.ksiDelta, '%')); break;
+                  case 'velocity': row.push(formatDelta(t.outcomeDetails.velocityDelta, '%')); break;
+                  case 'riskScore': row.push(formatDelta(t.outcomeDetails.riskScoreDelta)); break;
+                  case 'tier': row.push(t.outcomeDetails.tierChange || '—'); break;
+                  default: row.push('—');
+                }
+              } else {
+                row.push('—');
+              }
+            });
+            return row;
+          }
         });
         
         autoTable(doc, {
@@ -207,18 +229,27 @@ export default function LogViewWithTabs({ logs }: LogViewWithTabsProps) {
           head: [headers],
           body: rows,
           theme: 'striped',
-          headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+          headStyles: { fillColor: isCurrentState ? [147, 51, 234] : [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
           bodyStyles: { fontSize: 8, textColor: [30, 41, 59] },
           alternateRowStyles: { fillColor: [248, 250, 252] },
-          columnStyles: { 0: { fontStyle: 'bold' }, 4: { halign: 'center' } },
+          columnStyles: { 0: { fontStyle: 'bold' } },
           didParseCell: function(data) {
-            if (data.column.index === 4 && data.section === 'body') {
+            // Status column coloring for current state
+            if (isCurrentState && data.column.index === 3 && data.section === 'body') {
+              const status = data.cell.raw?.toString().toLowerCase();
+              if (status === 'active') data.cell.styles.textColor = [217, 119, 6];
+              else if (status === 'completed') data.cell.styles.textColor = [5, 150, 105];
+              else if (status === 'cancelled') data.cell.styles.textColor = [148, 163, 184];
+            }
+            // Outcome column coloring for completed
+            if (!isCurrentState && data.column.index === 4 && data.section === 'body') {
               const outcome = data.cell.raw?.toString().toLowerCase();
               if (outcome === 'improved') data.cell.styles.textColor = [5, 150, 105];
               else if (outcome === 'worsened') data.cell.styles.textColor = [220, 38, 38];
               else if (outcome === 'stable') data.cell.styles.textColor = [37, 99, 235];
             }
-            if (data.column.index > 4 && data.section === 'body') {
+            // Delta coloring
+            if (!isCurrentState && data.column.index > 4 && data.section === 'body') {
               const value = data.cell.raw?.toString() || '';
               if (value.startsWith('+')) data.cell.styles.textColor = [5, 150, 105];
               else if (value.startsWith('-')) data.cell.styles.textColor = [220, 38, 38];
@@ -238,7 +269,10 @@ export default function LogViewWithTabs({ logs }: LogViewWithTabsProps) {
         doc.text(`Page ${i} of ${pageCount}`, pageWidth - 14, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
       }
       
-      doc.save(`impact-report-${new Date().toISOString().split('T')[0]}.pdf`);
+      const filename = isCurrentState 
+        ? `current-state-report-${new Date().toISOString().split('T')[0]}.pdf`
+        : `impact-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(filename);
       
     } catch (error) {
       console.error('Error exporting PDF:', error);
@@ -381,8 +415,11 @@ export default function LogViewWithTabs({ logs }: LogViewWithTabsProps) {
             <div className="flex-1" />
             <span className="text-[9px] text-slate-600 self-center">Showing {filteredTrackings.length} of {trackings.length}</span>
             
-            <button onClick={handleExportPDF} disabled={exporting || stats.completed === 0} className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-colors flex items-center gap-2">
-              {exporting ? (<><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Generating...</>) : (<>📄 Export PDF</>)}
+            <button onClick={() => handleExportPDF('current')} disabled={exporting || stats.total === 0} className="bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:text-slate-600 text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-colors flex items-center gap-2">
+              {exporting ? (<><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />...</>) : (<>📄 Current State</>)}
+            </button>
+            <button onClick={() => handleExportPDF('completed')} disabled={exporting || stats.completed === 0} className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-colors flex items-center gap-2">
+              {exporting ? (<><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />...</>) : (<>📄 Completed</>)}
             </button>
           </div>
 
