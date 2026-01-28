@@ -206,7 +206,7 @@ export async function generateStudentPDF({
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(...(COLORS.textGrey));
-      doc.text('Academic Performance Lead', pageWidth - margin, sigY + 4, { align: 'right' }); // Changed from HS Math DRI
+      doc.text('HS Math DRI', pageWidth - margin, sigY + 4, { align: 'right' }); // Back to HS Math DRI for consistency
       doc.text('Alpha High Performance Team', pageWidth - margin, sigY + 8, { align: 'right' });
     }
 
@@ -234,8 +234,8 @@ export async function generateStudentPDF({
   doc.setTextColor(200, 210, 220); 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  // "Lead Coach" suena más cercano que "DRI"
-  doc.text(`STRATEGIC INTERVENTION | LEAD COACH: ${driName.toUpperCase()}`, margin + 8, margin + 10);
+  // Revert back to "HS Math DRI" as explicitly requested
+  doc.text(`STRATEGIC INTERVENTION | HS Math DRI: ${driName.toUpperCase()}`, margin + 8, margin + 10);
 
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
