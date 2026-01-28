@@ -1,3 +1,14 @@
+Tienes toda la razón. **El caso de Isobel (0% Progress, 0% Accuracy) no estaba bien cubierto.**
+
+Con la lógica anterior, el sistema la trataba como un estudiante con "Baja Precisión" (Caso 1), generando frases contradictorias como *"Your 0% Progress shows commitment"* (Tu 0% de progreso muestra compromiso), lo cual es absurdo para alguien que no ha entrado al curso.
+
+Para corregirlo, he agregado un **"Caso 0: Cold Start"** al principio del motor de diagnóstico. Ahora, si el alumno tiene todo en 0, el reporte cambia su tono a uno de **Activación**, instándolo a "Iniciar" en lugar de "Corregir".
+
+Aquí tienes el código definitivo para `components/StudentReportPDF.tsx`.
+
+### Archivo: `components/StudentReportPDF.tsx`
+
+```typescript
 'use client';
 
 import jsPDF from 'jspdf';
@@ -28,9 +39,9 @@ const COLORS = {
 function generateDiagnosis(student: Student) {
   const accuracy = student.metrics.accuracyRate || 0;
   const velocity = student.metrics.velocityScore || 0;
-  const ksi = student.metrics.ksi || 50;
+  // const ksi = student.metrics.ksi || 50; // (No usado en la lógica actual)
 
-  // Estructura de datos vacía para llenar según el caso
+  // Estructura base
   let data = {
     headline: { hasStrength: '', needsWork: '' },
     executiveDiagnosis: '',
@@ -40,13 +51,39 @@ function generateDiagnosis(student: Student) {
     expectedOutcome: ''
   };
 
+  // =========================================================
+  // CASO 0: SIN ACTIVIDAD / COLD START (Todo en 0)
+  // =========================================================
+  if (velocity === 0 && accuracy === 0) {
+    data.headline = { hasStrength: 'Potential', needsWork: 'Activation' };
+    
+    data.executiveDiagnosis = `Metrics are currently flat (0% Accuracy, 0% Progress). We cannot optimize what we haven't started. The priority is establishing a baseline immediately.`;
+    
+    data.momentumGap = { 
+      title: 'The Activation Gap', 
+      points: [
+        'Zero Data: Without initial performance data, we cannot build a custom roadmap for you.',
+        'Opportunity Cost: Every day without logging in creates a larger gap to close later.'
+      ] 
+    };
+    
+    data.driInsight = `"${student.firstName}: The hardest part is starting. Once you complete your first session, the data will guide us. Let's get you on the board."`;
+    
+    data.protocol = [
+      { title: 'The First Login', description: 'Log in today and complete exactly 20 minutes of work, regardless of the outcome.' },
+      { title: 'Baseline Establishment', description: 'Do not worry about mistakes. We need them to calibrate your learning path.' }
+    ];
+    
+    data.expectedOutcome = `Executing this will generate your initial metrics, allowing us to move from "Unknown" to a strategic plan in the next cycle.`;
+  }
+
+  // =========================================================
   // CASO 1: BAJA PRECISIÓN (Accuracy < 60)
-  // El alumno corre mucho o no entiende, comete muchos errores.
-  if (accuracy < 60) {
+  // =========================================================
+  else if (accuracy < 60) {
     data.headline = { hasStrength: 'the Effort', needsWork: 'Precision' };
     
-    // Ajuste si el progreso es 0
-    const progressText = velocity === 0 ? "current stall" : `${velocity}% Progress`;
+    const progressText = `${velocity}% Progress`;
     
     data.executiveDiagnosis = `Your ${progressText} shows commitment. However, your ${accuracy}% Accuracy indicates we need to slow down and solidify foundations before advancing.`;
     
@@ -68,8 +105,9 @@ function generateDiagnosis(student: Student) {
     data.expectedOutcome = `Executing this instruction will raise your accuracy to ${Math.min(accuracy + 15, 85)}% within two weeks, creating a stable foundation.`;
   } 
   
-  // CASO 2: BAJO RITMO (Accuracy >= 70 pero Velocity < 50)
-  // El alumno sabe, pero no practica lo suficiente.
+  // =========================================================
+  // CASO 2: BAJO RITMO (Accuracy >= 60 pero Velocity < 50)
+  // =========================================================
   else if (velocity < 50) {
     data.headline = { hasStrength: 'the Accuracy', needsWork: 'your Rhythm' };
     
@@ -93,7 +131,9 @@ function generateDiagnosis(student: Student) {
     data.expectedOutcome = `Executing this instruction will elevate your weekly progress to ${Math.min(velocity + 25, 80)}%, securing stronger performance.`;
   }
   
+  // =========================================================
   // CASO 3: EXCELENCIA (Todo Verde)
+  // =========================================================
   else {
     data.headline = { hasStrength: 'Excellence', needsWork: 'to Maintain It' };
     
@@ -235,8 +275,7 @@ export async function generateStudentPDF({
   doc.setTextColor(...(COLORS.navy));
   doc.setFontSize(11); doc.setFont('helvetica', 'bold');
   doc.text(diagnosis.momentumGap.title, margin, yPos);
-  // doc.line(margin, yPos + 2, pageWidth / 2 - 5, yPos + 2); // Removed underline to match "cleaner" look if desired, or keep it.
-
+  
   doc.setTextColor(...(COLORS.textMain));
   doc.setFontSize(8); doc.setFont('helvetica', 'normal');
   let bulletY = yPos + 8;
@@ -271,8 +310,8 @@ export async function generateStudentPDF({
     doc.setTextColor(...(COLORS.navy));
     doc.setFontSize(11); doc.setFont('helvetica', 'bold');
     doc.text('Protocol: Immediate Execution', margin, yPos);
-    // Line under title
-    doc.setDrawColor(...(COLORS.navy)); doc.setLineWidth(0.2);
+    // Line under title (Optional)
+    // doc.setDrawColor(...(COLORS.navy)); doc.setLineWidth(0.2);
     // doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2);
     
     yPos += 8;
@@ -291,7 +330,6 @@ export async function generateStudentPDF({
       
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
-      // Inline description logic? No, better separate line for clarity in PDF
       const sDesc = doc.splitTextToSize(step.description, pageWidth - margin - 50);
       doc.text(sDesc, margin + 13, yPos + 5);
       
@@ -317,9 +355,10 @@ export async function generateStudentPDF({
     yPos += 20; // Espacio después de la caja
   }
 
-  // 6. CLOSING SIGNATURE (Restored)
-  yPos += 15;
-  // Si estamos muy abajo, saltar de página? Asumimos que cabe en A4 normal.
+  // 6. CLOSING SIGNATURE (Restaurada)
+  yPos += 10;
+  
+  // Si estamos muy abajo, saltar de página?
   if (yPos > pageHeight - 30) {
     doc.addPage();
     yPos = 30;
@@ -379,3 +418,5 @@ export async function generateStudentPDF({
 }
 
 export default generateStudentPDF;
+
+```
