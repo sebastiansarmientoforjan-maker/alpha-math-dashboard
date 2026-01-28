@@ -8,6 +8,7 @@ import CoachInterventionModal from '@/components/CoachInterventionModal';
 import TrackImpactModal from '@/components/TrackImpactModal';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { generateStudentPDF } from '@/components/StudentReportPDF';
 
 // ==========================================
 // METRIC DEFINITIONS
@@ -90,6 +91,7 @@ export default function StudentModal({
   const [showTrackImpact, setShowTrackImpact] = useState(false);
   const [interventionSaved, setInterventionSaved] = useState(false);
   const [studentInterventions, setStudentInterventions] = useState<any[]>([]);
+  const [exportingPDF, setExportingPDF] = useState(false);
 
   const tasks = student?.activity?.tasks || [];
 
@@ -209,6 +211,22 @@ export default function StudentModal({
     setTimeout(() => setInterventionSaved(false), 3000);
   };
 
+  const handleExportPDF = async () => {
+    setExportingPDF(true);
+    try {
+      await generateStudentPDF({
+        student,
+        interventions: studentInterventions,
+        includeRecommendations: true,
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please try again.');
+    } finally {
+      setExportingPDF(false);
+    }
+  };
+
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 animate-in fade-in duration-200">
@@ -292,6 +310,21 @@ export default function StudentModal({
                 title="Track Impact"
               >
                 📈 Track Impact
+              </button>
+              <button
+                onClick={handleExportPDF}
+                disabled={exportingPDF}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500 text-white text-[10px] font-black uppercase rounded-xl transition-colors flex items-center gap-2"
+                title="Export Student Report PDF"
+              >
+                {exportingPDF ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>📄 Export PDF</>
+                )}
               </button>
               
               {onNavigate && totalStudents > 1 && (
