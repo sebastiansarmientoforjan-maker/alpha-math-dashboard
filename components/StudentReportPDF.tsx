@@ -255,12 +255,24 @@ export async function generateStudentPDF({
   doc.text(diag.headline.highlight2 + '.', margin + 8 + w2, line2Y);
 
   const diagY = margin + 42;
+  
+  // High Definition Label + Justified Block Layout
   doc.setTextColor(240, 240, 240); 
   doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Strategic Diagnosis:', margin + 8, diagY);
+  
+  const labelWidth = doc.getTextWidth('Strategic Diagnosis: ');
+  const diagTextX = margin + 8 + labelWidth + 2; // +2mm spacing
+  const diagTextMaxWidth = pageWidth - margin * 2 - 16 - labelWidth - 2;
+
   doc.setFont('helvetica', 'normal');
-  // Usamos "Strategic Diagnosis" para empoderar
-  const splitDiag = doc.splitTextToSize(`Strategic Diagnosis: ${diag.strategicDiagnosis}`, pageWidth - margin * 2 - 16);
-  doc.text(splitDiag, margin + 8, diagY);
+  // JUSTIFIED ALIGNMENT for the block
+  doc.text(diag.strategicDiagnosis, diagTextX, diagY, {
+    maxWidth: diagTextMaxWidth,
+    align: 'justify',
+    lineHeightFactor: 1.15
+  });
 
   // 2. KPI BOXES (The "Data")
   let yPos = margin + 55;
@@ -330,10 +342,16 @@ export async function generateStudentPDF({
   doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   doc.setTextColor(...(COLORS.textMain));
   
+  // Justify Intro Text
   if (diag.momentumGap.intro) {
-    const introLines = doc.splitTextToSize(diag.momentumGap.intro, col1W);
-    doc.text(introLines, margin, textY);
-    textY += (introLines.length * 4) + 3;
+    doc.text(diag.momentumGap.intro, margin, textY, {
+        maxWidth: col1W,
+        align: 'justify',
+        lineHeightFactor: 1.15
+    });
+    // Approximation for height update since text() returns doc
+    const lines = doc.splitTextToSize(diag.momentumGap.intro, col1W);
+    textY += (lines.length * 4) + 3;
   }
 
   diag.momentumGap.points.forEach(point => {
@@ -343,23 +361,32 @@ export async function generateStudentPDF({
     doc.setTextColor(...(COLORS.textMain));
     const parts = point.split(':');
     if (parts.length > 1) {
+        // Bold Title
         doc.setFont('helvetica', 'bold');
         doc.text(parts[0] + ':', margin + 4, textY);
         const prefixW = doc.getTextWidth(parts[0] + ': ');
         
+        // Justified Hanging Indent for Description
         doc.setFont('helvetica', 'normal');
-        const restText = doc.splitTextToSize(parts.slice(1).join(':').trim(), col1W - 6 - prefixW);
-        doc.text(restText[0], margin + 4 + prefixW, textY);
-        if (restText.length > 1) {
-           doc.text(restText.slice(1), margin + 4, textY + 4);
-           textY += (restText.length * 4);
-        } else {
-           textY += 4;
-        }
+        const descMaxWidth = col1W - 6 - prefixW;
+        doc.text(parts.slice(1).join(':').trim(), margin + 4 + prefixW, textY, {
+            maxWidth: descMaxWidth,
+            align: 'justify',
+            lineHeightFactor: 1.15
+        });
+        
+        const lines = doc.splitTextToSize(parts.slice(1).join(':').trim(), descMaxWidth);
+        textY += (lines.length * 4);
     } else {
-        const bulletText = doc.splitTextToSize(point, col1W - 6);
-        doc.text(bulletText, margin + 4, textY);
-        textY += bulletText.length * 4;
+        // Just Bullet
+        const bulletMaxWidth = col1W - 6;
+        doc.text(point, margin + 4, textY, {
+            maxWidth: bulletMaxWidth,
+            align: 'justify',
+            lineHeightFactor: 1.15
+        });
+        const lines = doc.splitTextToSize(point, bulletMaxWidth);
+        textY += lines.length * 4;
     }
     textY += 2;
   });
@@ -373,6 +400,9 @@ export async function generateStudentPDF({
   doc.text('Coach Insight', col2X, yPos);
   
   doc.setTextColor(...(COLORS.textMain)); doc.setFontSize(9); doc.setFont('helvetica', 'italic');
+  
+  // Quote usually looks better Left Aligned (ragged right) to feel organic, or Centered. 
+  // Justified quotes can look weird if short. Let's keep it clean Left but tighter.
   const quoteLines = doc.splitTextToSize(diag.coachInsight, col2W);
   doc.text(quoteLines, col2X, yPos + 8);
   
@@ -401,19 +431,22 @@ export async function generateStudentPDF({
       const contentX = margin + numSize + 4;
       doc.setTextColor(...(COLORS.textMain));
       doc.setFontSize(9); doc.setFont('helvetica', 'bold');
-      doc.text(step.title + ':', contentX, yPos);
+      doc.text(step.title, contentX, yPos);
       
-      // Description
+      // Description - JUSTIFIED and placed BELOW the title for cleanliness (8K Look)
+      const descY = yPos + 4.5;
+      const descMaxWidth = pageWidth - contentX - margin;
+      
       doc.setFont('helvetica', 'normal');
-      const titleW = doc.getTextWidth(step.title + ': ');
-      const descLines = doc.splitTextToSize(step.description, pageWidth - contentX - margin - titleW);
+      doc.setTextColor(50, 50, 50); // Slightly softer black
+      doc.text(step.description, contentX, descY, {
+          maxWidth: descMaxWidth,
+          align: 'justify',
+          lineHeightFactor: 1.2
+      });
       
-      doc.text(descLines[0], contentX + titleW, yPos);
-      if (descLines.length > 1) {
-          doc.text(descLines.slice(1), contentX, yPos + 4.5);
-      }
-      
-      yPos += 4.5 * (descLines.length || 1) + 5;
+      const lines = doc.splitTextToSize(step.description, descMaxWidth);
+      yPos += 4.5 + (lines.length * 4.5) + 4; // Spacing
     });
 
     // 5. ROI BOX (The "Why")
@@ -430,10 +463,18 @@ export async function generateStudentPDF({
     
     doc.setTextColor(20, 60, 20); 
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
-    const roiLines = doc.splitTextToSize(diag.expectedOutcome, pageWidth - margin * 2 - (boxPad * 2));
-    doc.text(roiLines, margin + boxPad, yPos + 10);
     
-    const ctaY = yPos + 10 + (roiLines.length * 4) + 2;
+    // Justified ROI Text
+    const roiMaxWidth = pageWidth - margin * 2 - (boxPad * 2);
+    doc.text(diag.expectedOutcome, margin + boxPad, yPos + 10, {
+        maxWidth: roiMaxWidth,
+        align: 'justify',
+        lineHeightFactor: 1.2
+    });
+    
+    const roiLines = doc.splitTextToSize(diag.expectedOutcome, roiMaxWidth);
+    const ctaY = yPos + 10 + (roiLines.length * 4.5) + 2;
+    
     doc.setTextColor(...(COLORS.navy));
     doc.setFontSize(8); doc.setFont('helvetica', 'bold');
     doc.textWithLink('>>> Click to sync with your Coach', margin + boxPad, ctaY, { url: 'https://calendly.com/alpha-hs/coaching-session' });
