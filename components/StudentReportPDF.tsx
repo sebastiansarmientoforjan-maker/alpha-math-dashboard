@@ -4,7 +4,6 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 // --- TYPES (Mocked for context) ---
-// En producción, importar desde '@/types'
 export interface Student {
   firstName: string;
   lastName: string;
@@ -25,21 +24,20 @@ interface StudentReportOptions {
 
 type RGBColor = [number, number, number];
 
-// --- PALETA DE AUTORIDAD EDUCATIVA (BIBLIA DE DISEÑO) ---
+// --- PALETA DE AUTORIDAD EDUCATIVA ---
 const COLORS = {
   navy: [18, 67, 109] as RGBColor,          // #12436D (Confianza/Autoridad)
-  accentOrange: [216, 67, 21] as RGBColor,  // #D84315 (Acción/Urgencia)
-  positiveGreen: [27, 94, 32] as RGBColor,  // #1B5E20 (Logro/Maestría)
-  limeHighlight: [163, 230, 53] as RGBColor, // #a3e635 (Foco Visual)
+  accentOrange: [216, 67, 21] as RGBColor,  // #D84315 (Acción/Urgencia - "Rhythm")
+  positiveGreen: [27, 94, 32] as RGBColor,  // #1B5E20 (Logro/Maestría - "Accuracy")
   lightGreen: [232, 245, 233] as RGBColor,  // #E8F5E9 (Fondo ROI)
-  textMain: [26, 26, 26] as RGBColor,       // #1A1A1A (Legibilidad Alta)
-  textGrey: [97, 97, 97] as RGBColor,       // #616161 (Contexto)
+  textMain: [26, 26, 26] as RGBColor,       // #1A1A1A (Texto Principal - Negro Suave)
+  textGrey: [97, 97, 97] as RGBColor,       // #616161 (Contexto / Etiquetas)
   softBg: [248, 249, 250] as RGBColor,      // #F8F9FA
   white: [255, 255, 255] as RGBColor,
 };
 
 // ==========================================
-// 1. LOGIC ENGINE (Context-Aware & Neuro-Linguistic)
+// 1. LOGIC ENGINE
 // ==========================================
 function generateDiagnosis(student: Student) {
   const accuracy = student.metrics.accuracyRate || 0;
@@ -49,7 +47,6 @@ function generateDiagnosis(student: Student) {
   let contextLabel = `Mastering ${courseName}`;
   let contextGoal = 'complete mastery';
 
-  // Personalización de Objetivo
   if (courseName.includes('SAT')) {
     contextLabel = 'The SAT';
     contextGoal = 'a 700+ score';
@@ -60,14 +57,14 @@ function generateDiagnosis(student: Student) {
 
   let data = {
     headline: { part1: '', highlight: '', part2: '', highlight2: '' },
-    strategicDiagnosis: '', // Renamed from Executive Diagnosis for Student context
+    strategicDiagnosis: '', 
     momentumGap: { title: '', intro: '', points: [] as string[] },
-    coachInsight: '', // Renamed from DRI Insight
+    coachInsight: '', 
     protocol: [] as { title: string; description: string }[],
     expectedOutcome: ''
   };
 
-  // CASO 0: COLD START (La Trampa de la Fricción)
+  // CASO 0: COLD START
   if (velocity === 0 && accuracy === 0) {
     data.headline = { 
       part1: `${student.firstName}, you have `, highlight: 'Potential', 
@@ -91,7 +88,7 @@ function generateDiagnosis(student: Student) {
     data.expectedOutcome = `Executing this will generate your initial baseline, moving your status from "Unknown" to "Active Strategy" by next week.`;
   }
 
-  // CASO 1: BAJA PRECISIÓN (La Trampa de la Velocidad)
+  // CASO 1: BAJA PRECISIÓN
   else if (accuracy < 60) {
     data.headline = { 
       part1: `${student.firstName}, you have the `, highlight: 'Effort', 
@@ -115,7 +112,7 @@ function generateDiagnosis(student: Student) {
     data.expectedOutcome = `This pivot will raise your accuracy to ${Math.min(accuracy + 15, 85)}% within 10 days, creating a stable platform for future acceleration.`;
   } 
   
-  // CASO 2: BAJO RITMO (La Trampa de la Frecuencia)
+  // CASO 2: BAJO RITMO
   else if (velocity < 50) {
     data.headline = { 
       part1: `${student.firstName}, you have the `, highlight: 'Accuracy', 
@@ -139,7 +136,7 @@ function generateDiagnosis(student: Student) {
     data.expectedOutcome = `Increasing volume aims to reach 125 XP/week. This converts your potential into permanent performance and secures a ${contextGoal} projection.`;
   }
   
-  // CASO 3: EXCELENCIA (El Reto de la Maestría)
+  // CASO 3: EXCELENCIA
   else {
     data.headline = { 
       part1: `${student.firstName}, you have `, highlight: 'Excellence', 
@@ -167,7 +164,7 @@ function generateDiagnosis(student: Student) {
 }
 
 // ==========================================
-// 2. RENDER ENGINE (Student-Centric High Performance Layout)
+// 2. RENDER ENGINE (Editorial / Clean White Layout)
 // ==========================================
 export async function generateStudentPDF({ 
   student, 
@@ -191,11 +188,11 @@ export async function generateStudentPDF({
   const dateObj = new Date();
   const reportDate = dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
-  // --- HELPER: FOOTER (Minimalist & Professional) ---
+  // --- HELPER: FOOTER ---
   const addFooter = (pageNum: number) => {
     doc.setPage(pageNum);
     
-    // SIGNATURE BLOCK (Solo página 1) - Formal but Supportive
+    // SIGNATURE BLOCK (Solo página 1)
     if (pageNum === 1) {
       const sigY = pageHeight - 32; 
       doc.setFont('helvetica', 'bold');
@@ -206,7 +203,7 @@ export async function generateStudentPDF({
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(...(COLORS.textGrey));
-      doc.text('HS Math DRI', pageWidth - margin, sigY + 4, { align: 'right' }); // Back to HS Math DRI for consistency
+      doc.text('HS Math DRI', pageWidth - margin, sigY + 4, { align: 'right' });
       doc.text('Alpha High Performance Team', pageWidth - margin, sigY + 8, { align: 'right' });
     }
 
@@ -227,55 +224,63 @@ export async function generateStudentPDF({
 
   // --- PAGE 1 CONTENT ---
   
-  // 1. HERO HEADER (The "Assertion")
-  doc.setFillColor(...(COLORS.navy));
-  doc.roundedRect(margin, margin, pageWidth - margin * 2, 48, 3, 3, 'F');
-  
-  doc.setTextColor(200, 210, 220); 
+  // 1. HERO HEADER (Editorial Style - No Box)
+  // Eyebrow Label
   doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  // Revert back to "HS Math DRI" as explicitly requested
-  doc.text(`STRATEGIC INTERVENTION | HS Math DRI: ${driName.toUpperCase()}`, margin + 8, margin + 10);
+  doc.setFont('helvetica', 'normal'); // Normal weight for the label
+  doc.setTextColor(...(COLORS.textGrey));
+  doc.text('DRI MESSAGE | HS MATH DRI', margin, margin + 4);
 
-  doc.setFontSize(22);
+  // Headline Lines
+  doc.setFontSize(24);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255); 
   
-  const line1Y = margin + 22;
-  doc.text(diag.headline.part1, margin + 8, line1Y);
+  // Line 1
+  const line1Y = margin + 16;
+  doc.setTextColor(...(COLORS.textMain)); // Black text
+  doc.text(diag.headline.part1, margin, line1Y);
+  
   const w1 = doc.getTextWidth(diag.headline.part1);
-  doc.setTextColor(...(COLORS.limeHighlight)); 
-  doc.text(diag.headline.highlight, margin + 8 + w1, line1Y);
+  doc.setTextColor(...(COLORS.positiveGreen)); // GREEN highlight (Accuracy/Potential)
+  doc.text(diag.headline.highlight + '.', margin + w1, line1Y);
 
-  const line2Y = margin + 32;
-  doc.setTextColor(255, 255, 255);
-  doc.text(diag.headline.part2, margin + 8, line2Y);
+  // Line 2
+  const line2Y = margin + 27;
+  doc.setTextColor(...(COLORS.textMain)); // Black text
+  doc.text(diag.headline.part2, margin, line2Y);
+  
   const w2 = doc.getTextWidth(diag.headline.part2);
-  doc.setTextColor(...(COLORS.accentOrange)); 
-  doc.text(diag.headline.highlight2 + '.', margin + 8 + w2, line2Y);
+  doc.setTextColor(...(COLORS.accentOrange)); // ORANGE highlight (Rhythm/Activation)
+  doc.text(diag.headline.highlight2 + '.', margin + w2, line2Y);
 
+  // 2. STRATEGIC DIAGNOSIS (Justified Block)
   const diagY = margin + 42;
   
-  // High Definition Label + Justified Block Layout
-  doc.setTextColor(240, 240, 240); 
+  doc.setTextColor(...(COLORS.textGrey)); 
   doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Strategic Diagnosis:', margin + 8, diagY);
+  doc.setFont('helvetica', 'normal'); // Label in grey
+  doc.text('Executive Diagnosis:', margin, diagY);
   
-  const labelWidth = doc.getTextWidth('Strategic Diagnosis: ');
-  const diagTextX = margin + 8 + labelWidth + 2; // +2mm spacing
-  const diagTextMaxWidth = pageWidth - margin * 2 - 16 - labelWidth - 2;
+  const labelWidth = doc.getTextWidth('Executive Diagnosis: ');
+  const diagTextX = margin + labelWidth + 2; 
+  const diagTextMaxWidth = pageWidth - margin * 2 - labelWidth - 2;
 
+  doc.setTextColor(...(COLORS.textMain)); // Body text in Black
   doc.setFont('helvetica', 'normal');
-  // JUSTIFIED ALIGNMENT for the block
+  
+  // JUSTIFIED ALIGNMENT
   doc.text(diag.strategicDiagnosis, diagTextX, diagY, {
     maxWidth: diagTextMaxWidth,
     align: 'justify',
-    lineHeightFactor: 1.15
+    lineHeightFactor: 1.3 // Increased leading for "8K" readability
   });
+  
+  // Calculate height used by diagnosis to push KPIs down
+  const diagLines = doc.splitTextToSize(diag.strategicDiagnosis, diagTextMaxWidth);
+  const diagHeight = diagLines.length * 4.5; 
 
-  // 2. KPI BOXES (The "Data")
-  let yPos = margin + 55;
+  // 3. KPI BOXES
+  let yPos = diagY + diagHeight + 10; // Dynamic spacing
   const kpiGap = 4;
   const kpiW = (pageWidth - (margin * 2) - (kpiGap * 2)) / 3;
   const kpiH = 32;
@@ -294,7 +299,7 @@ export async function generateStudentPDF({
       desc: 'Speed towards the goal.' 
     },
     { 
-      label: 'CONSISTENCY', sub: 'STREAK', // "Streak" resonates better with students than "KSI"
+      label: 'CONSISTENCY', sub: 'STREAK', 
       val: `${student.metrics.ksi || 0}%`, 
       col: COLORS.textMain, 
       desc: 'Reliability of effort.' 
@@ -305,7 +310,7 @@ export async function generateStudentPDF({
     const x = margin + i * (kpiW + kpiGap);
     
     doc.setFillColor(...(COLORS.softBg));
-    doc.setDrawColor(220, 220, 230);
+    doc.setDrawColor(230, 230, 230);
     doc.setLineWidth(0.1);
     doc.roundedRect(x, yPos, kpiW, kpiH, 2, 2, 'FD');
     
@@ -327,8 +332,8 @@ export async function generateStudentPDF({
     doc.text(kpi.desc, x + kpiW / 2, yPos + 27, { align: 'center' });
   });
 
-  // 3. MOMENTUM GAP & INSIGHT (The "Science")
-  yPos += 40;
+  // 4. MOMENTUM GAP & INSIGHT
+  yPos += 45; // Increased spacing
   const colGap = 10;
   const col1W = (pageWidth - margin * 2 - colGap) * 0.55; 
   const col2X = margin + col1W + colGap;
@@ -342,16 +347,14 @@ export async function generateStudentPDF({
   doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   doc.setTextColor(...(COLORS.textMain));
   
-  // Justify Intro Text
   if (diag.momentumGap.intro) {
     doc.text(diag.momentumGap.intro, margin, textY, {
         maxWidth: col1W,
         align: 'justify',
-        lineHeightFactor: 1.15
+        lineHeightFactor: 1.2
     });
-    // Approximation for height update since text() returns doc
     const lines = doc.splitTextToSize(diag.momentumGap.intro, col1W);
-    textY += (lines.length * 4) + 3;
+    textY += (lines.length * 4.5) + 3;
   }
 
   diag.momentumGap.points.forEach(point => {
@@ -361,32 +364,29 @@ export async function generateStudentPDF({
     doc.setTextColor(...(COLORS.textMain));
     const parts = point.split(':');
     if (parts.length > 1) {
-        // Bold Title
         doc.setFont('helvetica', 'bold');
         doc.text(parts[0] + ':', margin + 4, textY);
         const prefixW = doc.getTextWidth(parts[0] + ': ');
         
-        // Justified Hanging Indent for Description
         doc.setFont('helvetica', 'normal');
         const descMaxWidth = col1W - 6 - prefixW;
         doc.text(parts.slice(1).join(':').trim(), margin + 4 + prefixW, textY, {
             maxWidth: descMaxWidth,
             align: 'justify',
-            lineHeightFactor: 1.15
+            lineHeightFactor: 1.2
         });
         
         const lines = doc.splitTextToSize(parts.slice(1).join(':').trim(), descMaxWidth);
-        textY += (lines.length * 4);
+        textY += (lines.length * 4.5);
     } else {
-        // Just Bullet
         const bulletMaxWidth = col1W - 6;
         doc.text(point, margin + 4, textY, {
             maxWidth: bulletMaxWidth,
             align: 'justify',
-            lineHeightFactor: 1.15
+            lineHeightFactor: 1.2
         });
         const lines = doc.splitTextToSize(point, bulletMaxWidth);
-        textY += lines.length * 4;
+        textY += lines.length * 4.5;
     }
     textY += 2;
   });
@@ -401,8 +401,6 @@ export async function generateStudentPDF({
   
   doc.setTextColor(...(COLORS.textMain)); doc.setFontSize(9); doc.setFont('helvetica', 'italic');
   
-  // Quote usually looks better Left Aligned (ragged right) to feel organic, or Centered. 
-  // Justified quotes can look weird if short. Let's keep it clean Left but tighter.
   const quoteLines = doc.splitTextToSize(diag.coachInsight, col2W);
   doc.text(quoteLines, col2X, yPos + 8);
   
@@ -410,7 +408,7 @@ export async function generateStudentPDF({
   doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
   doc.text(`- ${driName}`, col2X, yPos + 8 + quoteH + 2);
 
-  // 4. PROTOCOL (The "Action")
+  // 5. PROTOCOL
   if (includeRecommendations) {
     yPos = Math.max(textY, yPos + 8 + quoteH + 15) + 5;
     
@@ -433,12 +431,12 @@ export async function generateStudentPDF({
       doc.setFontSize(9); doc.setFont('helvetica', 'bold');
       doc.text(step.title, contentX, yPos);
       
-      // Description - JUSTIFIED and placed BELOW the title for cleanliness (8K Look)
+      // Description
       const descY = yPos + 4.5;
       const descMaxWidth = pageWidth - contentX - margin;
       
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(50, 50, 50); // Slightly softer black
+      doc.setTextColor(50, 50, 50); 
       doc.text(step.description, contentX, descY, {
           maxWidth: descMaxWidth,
           align: 'justify',
@@ -446,10 +444,10 @@ export async function generateStudentPDF({
       });
       
       const lines = doc.splitTextToSize(step.description, descMaxWidth);
-      yPos += 4.5 + (lines.length * 4.5) + 4; // Spacing
+      yPos += 4.5 + (lines.length * 4.5) + 4; 
     });
 
-    // 5. ROI BOX (The "Why")
+    // 6. ROI BOX
     yPos += 2;
     doc.setFillColor(...(COLORS.lightGreen));
     doc.setDrawColor(...(COLORS.positiveGreen));
@@ -464,7 +462,6 @@ export async function generateStudentPDF({
     doc.setTextColor(20, 60, 20); 
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
     
-    // Justified ROI Text
     const roiMaxWidth = pageWidth - margin * 2 - (boxPad * 2);
     doc.text(diag.expectedOutcome, margin + boxPad, yPos + 10, {
         maxWidth: roiMaxWidth,
@@ -482,7 +479,7 @@ export async function generateStudentPDF({
 
   addFooter(1);
 
-  // --- PAGE 2: EVIDENCE (Optional) ---
+  // --- PAGE 2: EVIDENCE ---
   if (interventions.length > 0) {
     doc.addPage();
     doc.setFillColor(...(COLORS.softBg));
