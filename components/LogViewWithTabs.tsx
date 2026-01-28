@@ -2,18 +2,32 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { InterventionTracking, TrackingOutcome, TrackingStatus } from '@/types';
 
 interface LogViewWithTabsProps {
   logs: any[];
 }
 
+// Métricas disponibles para el reporte
+const AVAILABLE_METRICS = [
+  { key: 'rsr', label: 'RSR (Recent Success Rate)', suffix: '%' },
+  { key: 'ksi', label: 'KSI (Knowledge Stability)', suffix: '%' },
+  { key: 'velocity', label: 'Velocity', suffix: '%' },
+  { key: 'riskScore', label: 'Risk Score', suffix: '' },
+  { key: 'tier', label: 'Tier Change', suffix: '' },
+];
+
 export default function LogViewWithTabs({ logs }: LogViewWithTabsProps) {
   const [activeTab, setActiveTab] = useState<'interventions' | 'impact'>('interventions');
   const [trackings, setTrackings] = useState<InterventionTracking[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | TrackingStatus>('all');
   const [outcomeFilter, setOutcomeFilter] = useState<'all' | TrackingOutcome>('all');
+  
+  // Métricas seleccionadas para el reporte
+  const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['rsr', 'ksi', 'velocity', 'riskScore', 'tier']);
+  const [showMetricSelector, setShowMetricSelector] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Fetch intervention trackings
   useEffect(() => {
@@ -84,6 +98,192 @@ export default function LogViewWithTabs({ logs }: LogViewWithTabsProps) {
     if (value === null) return 'N/A';
     const sign = value > 0 ? '+' : '';
     return `${sign}${value}${suffix}`;
+  };
+
+  const toggleMetric = (key: string) => {
+    setSelectedMetrics(prev => 
+      prev.includes(key) 
+        ? prev.filter(m => m !== key)
+        : [...prev, key]
+    );
+  };
+
+  // Export PDF function
+  const handleExportPDF = async () => {
+    setExporting(true);
+    
+    try {
+      const completedTrackings = filteredTrackings.filter(t => t.status === 'completed');
+      
+      // Generar HTML para el PDF
+      const reportDate = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', month: 'long', day: 'numeric' 
+      });
+      
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Impact Report - ${reportDate}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; }
+            .header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+            .header h1 { font-size: 28px; font-weight: 800; color: #0f172a; margin-bottom: 8px; }
+            .header p { color: #64748b; font-size: 14px; }
+            .summary { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 40px; }
+            .summary-card { padding: 16px; border-radius: 12px; text-align: center; }
+            .summary-card.total { background: #f1f5f9; }
+            .summary-card.active { background: #fef3c7; }
+            .summary-card.completed { background: #e0e7ff; }
+            .summary-card.improved { background: #d1fae5; }
+            .summary-card.stable { background: #dbeafe; }
+            .summary-card.worsened { background: #fee2e2; }
+            .summary-card .value { font-size: 32px; font-weight: 800; }
+            .summary-card .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-top: 4px; }
+            .section-title { font-size: 16px; font-weight: 700; color: #334155; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
+            .tracking-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px; page-break-inside: avoid; }
+            .tracking-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+            .student-name { font-size: 16px; font-weight: 700; color: #0f172a; }
+            .student-course { font-size: 12px; color: #64748b; }
+            .outcome-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+            .outcome-improved { background: #d1fae5; color: #065f46; }
+            .outcome-stable { background: #dbeafe; color: #1e40af; }
+            .outcome-worsened { background: #fee2e2; color: #991b1b; }
+            .tracking-meta { display: flex; gap: 20px; font-size: 11px; color: #64748b; margin-bottom: 16px; }
+            .metrics-grid { display: grid; grid-template-columns: repeat(${selectedMetrics.length}, 1fr); gap: 8px; background: #fff; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; }
+            .metric-item { text-align: center; }
+            .metric-label { font-size: 9px; text-transform: uppercase; color: #94a3b8; margin-bottom: 4px; }
+            .metric-value { font-size: 16px; font-weight: 700; }
+            .metric-positive { color: #059669; }
+            .metric-negative { color: #dc2626; }
+            .metric-neutral { color: #64748b; }
+            .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 11px; }
+            .no-data { text-align: center; padding: 60px; color: #94a3b8; font-style: italic; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>📊 DRI Impact Report</h1>
+            <p>Generated on ${reportDate} • ${completedTrackings.length} completed trackings</p>
+          </div>
+          
+          <div class="summary">
+            <div class="summary-card total">
+              <div class="value">${stats.total}</div>
+              <div class="label">Total</div>
+            </div>
+            <div class="summary-card active">
+              <div class="value">${stats.active}</div>
+              <div class="label">Active</div>
+            </div>
+            <div class="summary-card completed">
+              <div class="value">${stats.completed}</div>
+              <div class="label">Completed</div>
+            </div>
+            <div class="summary-card improved">
+              <div class="value">${stats.improved}</div>
+              <div class="label">Improved</div>
+            </div>
+            <div class="summary-card stable">
+              <div class="value">${stats.stable}</div>
+              <div class="label">Stable</div>
+            </div>
+            <div class="summary-card worsened">
+              <div class="value">${stats.worsened}</div>
+              <div class="label">Worsened</div>
+            </div>
+          </div>
+          
+          <div class="section-title">Completed Intervention Trackings</div>
+          
+          ${completedTrackings.length === 0 ? `
+            <div class="no-data">No completed trackings to display</div>
+          ` : completedTrackings.map(t => `
+            <div class="tracking-card">
+              <div class="tracking-header">
+                <div>
+                  <div class="student-name">${t.studentName}</div>
+                  <div class="student-course">${t.studentCourse}</div>
+                </div>
+                <span class="outcome-badge outcome-${t.outcome}">${t.outcome}</span>
+              </div>
+              <div class="tracking-meta">
+                <span>📋 ${t.interventionType}</span>
+                <span>📅 ${t.period.replace('_', ' ')}</span>
+                <span>🕐 ${t.createdAt.toLocaleDateString()} → ${t.completedAt?.toLocaleDateString() || 'N/A'}</span>
+              </div>
+              ${t.outcomeDetails ? `
+                <div class="metrics-grid">
+                  ${selectedMetrics.includes('rsr') ? `
+                    <div class="metric-item">
+                      <div class="metric-label">RSR Δ</div>
+                      <div class="metric-value ${(t.outcomeDetails.rsrDelta || 0) > 0 ? 'metric-positive' : (t.outcomeDetails.rsrDelta || 0) < 0 ? 'metric-negative' : 'metric-neutral'}">
+                        ${formatDelta(t.outcomeDetails.rsrDelta, '%')}
+                      </div>
+                    </div>
+                  ` : ''}
+                  ${selectedMetrics.includes('ksi') ? `
+                    <div class="metric-item">
+                      <div class="metric-label">KSI Δ</div>
+                      <div class="metric-value ${(t.outcomeDetails.ksiDelta || 0) > 0 ? 'metric-positive' : (t.outcomeDetails.ksiDelta || 0) < 0 ? 'metric-negative' : 'metric-neutral'}">
+                        ${formatDelta(t.outcomeDetails.ksiDelta, '%')}
+                      </div>
+                    </div>
+                  ` : ''}
+                  ${selectedMetrics.includes('velocity') ? `
+                    <div class="metric-item">
+                      <div class="metric-label">Velocity Δ</div>
+                      <div class="metric-value ${(t.outcomeDetails.velocityDelta || 0) > 0 ? 'metric-positive' : (t.outcomeDetails.velocityDelta || 0) < 0 ? 'metric-negative' : 'metric-neutral'}">
+                        ${formatDelta(t.outcomeDetails.velocityDelta, '%')}
+                      </div>
+                    </div>
+                  ` : ''}
+                  ${selectedMetrics.includes('riskScore') ? `
+                    <div class="metric-item">
+                      <div class="metric-label">Risk Δ</div>
+                      <div class="metric-value ${(t.outcomeDetails.riskScoreDelta || 0) < 0 ? 'metric-positive' : (t.outcomeDetails.riskScoreDelta || 0) > 0 ? 'metric-negative' : 'metric-neutral'}">
+                        ${formatDelta(t.outcomeDetails.riskScoreDelta)}
+                      </div>
+                    </div>
+                  ` : ''}
+                  ${selectedMetrics.includes('tier') ? `
+                    <div class="metric-item">
+                      <div class="metric-label">Tier</div>
+                      <div class="metric-value metric-neutral">
+                        ${t.outcomeDetails.tierChange || '—'}
+                      </div>
+                    </div>
+                  ` : ''}
+                </div>
+              ` : ''}
+              ${t.interventionNotes ? `<p style="margin-top: 12px; font-size: 12px; color: #64748b; font-style: italic;">"${t.interventionNotes}"</p>` : ''}
+            </div>
+          `).join('')}
+          
+          <div class="footer">
+            DRI Command Center • Alpha Math Dashboard • Impact Tracking System
+          </div>
+        </body>
+        </html>
+      `;
+      
+      // Crear blob y descargar
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `impact-report-${new Date().toISOString().split('T')[0]}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Error exporting report:', error);
+      alert('Error generating report. Please try again.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -201,8 +401,8 @@ export default function LogViewWithTabs({ logs }: LogViewWithTabsProps) {
             </div>
           </div>
 
-          {/* Filters */}
-          <div className="flex-shrink-0 flex gap-3 mb-4">
+          {/* Filters & Export */}
+          <div className="flex-shrink-0 flex flex-wrap gap-3 mb-4">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
@@ -224,11 +424,67 @@ export default function LogViewWithTabs({ logs }: LogViewWithTabsProps) {
               <option value="worsened">Worsened</option>
               <option value="pending">Pending</option>
             </select>
+            
+            {/* Metric Selector */}
+            <div className="relative">
+              <button
+                onClick={() => setShowMetricSelector(!showMetricSelector)}
+                className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-[10px] font-bold text-slate-400 hover:border-slate-700 transition-colors flex items-center gap-2"
+              >
+                📊 Metrics ({selectedMetrics.length})
+                <span className="text-[8px]">▼</span>
+              </button>
+              
+              {showMetricSelector && (
+                <div className="absolute top-full left-0 mt-2 bg-slate-900 border border-slate-700 rounded-xl p-3 z-50 shadow-2xl min-w-[200px]">
+                  <p className="text-[9px] text-slate-500 uppercase font-bold mb-2">Include in Report:</p>
+                  {AVAILABLE_METRICS.map(metric => (
+                    <label key={metric.key} className="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-slate-800/50 px-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={selectedMetrics.includes(metric.key)}
+                        onChange={() => toggleMetric(metric.key)}
+                        className="rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0"
+                      />
+                      <span className="text-[10px] text-slate-300">{metric.label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            
             <div className="flex-1" />
+            
             <span className="text-[9px] text-slate-600 self-center">
               Showing {filteredTrackings.length} of {trackings.length}
             </span>
+            
+            {/* Export Button */}
+            <button
+              onClick={handleExportPDF}
+              disabled={exporting || stats.completed === 0}
+              className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-colors flex items-center gap-2"
+            >
+              {exporting ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  📄 Export Report
+                </>
+              )}
+            </button>
           </div>
+
+          {/* Click outside to close metric selector */}
+          {showMetricSelector && (
+            <div 
+              className="fixed inset-0 z-40" 
+              onClick={() => setShowMetricSelector(false)} 
+            />
+          )}
 
           {/* Trackings Table */}
           <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -273,51 +529,61 @@ export default function LogViewWithTabs({ logs }: LogViewWithTabsProps) {
                       )}
                     </div>
 
-                    {/* Metrics Comparison (for completed) */}
+                    {/* Metrics Comparison (for completed) - Only show selected metrics */}
                     {tracking.status === 'completed' && tracking.outcomeDetails && (
-                      <div className="grid grid-cols-5 gap-2 p-3 bg-slate-900/50 rounded-xl">
-                        <div className="text-center">
-                          <div className="text-[8px] text-slate-600 uppercase">RSR Δ</div>
-                          <div className={`text-sm font-bold ${
-                            (tracking.outcomeDetails.rsrDelta || 0) > 0 ? 'text-emerald-400' :
-                            (tracking.outcomeDetails.rsrDelta || 0) < 0 ? 'text-red-400' : 'text-slate-400'
-                          }`}>
-                            {formatDelta(tracking.outcomeDetails.rsrDelta, '%')}
+                      <div className={`grid gap-2 p-3 bg-slate-900/50 rounded-xl`} style={{ gridTemplateColumns: `repeat(${selectedMetrics.length}, 1fr)` }}>
+                        {selectedMetrics.includes('rsr') && (
+                          <div className="text-center">
+                            <div className="text-[8px] text-slate-600 uppercase">RSR Δ</div>
+                            <div className={`text-sm font-bold ${
+                              (tracking.outcomeDetails.rsrDelta || 0) > 0 ? 'text-emerald-400' :
+                              (tracking.outcomeDetails.rsrDelta || 0) < 0 ? 'text-red-400' : 'text-slate-400'
+                            }`}>
+                              {formatDelta(tracking.outcomeDetails.rsrDelta, '%')}
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-[8px] text-slate-600 uppercase">KSI Δ</div>
-                          <div className={`text-sm font-bold ${
-                            (tracking.outcomeDetails.ksiDelta || 0) > 0 ? 'text-emerald-400' :
-                            (tracking.outcomeDetails.ksiDelta || 0) < 0 ? 'text-red-400' : 'text-slate-400'
-                          }`}>
-                            {formatDelta(tracking.outcomeDetails.ksiDelta, '%')}
+                        )}
+                        {selectedMetrics.includes('ksi') && (
+                          <div className="text-center">
+                            <div className="text-[8px] text-slate-600 uppercase">KSI Δ</div>
+                            <div className={`text-sm font-bold ${
+                              (tracking.outcomeDetails.ksiDelta || 0) > 0 ? 'text-emerald-400' :
+                              (tracking.outcomeDetails.ksiDelta || 0) < 0 ? 'text-red-400' : 'text-slate-400'
+                            }`}>
+                              {formatDelta(tracking.outcomeDetails.ksiDelta, '%')}
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-[8px] text-slate-600 uppercase">Velocity Δ</div>
-                          <div className={`text-sm font-bold ${
-                            (tracking.outcomeDetails.velocityDelta || 0) > 0 ? 'text-emerald-400' :
-                            (tracking.outcomeDetails.velocityDelta || 0) < 0 ? 'text-red-400' : 'text-slate-400'
-                          }`}>
-                            {formatDelta(tracking.outcomeDetails.velocityDelta, '%')}
+                        )}
+                        {selectedMetrics.includes('velocity') && (
+                          <div className="text-center">
+                            <div className="text-[8px] text-slate-600 uppercase">Velocity Δ</div>
+                            <div className={`text-sm font-bold ${
+                              (tracking.outcomeDetails.velocityDelta || 0) > 0 ? 'text-emerald-400' :
+                              (tracking.outcomeDetails.velocityDelta || 0) < 0 ? 'text-red-400' : 'text-slate-400'
+                            }`}>
+                              {formatDelta(tracking.outcomeDetails.velocityDelta, '%')}
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-[8px] text-slate-600 uppercase">Risk Δ</div>
-                          <div className={`text-sm font-bold ${
-                            (tracking.outcomeDetails.riskScoreDelta || 0) < 0 ? 'text-emerald-400' :
-                            (tracking.outcomeDetails.riskScoreDelta || 0) > 0 ? 'text-red-400' : 'text-slate-400'
-                          }`}>
-                            {formatDelta(tracking.outcomeDetails.riskScoreDelta)}
+                        )}
+                        {selectedMetrics.includes('riskScore') && (
+                          <div className="text-center">
+                            <div className="text-[8px] text-slate-600 uppercase">Risk Δ</div>
+                            <div className={`text-sm font-bold ${
+                              (tracking.outcomeDetails.riskScoreDelta || 0) < 0 ? 'text-emerald-400' :
+                              (tracking.outcomeDetails.riskScoreDelta || 0) > 0 ? 'text-red-400' : 'text-slate-400'
+                            }`}>
+                              {formatDelta(tracking.outcomeDetails.riskScoreDelta)}
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-[8px] text-slate-600 uppercase">Tier</div>
-                          <div className="text-sm font-bold text-purple-400">
-                            {tracking.outcomeDetails.tierChange || '—'}
+                        )}
+                        {selectedMetrics.includes('tier') && (
+                          <div className="text-center">
+                            <div className="text-[8px] text-slate-600 uppercase">Tier</div>
+                            <div className="text-sm font-bold text-purple-400">
+                              {tracking.outcomeDetails.tierChange || '—'}
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     )}
 
