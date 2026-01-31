@@ -1,3 +1,5 @@
+import { StudentDimensions } from '@/lib/student-dimensions';
+
 export interface Student {
   id: string;
   firstName: string;
@@ -13,6 +15,9 @@ export interface Student {
   metrics: Metrics;
   dri: DRIMetrics;
   lastUpdated: string;
+  
+  // ⭐ NUEVO: Dimensiones de agrupación (FASE 3 - Group Analytics)
+  dimensions?: StudentDimensions | null;
 }
 
 export interface StudentActivity {
@@ -155,6 +160,7 @@ export interface AlertsSummary {
   };
   recentAlerts: Alert[];
 }
+
 // ==========================================
 // INTERVENTION TRACKING TYPES - FASE 1B
 // ==========================================
