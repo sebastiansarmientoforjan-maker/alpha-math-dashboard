@@ -11,6 +11,7 @@ import Tooltip from '@/components/Tooltip';
 import AlertsDropdown from '@/components/AlertsDropdown';
 import LogViewWithTabs from '@/components/LogViewWithTabs';
 import GroupAnalyticsView from '@/components/GroupAnalyticsView';
+import DashboardTrendsView from '@/components/DashboardTrendsView';
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
 import { DRI_CONFIG } from '@/lib/dri-config';
@@ -258,7 +259,7 @@ export default function HomePage() {
   const [eta, setEta] = useState<number | null>(null);
   const [avgBatchTime, setAvgBatchTime] = useState<number | null>(null);
   const [isPaused, setIsPaused] = useState(false);
-  const [viewMode, setViewMode] = useState<'TRIAGE' | 'MATRIX' | 'HEATMAP' | 'LOG' | 'GROUP'>('TRIAGE');
+  const [viewMode, setViewMode] = useState<'TRIAGE' | 'MATRIX' | 'HEATMAP' | 'LOG' | 'GROUP' | 'TRENDS'>('TRIAGE');
   const [search, setSearch] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('ALL');
 
@@ -270,6 +271,7 @@ export default function HomePage() {
       if (e.key === '3' && !selectedStudent) setViewMode('HEATMAP');
       if (e.key === '4' && !selectedStudent) setViewMode('LOG');
       if (e.key === '5' && !selectedStudent) setViewMode('GROUP');
+      if (e.key === '6' && !selectedStudent) setViewMode('TRENDS');
       if (e.key === 'Escape') {
         if (selectedStudent) { setSelectedStudent(null); setSelectedStudentIndex(-1); }
         else if (selectionMode) { setSelectionMode(false); setSelectedIds(new Set()); }
@@ -471,7 +473,7 @@ export default function HomePage() {
           </div>
           <div className="flex flex-col items-end gap-2">
             <div className={`flex bg-slate-900/50 p-1 rounded-xl border border-slate-800 font-black uppercase ${compactHeader ? 'text-[8px]' : 'text-[10px]'}`}>
-              {(['TRIAGE', 'MATRIX', 'HEATMAP', 'LOG', 'GROUP'] as const).map((m, i) => (
+              {(['TRIAGE', 'MATRIX', 'HEATMAP', 'LOG', 'GROUP', 'TRENDS'] as const).map((m, i) => (
                 <button key={m} onClick={() => setViewMode(m)} className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${viewMode === m ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>
                   {m}<kbd className={`text-[7px] px-1 rounded ${viewMode === m ? 'bg-indigo-500' : 'bg-slate-800'}`}>{i + 1}</kbd>
                 </button>
@@ -608,6 +610,8 @@ export default function HomePage() {
         {viewMode === 'LOG' && <LogViewWithTabs logs={logs} />}
 
         {viewMode === 'GROUP' && <GroupAnalyticsView students={filtered} />}
+
+        {viewMode === 'TRENDS' && <DashboardTrendsView />}
       </div>
 
       {selectedStudent && <StudentModal student={selectedStudent} onClose={() => { setSelectedStudent(null); setSelectedStudentIndex(-1); }} onNavigate={navigateStudent} currentIndex={selectedStudentIndex} totalStudents={filteredForNavigation.length} />}
