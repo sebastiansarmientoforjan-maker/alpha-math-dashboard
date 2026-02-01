@@ -135,9 +135,9 @@ export default function GroupAnalyticsView({
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 border border-slate-800 rounded-3xl p-8">
+    <div className="h-full flex flex-col bg-slate-950 border border-slate-800 rounded-3xl p-8 overflow-hidden">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
           <h2 className="text-2xl font-black text-white flex items-center gap-2">
             <span>{dimensionConfig.icon}</span>
@@ -165,7 +165,7 @@ export default function GroupAnalyticsView({
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-4 gap-4 mb-6 flex-shrink-0">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">Total Students</div>
           <div className="text-2xl font-black text-white">{students.length}</div>
@@ -199,7 +199,7 @@ export default function GroupAnalyticsView({
       </div>
 
       {/* Charts Grid */}
-      <div className="flex-1 grid grid-cols-2 gap-6 min-h-0">
+      <div className="flex-1 grid grid-cols-2 gap-6 min-h-0 overflow-hidden">
         {/* Bar Chart: Tier Distribution */}
         <ChartCard title="Distribution by Tier">
           <ResponsiveContainer width="100%" height="100%">
@@ -389,7 +389,7 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col min-h-[300px]">
       <h3 className="text-sm font-black text-white mb-4">{title}</h3>
       <div className="flex-1 min-h-0">{children}</div>
     </div>
