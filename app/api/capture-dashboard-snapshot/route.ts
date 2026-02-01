@@ -57,8 +57,7 @@ export async function GET() {
       const data = doc.data();
       const metrics = calculateTier1Metrics(data, data.activity);
       
-      // CORRECCIÓN DE TIPOS:
-      // Agregamos 'id' y usamos 'as any' para cumplir con la interfaz Student requerida por dri-calculus
+      // Agregamos 'id' y casteamos a any para cumplir con la interfaz Student
       const dri = calculateDRIMetrics({ id: doc.id, ...data, metrics } as any);
       
       return {
@@ -120,7 +119,6 @@ export async function GET() {
 
     console.log(`[SNAPSHOT] ✅ Snapshot saved: ${dateStr}, ${students.length} students`);
 
-    // CORRECCIÓN FINAL: Retornamos spread de results (que ya tiene success: true)
     return NextResponse.json({
       ...results,
       preview: {
@@ -132,8 +130,12 @@ export async function GET() {
   } catch (error: any) {
     console.error('[SNAPSHOT] Fatal error:', error);
     results.error = error.message;
+    
+    // Aseguramos que sea false antes de responder
+    results.success = false;
+
+    // CORRECCIÓN: Eliminamos la propiedad duplicada 'success: false'
     return NextResponse.json({
-      success: false,
       ...results,
     }, { status: 500 });
   }
@@ -215,5 +217,5 @@ function calculateTopicScores(students: any[]): TopicScore[] {
       avgRSR: Math.round((data.totalRSR / data.count) * 100),
       studentCount: data.count,
     }))
-    .filter(t => t.studentCount >= 5); // Mínimo 5 estudiantes
+    .filter(t => t.studentCount >= 5);
 }
