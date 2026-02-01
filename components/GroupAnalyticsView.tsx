@@ -196,20 +196,44 @@ export default function GroupAnalyticsView({
           </p>
         </div>
 
-        {/* Dimension Selector */}
-        <select
-          value={selectedDimension}
-          onChange={(e) =>
-            setSelectedDimension(e.target.value as GroupDimension)
-          }
-          className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white hover:border-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
-        >
-          {GROUP_DIMENSIONS.map((dim) => (
-            <option key={dim.value} value={dim.value}>
-              {dim.icon} {dim.label} ({dim.groups} groups)
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-3">
+          {/* Dimension Selector */}
+          <select
+            value={selectedDimension}
+            onChange={(e) =>
+              setSelectedDimension(e.target.value as GroupDimension)
+            }
+            className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white hover:border-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+          >
+            {GROUP_DIMENSIONS.map((dim) => (
+              <option key={dim.value} value={dim.value}>
+                {dim.icon} {dim.label} ({dim.groups} groups)
+              </option>
+            ))}
+          </select>
+
+          {/* Export PDF Button */}
+          <button
+            onClick={async () => {
+              try {
+                await generateGroupReportPDF({
+                  dimension: selectedDimension,
+                  dimensionLabel: dimensionConfig.label,
+                  stats: statsData,
+                  students: students,
+                  includeStudentPages: false,
+                });
+              } catch (error) {
+                console.error('PDF generation error:', error);
+                alert('Error generating PDF. Check console for details.');
+              }
+            }}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase rounded-xl transition-all flex items-center gap-2 shadow-lg hover:shadow-indigo-500/50 hover:scale-105"
+          >
+            <span>📄</span>
+            Export PDF
+          </button>
+        </div>
       </div>
 
       {/* Summary Stats */}
@@ -423,30 +447,6 @@ export default function GroupAnalyticsView({
             </table>
           </div>
         </ChartCard>
-      </div>
-
-      {/* Export Button */}
-      <div className="mt-6 flex justify-end">
-        <button
-          onClick={async () => {
-            try {
-              await generateGroupReportPDF({
-                dimension: selectedDimension,
-                dimensionLabel: dimensionConfig.label,
-                stats: statsData,
-                students: students,
-                includeStudentPages: false,
-              });
-            } catch (error) {
-              console.error('PDF generation error:', error);
-              alert('Error generating PDF. Check console for details.');
-            }
-          }}
-          className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase rounded-xl transition-colors flex items-center gap-2 shadow-lg hover:shadow-indigo-500/50"
-        >
-          <span>📄</span>
-          Export Group Report PDF
-        </button>
       </div>
 
       {/* Drill-Down Modal */}
