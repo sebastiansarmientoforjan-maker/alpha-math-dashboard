@@ -197,7 +197,7 @@ export default function GroupAnalyticsView({
                 cy="50%"
                 outerRadius={80}
                 label={(entry) => `${entry.name} (${entry.value})`}
-                labelStyle={{ fontSize: '10px' }}
+                style={{ fontSize: '10px' }}
               >
                 {pieData.map((entry, index) => {
                   const color =
