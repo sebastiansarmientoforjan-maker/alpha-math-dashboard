@@ -135,9 +135,9 @@ export default function GroupAnalyticsView({
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 border border-slate-800 rounded-3xl p-8 overflow-hidden">
+    <div className="h-full bg-slate-950 border border-slate-800 rounded-3xl p-8 overflow-auto">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6 flex-shrink-0">
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-black text-white flex items-center gap-2">
             <span>{dimensionConfig.icon}</span>
@@ -165,7 +165,7 @@ export default function GroupAnalyticsView({
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6 flex-shrink-0">
+      <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">Total Students</div>
           <div className="text-2xl font-black text-white">{students.length}</div>
@@ -198,11 +198,11 @@ export default function GroupAnalyticsView({
         </div>
       </div>
 
-      {/* Charts Grid */}
-      <div className="flex-1 grid grid-cols-2 gap-6 min-h-0 overflow-hidden">
+      {/* Charts Grid - ALTURA FIJA */}
+      <div className="grid grid-cols-2 gap-6 h-[600px]">
         {/* Bar Chart: Tier Distribution */}
         <ChartCard title="Distribution by Tier">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height={250}>
             <BarChart data={tierDistributionData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
               <XAxis
@@ -232,7 +232,7 @@ export default function GroupAnalyticsView({
 
         {/* Pie Chart: Student Distribution */}
         <ChartCard title="Student Distribution">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height={250}>
             <PieChart>
               <Pie
                 data={pieData}
@@ -265,7 +265,7 @@ export default function GroupAnalyticsView({
 
         {/* Radar Chart: Metrics Comparison */}
         <ChartCard title="Metrics Comparison (Top 5 Groups)">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height={250}>
             <RadarChart data={radarData}>
               <PolarGrid stroke="#334155" />
               <PolarAngleAxis dataKey="group" stroke="#94a3b8" tick={{ fontSize: 10 }} />
@@ -298,7 +298,7 @@ export default function GroupAnalyticsView({
 
         {/* Table: Summary Statistics */}
         <ChartCard title="Summary Statistics">
-          <div className="h-full overflow-y-auto custom-scrollbar">
+          <div className="h-[250px] overflow-y-auto custom-scrollbar">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-slate-900 z-10">
                 <tr className="border-b border-slate-700">
@@ -389,9 +389,9 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col min-h-[300px]">
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
       <h3 className="text-sm font-black text-white mb-4">{title}</h3>
-      <div className="flex-1 min-h-0">{children}</div>
+      {children}
     </div>
   );
 }
