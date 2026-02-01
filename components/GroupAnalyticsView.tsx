@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Student } from '@/types';
 import {
   GroupDimension,
@@ -14,6 +14,7 @@ import {
   sortGroupsByCount,
   generateGroupSummary,
 } from '@/lib/group-analytics-utils';
+import { generateGroupReportPDF } from '@/lib/group-report-pdf';
 import {
   BarChart,
   Bar,
@@ -42,6 +43,20 @@ export default function GroupAnalyticsView({
 }: GroupAnalyticsViewProps) {
   const [selectedDimension, setSelectedDimension] =
     useState<GroupDimension>('campus');
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const [drillDownTier, setDrillDownTier] = useState<'RED' | 'YELLOW' | 'GREEN' | null>(null);
+
+  // Handle ESC key to close drill-down modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedGroup) {
+        closeDrillDown();
+      }
+    };
+    
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [selectedGroup]);
 
   // Agrupar estudiantes por dimensión seleccionada
   const groupedData = useMemo(() => {
@@ -112,6 +127,39 @@ export default function GroupAnalyticsView({
   console.log('👥 Total Students:', students.length);
   console.log('📦 Grouped Data Keys:', Object.keys(groupedData));
   console.log('📈 Stats Data Length:', statsData.length);
+
+  // Handlers para interactividad
+  const handleBarClick = (data: any) => {
+    if (data && data.activePayload && data.activePayload[0]) {
+      const groupName = data.activePayload[0].payload.name;
+      setSelectedGroup(groupName);
+      console.log('📊 Selected group:', groupName);
+    }
+  };
+
+  const handlePieClick = (data: any) => {
+    if (data && data.name) {
+      setSelectedGroup(data.name);
+      console.log('🥧 Selected group from pie:', data.name);
+    }
+  };
+
+  const handleTierClick = (tier: 'RED' | 'YELLOW' | 'GREEN', groupName: string) => {
+    setSelectedGroup(groupName);
+    setDrillDownTier(tier);
+    console.log('🎯 Drill down:', { group: groupName, tier });
+  };
+
+  const closeDrillDown = () => {
+    setSelectedGroup(null);
+    setDrillDownTier(null);
+  };
+
+  // Obtener estudiantes del grupo seleccionado
+  const drillDownStudents = selectedGroup ? groupedData[selectedGroup] || [] : [];
+  const filteredDrillDownStudents = drillDownTier
+    ? drillDownStudents.filter(s => s.dri?.driTier === drillDownTier)
+    : drillDownStudents;
 
   if (students.length === 0) {
     return (
@@ -203,7 +251,7 @@ export default function GroupAnalyticsView({
         {/* Bar Chart: Tier Distribution */}
         <ChartCard title="Distribution by Tier">
           <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={tierDistributionData}>
+            <BarChart data={tierDistributionData} onClick={handleBarClick}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
               <XAxis
                 dataKey="name"
@@ -221,13 +269,15 @@ export default function GroupAnalyticsView({
                   borderRadius: '8px',
                   fontSize: '12px',
                 }}
+                cursor={{ fill: 'rgba(99, 102, 241, 0.1)' }}
               />
               <Legend wrapperStyle={{ fontSize: '12px' }} />
-              <Bar dataKey="Red" stackId="a" fill="#ef4444" />
-              <Bar dataKey="Yellow" stackId="a" fill="#f59e0b" />
-              <Bar dataKey="Green" stackId="a" fill="#10b981" />
+              <Bar dataKey="Red" stackId="a" fill="#ef4444" cursor="pointer" />
+              <Bar dataKey="Yellow" stackId="a" fill="#f59e0b" cursor="pointer" />
+              <Bar dataKey="Green" stackId="a" fill="#10b981" cursor="pointer" />
             </BarChart>
           </ResponsiveContainer>
+          <p className="text-[10px] text-slate-600 italic mt-2">Click on a bar to view students</p>
         </ChartCard>
 
         {/* Pie Chart: Student Distribution */}
@@ -243,6 +293,8 @@ export default function GroupAnalyticsView({
                 outerRadius={80}
                 label={(entry) => `${entry.name} (${entry.value})`}
                 style={{ fontSize: '10px' }}
+                onClick={handlePieClick}
+                cursor="pointer"
               >
                 {pieData.map((entry, index) => {
                   const color =
@@ -261,6 +313,7 @@ export default function GroupAnalyticsView({
               />
             </PieChart>
           </ResponsiveContainer>
+          <p className="text-[10px] text-slate-600 italic mt-2">Click on a segment to view students</p>
         </ChartCard>
 
         {/* Radar Chart: Metrics Comparison */}
@@ -339,19 +392,28 @@ export default function GroupAnalyticsView({
                     <td className="text-center p-2">
                       <div className="flex gap-1 justify-center">
                         {stat.redCount > 0 && (
-                          <span className="text-red-500 text-[10px]">
+                          <button
+                            onClick={() => handleTierClick('RED', stat.group)}
+                            className="text-red-500 text-[10px] hover:bg-red-900/20 px-1 rounded transition-colors cursor-pointer"
+                          >
                             🔴{stat.redCount}
-                          </span>
+                          </button>
                         )}
                         {stat.yellowCount > 0 && (
-                          <span className="text-amber-500 text-[10px]">
+                          <button
+                            onClick={() => handleTierClick('YELLOW', stat.group)}
+                            className="text-amber-500 text-[10px] hover:bg-amber-900/20 px-1 rounded transition-colors cursor-pointer"
+                          >
                             🟡{stat.yellowCount}
-                          </span>
+                          </button>
                         )}
                         {stat.greenCount > 0 && (
-                          <span className="text-emerald-500 text-[10px]">
+                          <button
+                            onClick={() => handleTierClick('GREEN', stat.group)}
+                            className="text-emerald-500 text-[10px] hover:bg-emerald-900/20 px-1 rounded transition-colors cursor-pointer"
+                          >
                             🟢{stat.greenCount}
-                          </span>
+                          </button>
                         )}
                       </div>
                     </td>
@@ -366,16 +428,145 @@ export default function GroupAnalyticsView({
       {/* Export Button */}
       <div className="mt-6 flex justify-end">
         <button
-          onClick={() => {
-            // TODO: Implement PDF export
-            alert('PDF export coming soon!');
+          onClick={async () => {
+            try {
+              await generateGroupReportPDF({
+                dimension: selectedDimension,
+                dimensionLabel: dimensionConfig.label,
+                stats: statsData,
+                students: students,
+                includeStudentPages: false,
+              });
+            } catch (error) {
+              console.error('PDF generation error:', error);
+              alert('Error generating PDF. Check console for details.');
+            }
           }}
-          className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase rounded-xl transition-colors flex items-center gap-2"
+          className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase rounded-xl transition-colors flex items-center gap-2 shadow-lg hover:shadow-indigo-500/50"
         >
           <span>📄</span>
           Export Group Report PDF
         </button>
       </div>
+
+      {/* Drill-Down Modal */}
+      {selectedGroup && (
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-8"
+          onClick={closeDrillDown}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-xl font-black text-white flex items-center gap-2">
+                  {selectedGroup}
+                  {drillDownTier && (
+                    <span className={`text-sm px-2 py-1 rounded ${
+                      drillDownTier === 'RED' ? 'bg-red-900/30 text-red-400' :
+                      drillDownTier === 'YELLOW' ? 'bg-amber-900/30 text-amber-400' :
+                      'bg-emerald-900/30 text-emerald-400'
+                    }`}>
+                      {drillDownTier} Tier Only
+                    </span>
+                  )}
+                </h3>
+                <p className="text-sm text-slate-400 mt-1">
+                  {filteredDrillDownStudents.length} students
+                  {drillDownTier && ` (filtered from ${drillDownStudents.length} total)`}
+                </p>
+              </div>
+              <button
+                onClick={closeDrillDown}
+                className="text-slate-400 hover:text-white transition-colors text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Students List */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-slate-900 z-10">
+                  <tr className="border-b border-slate-700">
+                    <th className="text-left p-2 font-black">Student</th>
+                    <th className="text-center p-2 font-black">RSR</th>
+                    <th className="text-center p-2 font-black">Velocity</th>
+                    <th className="text-center p-2 font-black">KSI</th>
+                    <th className="text-center p-2 font-black">Risk</th>
+                    <th className="text-center p-2 font-black">Tier</th>
+                    <th className="text-left p-2 font-black">Course</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDrillDownStudents.map((student) => (
+                    <tr
+                      key={student.id}
+                      className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors"
+                    >
+                      <td className="p-2 text-white font-bold">
+                        {student.firstName} {student.lastName}
+                      </td>
+                      <td className="text-center p-2 text-slate-300">
+                        {(student.metrics.lmp * 100).toFixed(0)}%
+                      </td>
+                      <td className="text-center p-2 text-slate-300">
+                        {student.metrics.velocityScore}%
+                      </td>
+                      <td className="text-center p-2 text-slate-300">
+                        {student.metrics.ksi !== null ? `${student.metrics.ksi}%` : 'N/A'}
+                      </td>
+                      <td className="text-center p-2">
+                        <span className={`font-bold ${
+                          (student.dri?.riskScore || 0) >= 60 ? 'text-red-400' :
+                          (student.dri?.riskScore || 0) >= 35 ? 'text-amber-400' :
+                          'text-emerald-400'
+                        }`}>
+                          {student.dri?.riskScore || 0}
+                        </span>
+                      </td>
+                      <td className="text-center p-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                          student.dri?.driTier === 'RED' ? 'bg-red-900/30 text-red-400' :
+                          student.dri?.driTier === 'YELLOW' ? 'bg-amber-900/30 text-amber-400' :
+                          'bg-emerald-900/30 text-emerald-400'
+                        }`}>
+                          {student.dri?.driTier}
+                        </span>
+                      </td>
+                      <td className="p-2 text-slate-400 truncate max-w-[200px]">
+                        {student.currentCourse?.name || 'N/A'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {filteredDrillDownStudents.length === 0 && (
+                <div className="text-center py-12 text-slate-500">
+                  No students found in this category
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="mt-4 pt-4 border-t border-slate-800 flex justify-between items-center">
+              <div className="text-xs text-slate-500">
+                Press ESC or click outside to close
+              </div>
+              <button
+                onClick={closeDrillDown}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-black uppercase rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
