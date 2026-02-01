@@ -11,4 +11,10 @@ if (!getApps().length) {
   });
 }
 
-export const adminDb = getFirestore();
+const firestoreInstance = getFirestore();
+
+// Opción 1: Mantener para código antiguo que busca 'adminDb'
+export const adminDb = firestoreInstance;
+
+// Opción 2: Nueva exportación estándar para tu código nuevo que busca 'db'
+export const db = firestoreInstance;
