@@ -45,7 +45,13 @@ export default function GroupAnalyticsView({
 
   // Agrupar estudiantes por dimensión seleccionada
   const groupedData = useMemo(() => {
-    return groupStudentsByDimension(students, selectedDimension);
+    const grouped = groupStudentsByDimension(students, selectedDimension);
+    console.log('🔍 Grouped Data:', {
+      dimension: selectedDimension,
+      groups: Object.keys(grouped),
+      counts: Object.entries(grouped).map(([k, v]) => `${k}: ${v.length}`),
+    });
+    return grouped;
   }, [students, selectedDimension]);
 
   // Calcular estadísticas para cada grupo
@@ -54,40 +60,79 @@ export default function GroupAnalyticsView({
       calculateGroupStats(group, groupStudents)
     );
     // Ordenar por count descendente
-    return stats.sort((a, b) => b.count - a.count);
+    const sorted = stats.sort((a, b) => b.count - a.count);
+    console.log('📊 Stats Data:', sorted.map(s => ({
+      group: s.group,
+      count: s.count,
+      avgRSR: s.avgRSR,
+      redCount: s.redCount,
+    })));
+    return sorted;
   }, [groupedData]);
 
   // Datos para gráficos
   const tierDistributionData = useMemo(() => {
-    return statsData.map((stat) => ({
+    const data = statsData.map((stat) => ({
       name: stat.group,
       Red: stat.redCount,
       Yellow: stat.yellowCount,
       Green: stat.greenCount,
     }));
+    console.log('📊 Tier Distribution Data:', data);
+    return data;
   }, [statsData]);
 
   const pieData = useMemo(() => {
-    return statsData.map((stat) => ({
+    const data = statsData.map((stat) => ({
       name: stat.group,
       value: stat.count,
     }));
+    console.log('🥧 Pie Data:', data);
+    return data;
   }, [statsData]);
 
   const radarData = useMemo(() => {
     // Top 5 grupos por tamaño
-    return statsData.slice(0, 5).map((stat) => ({
+    const data = statsData.slice(0, 5).map((stat) => ({
       group: stat.group.length > 15 ? stat.group.substring(0, 12) + '...' : stat.group,
-      RSR: stat.avgRSR,
-      Velocity: stat.avgVelocity,
-      KSI: stat.avgKSI,
-      'Risk Score': stat.avgRiskScore,
+      RSR: Math.round(stat.avgRSR),
+      Velocity: Math.round(stat.avgVelocity),
+      KSI: Math.round(stat.avgKSI),
+      'Risk Score': Math.round(stat.avgRiskScore),
     }));
+    console.log('🎯 Radar Data:', data);
+    return data;
   }, [statsData]);
 
   const dimensionConfig = GROUP_DIMENSIONS.find(
     (d) => d.value === selectedDimension
   )!;
+
+  // Debug: verificar si hay datos
+  console.log('👥 Total Students:', students.length);
+  console.log('📦 Grouped Data Keys:', Object.keys(groupedData));
+  console.log('📈 Stats Data Length:', statsData.length);
+
+  if (students.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center bg-slate-950 border border-slate-800 rounded-3xl p-8">
+        <div className="text-center">
+          <p className="text-slate-500 text-lg">No students data available</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (statsData.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center bg-slate-950 border border-slate-800 rounded-3xl p-8">
+        <div className="text-center">
+          <p className="text-slate-500 text-lg">No groups found for dimension: {selectedDimension}</p>
+          <p className="text-slate-600 text-sm mt-2">Check console for details</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-slate-950 border border-slate-800 rounded-3xl p-8">
