@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, serverTimestamp } from 'firestore';
+// CORRECCIÓN: Cambiar 'firestore' por 'firebase/firestore'
+import { collection, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore'; 
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
 import { getStudentDimension } from '@/lib/student-dimensions';
