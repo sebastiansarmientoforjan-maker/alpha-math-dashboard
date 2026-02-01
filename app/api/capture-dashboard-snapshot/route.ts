@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-// CORRECCIÓN: Cambiar 'firestore' por 'firebase/firestore'
 import { collection, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore'; 
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
+// Importamos la función que acabamos de crear en la librería
 import { getStudentDimension } from '@/lib/student-dimensions';
 
 export const dynamic = 'force-dynamic';
@@ -28,24 +28,18 @@ interface TopicScore {
 interface DashboardSnapshot {
   date: string;
   timestamp: Date;
-  
-  // Global Metrics
   global: CampusSnapshot & {
     topTopics: TopicScore[];
     bottomTopics: TopicScore[];
   };
-  
-  // Campus Breakdown
   campuses: Record<string, CampusSnapshot>;
-  
-  // Metadata
   capturedAt: Date;
   studentsProcessed: number;
 }
 
 export async function GET() {
   const now = new Date();
-  const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+  const dateStr = now.toISOString().split('T')[0];
   
   const results = {
     success: false,
@@ -58,27 +52,31 @@ export async function GET() {
   try {
     console.log(`[SNAPSHOT] Starting dashboard snapshot for ${dateStr}`);
 
-    // 1. Obtener todos los estudiantes
     const studentsSnapshot = await getDocs(collection(db, 'students'));
     const students = studentsSnapshot.docs.map(doc => {
       const data = doc.data();
       const metrics = calculateTier1Metrics(data, data.activity);
-      const dri = calculateDRIMetrics({ ...data, metrics });
+      
+      // CORRECCIÓN: Agregamos 'id' explícitamente y casteamos a 'any' 
+      // para que TypeScript acepte que esto cumple con la interfaz 'Student'.
+      const dri = calculateDRIMetrics({ id: doc.id, ...data, metrics } as any);
+      
       return {
         id: doc.id,
         ...data,
         metrics,
         dri,
+        // Usamos la función de la librería correctamente importada
         campus: getStudentDimension(doc.id, 'campus'),
       };
     });
 
     results.studentsProcessed = students.length;
 
-    // 2. Calcular métricas globales
+    // Calcular métricas globales
     const globalMetrics = calculateSnapshotMetrics(students);
 
-    // 3. Calcular métricas por campus
+    // Calcular métricas por campus
     const campuses: Record<string, CampusSnapshot> = {};
     const campusGroups = students.reduce((acc, s) => {
       const campus = s.campus || 'Online (No Campus)';
@@ -91,27 +89,22 @@ export async function GET() {
       campuses[campusName] = calculateSnapshotMetrics(campusStudents);
     }
 
-    // 4. Top/Bottom topics
     const topicScores = calculateTopicScores(students);
     const sortedTopics = topicScores.sort((a, b) => b.avgRSR - a.avgRSR);
-    const topTopics = sortedTopics.slice(0, 10);
-    const bottomTopics = sortedTopics.slice(-10).reverse();
 
-    // 5. Construir snapshot
     const snapshot: DashboardSnapshot = {
       date: dateStr,
       timestamp: now,
       global: {
         ...globalMetrics,
-        topTopics,
-        bottomTopics,
+        topTopics: sortedTopics.slice(0, 10),
+        bottomTopics: sortedTopics.slice(-10).reverse(),
       },
       campuses,
       capturedAt: now,
       studentsProcessed: students.length,
     };
 
-    // 6. Guardar en Firestore
     const snapshotRef = doc(db, 'dashboard_snapshots', dateStr);
     await setDoc(snapshotRef, {
       ...snapshot,
@@ -135,16 +128,9 @@ export async function GET() {
   } catch (error: any) {
     console.error('[SNAPSHOT] Fatal error:', error);
     results.error = error.message;
-    return NextResponse.json({
-      success: false,
-      ...results,
-    }, { status: 500 });
+    return NextResponse.json({ success: false, ...results }, { status: 500 });
   }
 }
-
-// ==========================================
-// HELPER FUNCTIONS
-// ==========================================
 
 function calculateSnapshotMetrics(students: any[]): CampusSnapshot {
   if (students.length === 0) {
@@ -218,5 +204,5 @@ function calculateTopicScores(students: any[]): TopicScore[] {
       avgRSR: Math.round((data.totalRSR / data.count) * 100),
       studentCount: data.count,
     }))
-    .filter(t => t.studentCount >= 5); // Mínimo 5 estudiantes
+    .filter(t => t.studentCount >= 5);
 }
