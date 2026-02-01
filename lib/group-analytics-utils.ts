@@ -98,10 +98,10 @@ export function calculateGroupStats(
     validStudents.map((s) => s.dri?.riskScore || 0)
   );
   const avgAccuracy = average(
-    validStudents.map((s) => s.metrics.accuracy || 0)
+    validStudents.map((s) => s.metrics.accuracyRate || 0)
   );
   const avgEfficiency = average(
-    validStudents.map((s) => s.metrics.efficiency || 0)
+    validStudents.map((s) => s.metrics.focusIntegrity || 0)
   );
 
   // Contar por tier
