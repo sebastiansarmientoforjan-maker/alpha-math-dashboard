@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+// IMPORTANTE: Cambiamos a la instancia Admin para tener privilegios de escritura root
+import { db } from '@/lib/firebase-admin'; 
 import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
 import { getStudentDimension } from '@/lib/student-dimensions';
@@ -38,8 +38,9 @@ interface DashboardSnapshot {
 
 export async function GET() {
   const now = new Date();
-  const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+  const dateStr = now.toISOString().split('T')[0];
   
+  // Inicializamos el objeto de resultados
   const results = {
     success: false,
     date: dateStr,
@@ -49,15 +50,17 @@ export async function GET() {
   };
 
   try {
-    console.log(`[SNAPSHOT] Starting dashboard snapshot for ${dateStr}`);
+    console.log(`[SNAPSHOT] Starting dashboard snapshot for ${dateStr} using Admin SDK`);
 
-    // 1. Obtener todos los estudiantes
-    const studentsSnapshot = await getDocs(collection(db, 'students'));
+    // 1. Obtener estudiantes usando sintaxis Admin SDK
+    const studentsRef = db.collection('students');
+    const studentsSnapshot = await studentsRef.get();
+    
     const students = studentsSnapshot.docs.map(doc => {
       const data = doc.data();
       const metrics = calculateTier1Metrics(data, data.activity);
       
-      // Agregamos 'id' y casteamos a any para cumplir con la interfaz Student
+      // Cálculo de DRI con cast para cumplir interfaz
       const dri = calculateDRIMetrics({ id: doc.id, ...data, metrics } as any);
       
       return {
@@ -90,8 +93,6 @@ export async function GET() {
     // 4. Top/Bottom topics
     const topicScores = calculateTopicScores(students);
     const sortedTopics = topicScores.sort((a, b) => b.avgRSR - a.avgRSR);
-    const topTopics = sortedTopics.slice(0, 10);
-    const bottomTopics = sortedTopics.slice(-10).reverse();
 
     // 5. Construir snapshot
     const snapshot: DashboardSnapshot = {
@@ -99,19 +100,19 @@ export async function GET() {
       timestamp: now,
       global: {
         ...globalMetrics,
-        topTopics,
-        bottomTopics,
+        topTopics: sortedTopics.slice(0, 10),
+        bottomTopics: sortedTopics.slice(-10).reverse(),
       },
       campuses,
       capturedAt: now,
       studentsProcessed: students.length,
     };
 
-    // 6. Guardar en Firestore
-    const snapshotRef = doc(db, 'dashboard_snapshots', dateStr);
-    await setDoc(snapshotRef, {
+    // 6. Guardar en Firestore usando Admin SDK
+    await db.collection('dashboard_snapshots').doc(dateStr).set({
       ...snapshot,
-      capturedAt: serverTimestamp(),
+      // Admin SDK prefiere Dates nativos o Timestamps explícitos
+      capturedAt: new Date(), 
     });
 
     results.success = true;
@@ -130,11 +131,9 @@ export async function GET() {
   } catch (error: any) {
     console.error('[SNAPSHOT] Fatal error:', error);
     results.error = error.message;
-    
-    // Aseguramos que sea false antes de responder
+    // Forzamos success a false en caso de error
     results.success = false;
-
-    // CORRECCIÓN: Eliminamos la propiedad duplicada 'success: false'
+    
     return NextResponse.json({
       ...results,
     }, { status: 500 });
