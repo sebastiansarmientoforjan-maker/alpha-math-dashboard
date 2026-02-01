@@ -6,6 +6,7 @@ import { DRI_CONFIG } from '@/lib/dri-config';
 import Tooltip from '@/components/Tooltip';
 import CoachInterventionModal from '@/components/CoachInterventionModal';
 import TrackImpactModal from '@/components/TrackImpactModal';
+import StudentTrendsTab from '@/components/StudentTrendsTab';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { generateStudentPDF } from '@/components/StudentReportPDF';
@@ -86,7 +87,7 @@ export default function StudentModal({
   currentIndex = -1,
   totalStudents = 0
 }: StudentModalProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'interventions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'interventions' | 'trends'>('overview');
   const [showInterventionModal, setShowInterventionModal] = useState(false);
   const [showTrackImpact, setShowTrackImpact] = useState(false);
   const [interventionSaved, setInterventionSaved] = useState(false);
@@ -395,6 +396,16 @@ export default function StudentModal({
                   {studentInterventions.length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveTab('trends')}
+              className={`px-4 py-2 rounded-t-lg font-black text-[10px] uppercase tracking-widest transition-all ${
+                activeTab === 'trends'
+                  ? 'bg-slate-800 text-white border-t border-x border-slate-700'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              📈 Trends
             </button>
           </div>
 
@@ -788,6 +799,11 @@ export default function StudentModal({
                   </div>
                 )}
               </div>
+            )}
+
+            {/* TRENDS TAB */}
+            {activeTab === 'trends' && (
+              <StudentTrendsTab student={student} />
             )}
           </div>
         </div>
