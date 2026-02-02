@@ -47,6 +47,9 @@ export default function CoachInterventionModal({
   const [interventionDate, setInterventionDate] = useState(
     new Date().toISOString().split('T')[0]
   );
+  // FASE 5: Nuevo estado para Follow-up
+  const [followUpDate, setFollowUpDate] = useState('');
+  
   const [objective, setObjective] = useState('');
   const [customObjective, setCustomObjective] = useState('');
   const [whatWasDone, setWhatWasDone] = useState('');
@@ -89,6 +92,14 @@ export default function CoachInterventionModal({
     setIsSubmitting(true);
 
     try {
+      // FASE 5: Preparar datos de follow-up
+      const followUpData = followUpDate ? {
+        followUpDate: new Date(followUpDate),
+        followUpStatus: 'pending' // pending | completed | skipped
+      } : {
+        followUpStatus: 'none'
+      };
+
       await addDoc(collection(db, 'interventions'), {
         // Student info
         studentId: student.id,
@@ -107,6 +118,9 @@ export default function CoachInterventionModal({
         whatWasAchieved: whatWasAchieved.trim(),
         nextSteps: nextSteps.trim(),
         notes: notes.trim(),
+        
+        // FASE 5: Follow-up Data
+        ...followUpData,
         
         // Metadata
         type: 'coaching',
@@ -317,21 +331,41 @@ export default function CoachInterventionModal({
             </p>
           </div>
 
-          {/* Next Steps */}
-          <div>
-            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-              Next Steps / Continue Working On
-            </label>
-            <textarea
-              value={nextSteps}
-              onChange={(e) => setNextSteps(e.target.value)}
-              placeholder="Action items, follow-up tasks, or areas that need continued attention..."
-              rows={3}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 resize-none"
-            />
-            <p className="text-[9px] text-slate-600 mt-1">
-              Examples: Schedule follow-up in 1 week, focus on Algebra topics, contact parents...
-            </p>
+          {/* FASE 5: Next Steps + Follow Up Date (Grid) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                Next Steps / Continue Working On
+              </label>
+              <textarea
+                value={nextSteps}
+                onChange={(e) => setNextSteps(e.target.value)}
+                placeholder="Action items, follow-up tasks, or areas that need continued attention..."
+                rows={3}
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 resize-none"
+              />
+              <p className="text-[9px] text-slate-600 mt-1">
+                Examples: Schedule follow-up in 1 week, focus on Algebra topics, contact parents...
+              </p>
+            </div>
+            
+            {/* Campo Follow-up Date */}
+            <div className="md:col-span-1">
+              <label className="block text-[10px] font-black text-amber-500 uppercase tracking-widest mb-2">
+                ⏰ Follow-up Date
+              </label>
+              <div className="p-1 bg-amber-900/10 border border-amber-500/30 rounded-xl">
+                <input
+                  type="date"
+                  value={followUpDate}
+                  onChange={(e) => setFollowUpDate(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
+                />
+                <p className="text-[8px] text-amber-400/70 mt-2 px-1 leading-tight">
+                  Set a date to verify progress. Will appear in your daily dashboard reminders.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Additional Notes */}
