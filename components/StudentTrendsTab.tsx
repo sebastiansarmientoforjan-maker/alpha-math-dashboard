@@ -69,18 +69,21 @@ export default function StudentTrendsTab({ student }: StudentTrendsTabProps) {
     return history.slice(-range);
   }, [history, range]);
 
+  // SOLUCIÓN APLICADA AQUÍ: Optional Chaining (?.) para evitar el crash
   const chartData = useMemo(() => {
     return filteredHistory.map(snap => ({
       date: new Date(snap.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       fullDate: snap.date,
-      RSR: Math.round((snap.metrics.lmp || 0) * 100),
-      KSI: snap.metrics.ksi || 0,
-      Velocity: snap.metrics.velocityScore || 0,
-      Accuracy: snap.metrics.accuracyRate || 0,
-      Risk: snap.dri.riskScore || 0,
-      Tier: snap.dri.driTier,
-      DER: snap.dri.debtExposure,
-      PDI: snap.dri.precisionDecay,
+      // Protegemos el acceso a metrics
+      RSR: Math.round((snap.metrics?.lmp || 0) * 100),
+      KSI: snap.metrics?.ksi || 0,
+      Velocity: snap.metrics?.velocityScore || 0,
+      Accuracy: snap.metrics?.accuracyRate || 0,
+      // Protegemos el acceso a dri (esto arregla el error "reading 'riskScore'")
+      Risk: snap.dri?.riskScore || 0,
+      Tier: snap.dri?.driTier,
+      DER: snap.dri?.debtExposure,
+      PDI: snap.dri?.precisionDecay,
     }));
   }, [filteredHistory]);
 
@@ -236,8 +239,8 @@ export default function StudentTrendsTab({ student }: StudentTrendsTabProps) {
               type="monotone" 
               dataKey="Risk" 
               stroke="#ef4444" 
-              strokeWidth={3}
-              dot={{ r: 4, fill: '#ef4444' }}
+              strokeWidth={3} 
+              dot={{ r: 4, fill: '#ef4444' }} 
               name="Risk Score"
             />
           </LineChart>
@@ -272,15 +275,15 @@ export default function StudentTrendsTab({ student }: StudentTrendsTabProps) {
                   <td className="text-center p-3 text-slate-300">{snap.KSI}%</td>
                   <td className="text-center p-3">
                     <span className={`font-bold ${
-                      snap.Risk >= 60 ? 'text-red-400' :
-                      snap.Risk >= 35 ? 'text-amber-400' :
+                      snap.Risk >= 60 ? 'text-red-400' : 
+                      snap.Risk >= 35 ? 'text-amber-400' : 
                       'text-emerald-400'
                     }`}>{snap.Risk}</span>
                   </td>
                   <td className="text-center p-3">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
-                      snap.Tier === 'RED' ? 'bg-red-900/30 text-red-400' :
-                      snap.Tier === 'YELLOW' ? 'bg-amber-900/30 text-amber-400' :
+                      snap.Tier === 'RED' ? 'bg-red-900/30 text-red-400' : 
+                      snap.Tier === 'YELLOW' ? 'bg-amber-900/30 text-amber-400' : 
                       'bg-emerald-900/30 text-emerald-400'
                     }`}>
                       {snap.Tier}
