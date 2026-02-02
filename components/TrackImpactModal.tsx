@@ -95,22 +95,23 @@ export default function TrackImpactModal({ student, onClose, onSuccess }: TrackI
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#0a0a0a] border border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+      {/* BRANDING UPDATE: Navy Background + Gold Accents */}
+      <div className="bg-alpha-navy-bg border border-alpha-navy-light rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="p-6 border-b border-slate-800 bg-gradient-to-r from-indigo-900/30 to-purple-900/30">
+        <div className="p-6 border-b border-alpha-navy-light/30 bg-gradient-to-r from-alpha-navy to-alpha-navy-bg">
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-lg font-black text-white uppercase tracking-wide">
                 📈 Track Impact
               </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Monitor intervention effectiveness over time
+              <p className="text-xs text-alpha-gold mt-1 font-bold">
+                Monitor intervention effectiveness
               </p>
             </div>
             <button 
               onClick={onClose}
-              className="text-slate-500 hover:text-white transition-colors text-xl"
+              className="text-slate-500 hover:text-white transition-colors text-xl p-2 hover:bg-alpha-navy rounded-lg"
             >
               ✕
             </button>
@@ -118,7 +119,7 @@ export default function TrackImpactModal({ student, onClose, onSuccess }: TrackI
         </div>
 
         {/* Student Info */}
-        <div className="p-4 bg-slate-900/50 border-b border-slate-800">
+        <div className="p-4 bg-alpha-navy/20 border-b border-alpha-navy-light/30">
           <div className="flex items-center justify-between">
             <div>
               <p className="font-bold text-white">{student.firstName} {student.lastName}</p>
@@ -169,7 +170,7 @@ export default function TrackImpactModal({ student, onClose, onSuccess }: TrackI
             <select
               value={interventionType}
               onChange={(e) => setInterventionType(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 outline-none transition-colors"
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:border-alpha-gold outline-none transition-colors"
               required
             >
               <option value="">Select type...</option>
@@ -192,7 +193,7 @@ export default function TrackImpactModal({ student, onClose, onSuccess }: TrackI
                   onClick={() => setPeriod(option.value)}
                   className={`py-3 rounded-xl text-xs font-bold transition-all ${
                     period === option.value
-                      ? 'bg-indigo-600 text-white border border-indigo-500'
+                      ? 'bg-alpha-gold text-black border border-alpha-gold shadow-lg shadow-alpha-gold/20'
                       : 'bg-slate-900 text-slate-400 border border-slate-700 hover:border-slate-600'
                   }`}
                 >
@@ -200,8 +201,8 @@ export default function TrackImpactModal({ student, onClose, onSuccess }: TrackI
                 </button>
               ))}
             </div>
-            <p className="text-[9px] text-slate-600 mt-2">
-              📅 Weekly snapshots for {selectedPeriod?.weeks} weeks
+            <p className="text-[9px] text-slate-500 mt-2 italic">
+              📅 Snapshots capture automatically every Monday for {selectedPeriod?.weeks} weeks
             </p>
           </div>
 
@@ -213,9 +214,9 @@ export default function TrackImpactModal({ student, onClose, onSuccess }: TrackI
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="What intervention was performed? Goals?"
+              placeholder="Specific goals for this tracking period..."
               rows={3}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-indigo-500 outline-none resize-none transition-colors"
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-alpha-gold outline-none resize-none transition-colors"
             />
           </div>
 
@@ -238,7 +239,7 @@ export default function TrackImpactModal({ student, onClose, onSuccess }: TrackI
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 py-3 bg-alpha-navy hover:bg-alpha-navy-light text-white border border-alpha-navy-light rounded-xl text-xs font-black uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {saving ? (
                 <>
@@ -255,9 +256,8 @@ export default function TrackImpactModal({ student, onClose, onSuccess }: TrackI
         {/* Info Footer */}
         <div className="px-6 pb-6">
           <div className="p-3 bg-slate-900/50 border border-slate-800 rounded-xl text-[9px] text-slate-500">
-            <strong className="text-slate-400">How it works:</strong> Baseline metrics are captured now. 
-            Weekly snapshots will be taken automatically every Monday. After the tracking period ends, 
-            you'll see the impact summary with deltas.
+            <strong className="text-alpha-gold">System Note:</strong> Baseline metrics are captured immediately. 
+            The system will compare future weekly snapshots against this baseline to calculate impact.
           </div>
         </div>
       </div>
