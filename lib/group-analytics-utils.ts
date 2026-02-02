@@ -91,12 +91,21 @@ export function calculateGroupStats(
   const avgVelocity = average(
     validStudents.map((s) => s.metrics.velocityScore)
   );
+  
+  // FIX CRÍTICO: Filtrar primero los estudiantes con KSI válido
   const avgKSI = average(
-    validStudents.map((s) => (s.metrics.ksi || 0) * 100)
+    validStudents
+      .filter((s) => s.metrics.ksi !== null && typeof s.metrics.ksi === 'number')
+      .map((s) => s.metrics.ksi!)
   );
+  
+  // FIX CRÍTICO: Filtrar primero los estudiantes con riskScore válido
   const avgRiskScore = average(
-    validStudents.map((s) => s.dri?.riskScore || 0)
+    validStudents
+      .filter((s) => s.dri && typeof s.dri.riskScore === 'number')
+      .map((s) => s.dri.riskScore)
   );
+  
   const avgAccuracy = average(
     validStudents.map((s) => s.metrics.accuracyRate || 0)
   );
