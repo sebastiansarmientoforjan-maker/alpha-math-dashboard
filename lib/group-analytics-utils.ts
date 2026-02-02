@@ -1,5 +1,5 @@
 import { Student } from '@/types';
-import { GroupDimension, GroupStats } from '@/types/student-dimensions';
+import { GroupDimension, GroupStats } from '@/lib/student-dimensions';
 
 /**
  * Calcula estadísticas agregadas para un grupo de estudiantes
