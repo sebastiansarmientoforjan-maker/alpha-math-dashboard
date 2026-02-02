@@ -216,21 +216,66 @@ function CompactHeader({ isCompact, onToggle }: { isCompact: boolean; onToggle: 
   );
 }
 
-function ActiveFiltersIndicator({ search, course, onClearSearch, onClearCourse, onClearAll }: { search: string; course: string; onClearSearch: () => void; onClearCourse: () => void; onClearAll: () => void; }) {
-  if (!search && course === 'ALL') return null;
+function ActiveFiltersIndicator({ 
+  search, 
+  course,
+  campus,
+  grade,
+  guide,
+  onClearSearch, 
+  onClearCourse,
+  onClearCampus,
+  onClearGrade,
+  onClearGuide,
+  onClearAll 
+}: { 
+  search: string; 
+  course: string;
+  campus: string;
+  grade: string;
+  guide: string;
+  onClearSearch: () => void; 
+  onClearCourse: () => void;
+  onClearCampus: () => void;
+  onClearGrade: () => void;
+  onClearGuide: () => void;
+  onClearAll: () => void; 
+}) {
+  const hasFilters = search || course !== 'ALL' || campus !== 'ALL' || grade !== 'ALL' || guide !== 'ALL';
+  
+  if (!hasFilters) return null;
+  
   return (
-    <div className="flex items-center gap-2 text-[9px] bg-slate-900/40 px-3 py-2 rounded-xl border border-slate-800">
+    <div className="flex items-center gap-2 text-[9px] bg-slate-900/40 px-3 py-2 rounded-xl border border-slate-800 flex-wrap">
       <span className="text-slate-500">Active filters:</span>
       {search && (
         <span className="px-2 py-0.5 bg-indigo-500/20 border border-indigo-500/30 rounded-full text-indigo-300 flex items-center gap-1">
-          "{search.length > 15 ? search.substring(0, 15) + '...' : search}"
+          🔎 "{search.length > 15 ? search.substring(0, 15) + '...' : search}"
           <button onClick={onClearSearch} className="hover:text-white ml-1 text-[8px]">✕</button>
         </span>
       )}
       {course !== 'ALL' && (
         <span className="px-2 py-0.5 bg-purple-500/20 border border-purple-500/30 rounded-full text-purple-300 flex items-center gap-1">
-          {course}
+          📚 {course}
           <button onClick={onClearCourse} className="hover:text-white ml-1 text-[8px]">✕</button>
+        </span>
+      )}
+      {campus !== 'ALL' && (
+        <span className="px-2 py-0.5 bg-blue-500/20 border border-blue-500/30 rounded-full text-blue-300 flex items-center gap-1">
+          📍 {campus}
+          <button onClick={onClearCampus} className="hover:text-white ml-1 text-[8px]">✕</button>
+        </span>
+      )}
+      {grade !== 'ALL' && (
+        <span className="px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-emerald-300 flex items-center gap-1">
+          🎓 {grade}
+          <button onClick={onClearGrade} className="hover:text-white ml-1 text-[8px]">✕</button>
+        </span>
+      )}
+      {guide !== 'ALL' && (
+        <span className="px-2 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded-full text-amber-300 flex items-center gap-1">
+          👤 {guide}
+          <button onClick={onClearGuide} className="hover:text-white ml-1 text-[8px]">✕</button>
         </span>
       )}
       <button onClick={onClearAll} className="text-slate-500 hover:text-slate-300 ml-2" title="Clear all filters (c)">Clear all</button>
@@ -260,8 +305,12 @@ export default function HomePage() {
   const [avgBatchTime, setAvgBatchTime] = useState<number | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [viewMode, setViewMode] = useState<'TRIAGE' | 'MATRIX' | 'HEATMAP' | 'LOG' | 'GROUP' | 'TRENDS'>('TRIAGE');
+  
   const [search, setSearch] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('ALL');
+  const [selectedCampus, setSelectedCampus] = useState('ALL');
+  const [selectedGrade, setSelectedGrade] = useState('ALL');
+  const [selectedGuide, setSelectedGuide] = useState('ALL');
 
   useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
@@ -279,7 +328,15 @@ export default function HomePage() {
       if (e.key === '/' && !selectedStudent) { e.preventDefault(); (document.querySelector('input[placeholder*="SEARCH"]') as HTMLInputElement)?.focus(); }
       if (e.key === '?' && !selectedStudent) { e.preventDefault(); setShowHelp(true); }
       if (e.key === 'h' && !selectedStudent) setCompactHeader(prev => !prev);
-      if (e.key === 'c' && !selectedStudent && !e.ctrlKey && !e.metaKey) { if (search || selectedCourse !== 'ALL') { setSearch(''); setSelectedCourse('ALL'); } }
+      if (e.key === 'c' && !selectedStudent && !e.ctrlKey && !e.metaKey) { 
+        if (search || selectedCourse !== 'ALL' || selectedCampus !== 'ALL' || selectedGrade !== 'ALL' || selectedGuide !== 'ALL') { 
+          setSearch(''); 
+          setSelectedCourse('ALL');
+          setSelectedCampus('ALL');
+          setSelectedGrade('ALL');
+          setSelectedGuide('ALL');
+        } 
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 'a' && viewMode === 'TRIAGE' && !selectedStudent) {
         e.preventDefault();
         if (!selectionMode) setSelectionMode(true);
@@ -292,7 +349,7 @@ export default function HomePage() {
     };
     window.addEventListener('keydown', handleKeyboard);
     return () => window.removeEventListener('keydown', handleKeyboard);
-  }, [selectedStudent, selectedStudentIndex, selectionMode, viewMode, search, selectedCourse]);
+  }, [selectedStudent, selectedStudentIndex, selectionMode, viewMode, search, selectedCourse, selectedCampus, selectedGrade, selectedGuide]);
 
   useEffect(() => {
     const unsubStudents = onSnapshot(query(collection(db, 'students')), (snapshot) => {
@@ -376,8 +433,20 @@ export default function HomePage() {
   const handleExportSelected = useCallback(() => {
     const selectedStudents = students.filter(s => selectedIds.has(s.id));
     const csvContent = [
-      ['ID', 'Name', 'Course', 'RSR', 'KSI', 'Velocity', 'Risk Score', 'Tier'].join(','),
-      ...selectedStudents.map(s => [s.id, `${s.firstName} ${s.lastName}`, s.currentCourse?.name || 'N/A', `${(s.metrics.lmp * 100).toFixed(0)}%`, s.metrics.ksi !== null ? `${s.metrics.ksi}%` : 'N/A', `${s.metrics.velocityScore}%`, s.dri.riskScore || 'N/A', s.dri.driTier].join(','))
+      ['ID', 'Name', 'Course', 'Campus', 'Grade', 'Guide', 'RSR', 'KSI', 'Velocity', 'Risk Score', 'Tier'].join(','),
+      ...selectedStudents.map(s => [
+        s.id, 
+        `${s.firstName} ${s.lastName}`, 
+        s.currentCourse?.name || 'N/A',
+        s.dimensions?.campusDisplayName || 'Online',
+        s.dimensions?.grade || 'N/A',
+        s.dimensions?.guide || 'No Guide',
+        `${(s.metrics.lmp * 100).toFixed(0)}%`, 
+        s.metrics.ksi !== null ? `${s.metrics.ksi}%` : 'N/A', 
+        `${s.metrics.velocityScore}%`, 
+        s.dri.riskScore || 'N/A', 
+        s.dri.driTier
+      ].join(','))
     ].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -385,9 +454,50 @@ export default function HomePage() {
     URL.revokeObjectURL(url);
   }, [selectedIds, students]);
 
-  const clearFilters = useCallback(() => { setSearch(''); setSelectedCourse('ALL'); }, []);
+  const clearFilters = useCallback(() => { 
+    setSearch(''); 
+    setSelectedCourse('ALL');
+    setSelectedCampus('ALL');
+    setSelectedGrade('ALL');
+    setSelectedGuide('ALL');
+  }, []);
 
   const uniqueCourses = useMemo(() => Array.from(new Set(students.map(s => s.currentCourse?.name).filter(Boolean))).sort(), [students]);
+  
+  const uniqueCampuses = useMemo(() => {
+    const campuses = new Set<string>();
+    students.forEach(s => {
+      if (s.dimensions?.campusDisplayName) {
+        campuses.add(s.dimensions.campusDisplayName);
+      } else {
+        campuses.add('Online (No Campus)');
+      }
+    });
+    return Array.from(campuses).sort();
+  }, [students]);
+
+  const uniqueGrades = useMemo(() => {
+    const grades = new Set<string>();
+    students.forEach(s => {
+      if (s.dimensions?.grade) {
+        grades.add(`Grade ${s.dimensions.grade}`);
+      }
+    });
+    return Array.from(grades).sort();
+  }, [students]);
+
+  const uniqueGuides = useMemo(() => {
+    const guides = new Set<string>();
+    students.forEach(s => {
+      if (s.dimensions?.guide) {
+        guides.add(s.dimensions.guide);
+      } else if (s.dimensions) {
+        guides.add('No Guide');
+      }
+    });
+    return Array.from(guides).sort();
+  }, [students]);
+
   const criticalTopics = Object.keys(TOPIC_GRADE_MAP);
 
   const heatmapData = useMemo(() => {
@@ -405,8 +515,33 @@ export default function HomePage() {
   const filtered = useMemo(() => students.filter(s => {
     const nameMatch = `${s.firstName} ${s.lastName} ${s.id}`.toLowerCase().includes(search.toLowerCase());
     const courseMatch = selectedCourse === 'ALL' || s.currentCourse?.name === selectedCourse;
-    return nameMatch && courseMatch;
-  }), [students, search, selectedCourse]);
+    
+    let campusMatch = selectedCampus === 'ALL';
+    if (!campusMatch) {
+      if (selectedCampus === 'Online (No Campus)') {
+        campusMatch = !s.dimensions?.campusDisplayName;
+      } else {
+        campusMatch = s.dimensions?.campusDisplayName === selectedCampus;
+      }
+    }
+    
+    let gradeMatch = selectedGrade === 'ALL';
+    if (!gradeMatch) {
+      const gradeNum = parseInt(selectedGrade.replace('Grade ', ''));
+      gradeMatch = s.dimensions?.grade === gradeNum;
+    }
+    
+    let guideMatch = selectedGuide === 'ALL';
+    if (!guideMatch) {
+      if (selectedGuide === 'No Guide') {
+        guideMatch = !s.dimensions?.guide;
+      } else {
+        guideMatch = s.dimensions?.guide === selectedGuide;
+      }
+    }
+    
+    return nameMatch && courseMatch && campusMatch && gradeMatch && guideMatch;
+  }), [students, search, selectedCourse, selectedCampus, selectedGrade, selectedGuide]);
 
   const redZone = useMemo(() => filtered.filter(s => s.dri.driTier === 'RED'), [filtered]);
   const yellowZone = useMemo(() => filtered.filter(s => s.dri.driTier === 'YELLOW' && !redZone.some(r => r.id === s.id)), [filtered, redZone]);
@@ -414,13 +549,13 @@ export default function HomePage() {
   const filteredForNavigation = useMemo(() => [...redZone, ...yellowZone, ...greenZone], [redZone, yellowZone, greenZone]);
 
   const stats = useMemo(() => ({
-    total: students.length,
-    atRisk: students.filter(s => s.dri.driTier === 'RED').length,
-    attention: students.filter(s => s.dri.driTier === 'YELLOW').length,
-    onTrack: students.filter(s => s.dri.driTier === 'GREEN').length,
-    avgVelocity: Math.round(students.reduce((sum, s) => sum + (s.metrics?.velocityScore || 0), 0) / (students.length || 1)),
-    avgRSR: Math.round(students.reduce((sum, s) => sum + ((s.metrics?.lmp || 0) * 100), 0) / (students.length || 1))
-  }), [students]);
+    total: filtered.length,
+    atRisk: redZone.length,
+    attention: yellowZone.length,
+    onTrack: greenZone.length,
+    avgVelocity: Math.round(filtered.reduce((sum, s) => sum + (s.metrics?.velocityScore || 0), 0) / (filtered.length || 1)),
+    avgRSR: Math.round(filtered.reduce((sum, s) => sum + ((s.metrics?.lmp || 0) * 100), 0) / (filtered.length || 1))
+  }), [filtered, redZone, yellowZone, greenZone]);
 
   const trends = { atRisk: -5, attention: 2, onTrack: 3, avgVelocity: -2 };
 
@@ -460,7 +595,7 @@ export default function HomePage() {
               </div>
               {!compactHeader && (
                 <>
-                  <p className="text-xs text-indigo-400 font-bold tracking-[0.3em] uppercase">V5.5 Alpha • {students.length} Students</p>
+                  <p className="text-xs text-indigo-400 font-bold tracking-[0.3em] uppercase">V5.5 Alpha • {students.length} Students • {filtered.length} Filtered</p>
                   <div className="flex gap-3 mt-1 text-[9px] text-slate-600 font-mono flex-wrap">
                     <Tooltip content={METRIC_TOOLTIPS.rsr}><span className="cursor-help">RSR: <span className="text-emerald-500 font-bold">{stats.avgRSR}%</span></span></Tooltip>
                     <span className="text-slate-700">•</span>
@@ -494,26 +629,57 @@ export default function HomePage() {
         </div>
         {!compactHeader && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <MetricCard title="🔴 Critical" value={stats.atRisk} color="red" subtitle={`${((stats.atRisk/stats.total)*100).toFixed(1)}%`} tooltip="Risk Score ≥ 60, DER > 20%, or RSR < 60%" trend={trends.atRisk} />
-            <MetricCard title="🟡 Watch" value={stats.attention} color="amber" subtitle={`${((stats.attention/stats.total)*100).toFixed(1)}%`} tooltip="Risk Score 35-59, or PDI > 1.5" trend={trends.attention} />
-            <MetricCard title="🟢 Optimal" value={stats.onTrack} color="emerald" subtitle={`${((stats.onTrack/stats.total)*100).toFixed(1)}%`} tooltip="Risk Score < 35 with stable metrics" trend={trends.onTrack} />
+            <MetricCard title="🔴 Critical" value={stats.atRisk} color="red" subtitle={`${((stats.atRisk/Math.max(stats.total, 1))*100).toFixed(1)}%`} tooltip="Risk Score ≥ 60, DER > 20%, or RSR < 60%" trend={trends.atRisk} />
+            <MetricCard title="🟡 Watch" value={stats.attention} color="amber" subtitle={`${((stats.attention/Math.max(stats.total, 1))*100).toFixed(1)}%`} tooltip="Risk Score 35-59, or PDI > 1.5" trend={trends.attention} />
+            <MetricCard title="🟢 Optimal" value={stats.onTrack} color="emerald" subtitle={`${((stats.onTrack/Math.max(stats.total, 1))*100).toFixed(1)}%`} tooltip="Risk Score < 35 with stable metrics" trend={trends.onTrack} />
             <MetricCard title="Avg Velocity" value={`${stats.avgVelocity}%`} color="purple" subtitle={`${Math.round((stats.avgVelocity / 100) * DRI_CONFIG.ALPHA_WEEKLY_STANDARD)} XP/wk`} tooltip={METRIC_TOOLTIPS.velocity} trend={trends.avgVelocity} />
           </div>
         )}
+        
         <div className="flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-[280px]">
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔎 SEARCH STUDENT..." className={`w-full bg-slate-900/40 border border-slate-800 rounded-xl px-4 text-sm focus:border-indigo-500 outline-none font-mono transition-all ${compactHeader ? 'py-2' : 'py-3'}`} />
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded">/</kbd>
           </div>
+          
           {viewMode === 'TRIAGE' && (
             <button onClick={() => { setSelectionMode(!selectionMode); if (selectionMode) setSelectedIds(new Set()); }} className={`px-3 py-2 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all ${selectionMode ? 'bg-indigo-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-500 hover:text-white hover:border-indigo-500'}`}>{selectionMode ? '✓ Selecting' : '☐ Select'}</button>
           )}
-          <select value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none">
-            <option value="ALL">ALL COURSES</option>
+          
+          <select value={selectedCampus} onChange={(e) => setSelectedCampus(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none hover:border-slate-600 transition-colors">
+            <option value="ALL">📍 ALL CAMPUSES</option>
+            {uniqueCampuses.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          
+          <select value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none hover:border-slate-600 transition-colors">
+            <option value="ALL">🎓 ALL GRADES</option>
+            {uniqueGrades.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+          
+          <select value={selectedGuide} onChange={(e) => setSelectedGuide(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none hover:border-slate-600 transition-colors">
+            <option value="ALL">👤 ALL GUIDES</option>
+            {uniqueGuides.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+          
+          <select value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none hover:border-slate-600 transition-colors">
+            <option value="ALL">📚 ALL COURSES</option>
             {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-          <ActiveFiltersIndicator search={search} course={selectedCourse} onClearSearch={() => setSearch('')} onClearCourse={() => setSelectedCourse('ALL')} onClearAll={clearFilters} />
         </div>
+        
+        <ActiveFiltersIndicator 
+          search={search} 
+          course={selectedCourse}
+          campus={selectedCampus}
+          grade={selectedGrade}
+          guide={selectedGuide}
+          onClearSearch={() => setSearch('')} 
+          onClearCourse={() => setSelectedCourse('ALL')}
+          onClearCampus={() => setSelectedCampus('ALL')}
+          onClearGrade={() => setSelectedGrade('ALL')}
+          onClearGuide={() => setSelectedGuide('ALL')}
+          onClearAll={clearFilters} 
+        />
       </div>
 
       {selectionMode && selectedIds.size > 0 && <BulkActionsBar selectedCount={selectedIds.size} selectedStudents={selectedStudentsData} onClear={handleClearSelection} onExport={handleExportSelected} />}
@@ -547,7 +713,7 @@ export default function HomePage() {
                   </div>
                   <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                     {isRefreshing && col.data.length === 0 ? <ColumnSkeleton /> : col.data.length === 0 ? (
-                      <div className="text-center py-20 text-slate-600 italic text-xs">{(search || selectedCourse !== 'ALL') ? 'No students match filters' : 'No students'}</div>
+                      <div className="text-center py-20 text-slate-600 italic text-xs">{(search || selectedCourse !== 'ALL' || selectedCampus !== 'ALL' || selectedGrade !== 'ALL' || selectedGuide !== 'ALL') ? 'No students match filters' : 'No students'}</div>
                     ) : col.data.map(s => <StudentCard key={s.id} student={s} onClick={() => handleStudentClick(s)} borderColor={col.border} isSelected={selectedIds.has(s.id)} onSelect={handleSelectStudent} selectionMode={selectionMode} />)}
                   </div>
                 </div>
