@@ -11,7 +11,7 @@ interface CoachInterventionModalProps {
   onSuccess: () => void;
 }
 
-// Predefined coaches - can be extended or fetched from DB
+// Predefined coaches
 const COACHES = [
   'Sebastián Sarmiento',
   'Coach Alpha',
@@ -34,7 +34,7 @@ const OBJECTIVES = [
 
 export default function CoachInterventionModal({ 
   student, 
-  onClose,
+  onClose, 
   onSuccess 
 }: CoachInterventionModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -172,22 +172,23 @@ export default function CoachInterventionModal({
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0" onClick={onClose} />
       
-      <div className="bg-[#0a0a0a] border border-slate-800 w-full max-w-2xl max-h-[90vh] rounded-3xl relative z-10 flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+      {/* BRANDING UPDATE: Navy Background + Gold Accents */}
+      <div className="bg-alpha-navy-bg border border-alpha-navy-light/50 w-full max-w-2xl max-h-[90vh] rounded-3xl relative z-10 flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="flex-shrink-0 p-5 border-b border-slate-800 bg-gradient-to-b from-indigo-900/20 to-transparent">
+        <div className="flex-shrink-0 p-5 border-b border-alpha-navy-light/30 bg-gradient-to-b from-alpha-navy/50 to-transparent">
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-xl font-black text-white uppercase italic tracking-tight">
                 📝 Log Coach Intervention
               </h2>
-              <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mt-1">
+              <p className="text-[10px] text-alpha-gold font-bold uppercase tracking-widest mt-1">
                 {student.firstName} {student.lastName} • {student.currentCourse?.name}
               </p>
             </div>
             <button 
               onClick={onClose}
-              className="text-slate-600 hover:text-white text-xl transition-colors p-2 hover:bg-slate-800 rounded-lg"
+              className="text-slate-500 hover:text-white text-xl transition-colors p-2 hover:bg-alpha-navy rounded-lg"
             >
               ✕
             </button>
@@ -239,7 +240,7 @@ export default function CoachInterventionModal({
               <select
                 value={coachName}
                 onChange={(e) => setCoachName(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 transition-colors"
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-alpha-gold transition-colors"
               >
                 <option value="">Select coach...</option>
                 {COACHES.map(c => (
@@ -252,7 +253,7 @@ export default function CoachInterventionModal({
                   value={customCoach}
                   onChange={(e) => setCustomCoach(e.target.value)}
                   placeholder="Enter coach name..."
-                  className="w-full mt-2 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"
+                  className="w-full mt-2 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-alpha-gold"
                 />
               )}
             </div>
@@ -266,155 +267,11 @@ export default function CoachInterventionModal({
                 type="date"
                 value={interventionDate}
                 onChange={(e) => setInterventionDate(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-alpha-gold"
               />
             </div>
           </div>
 
           {/* Objective */}
           <div>
-            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-              Intervention Objective <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={objective}
-              onChange={(e) => setObjective(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"
-            >
-              <option value="">Select objective...</option>
-              {OBJECTIVES.map(o => (
-                <option key={o} value={o}>{o}</option>
-              ))}
-            </select>
-            {objective === 'Other' && (
-              <input
-                type="text"
-                value={customObjective}
-                onChange={(e) => setCustomObjective(e.target.value)}
-                placeholder="Enter custom objective..."
-                className="w-full mt-2 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"
-              />
-            )}
-          </div>
-
-          {/* What Was Done */}
-          <div>
-            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-              What Was Done? <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={whatWasDone}
-              onChange={(e) => setWhatWasDone(e.target.value)}
-              placeholder="Describe the activities, conversations, or exercises conducted during the intervention..."
-              rows={3}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 resize-none"
-            />
-            <p className="text-[9px] text-slate-600 mt-1">
-              Examples: 1-on-1 conversation, reviewed problem areas, practiced specific topics, discussed goals...
-            </p>
-          </div>
-
-          {/* What Was Achieved */}
-          <div>
-            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-              What Was Achieved?
-            </label>
-            <textarea
-              value={whatWasAchieved}
-              onChange={(e) => setWhatWasAchieved(e.target.value)}
-              placeholder="Outcomes, breakthroughs, or progress observed during or after the session..."
-              rows={3}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 resize-none"
-            />
-            <p className="text-[9px] text-slate-600 mt-1">
-              Examples: Student understood concept, showed motivation, identified root cause...
-            </p>
-          </div>
-
-          {/* FASE 5: Next Steps + Follow Up Date (Grid) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                Next Steps / Continue Working On
-              </label>
-              <textarea
-                value={nextSteps}
-                onChange={(e) => setNextSteps(e.target.value)}
-                placeholder="Action items, follow-up tasks, or areas that need continued attention..."
-                rows={3}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 resize-none"
-              />
-              <p className="text-[9px] text-slate-600 mt-1">
-                Examples: Schedule follow-up in 1 week, focus on Algebra topics, contact parents...
-              </p>
-            </div>
-            
-            {/* Campo Follow-up Date */}
-            <div className="md:col-span-1">
-              <label className="block text-[10px] font-black text-amber-500 uppercase tracking-widest mb-2">
-                ⏰ Follow-up Date
-              </label>
-              <div className="p-1 bg-amber-900/10 border border-amber-500/30 rounded-xl">
-                <input
-                  type="date"
-                  value={followUpDate}
-                  onChange={(e) => setFollowUpDate(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
-                />
-                <p className="text-[8px] text-amber-400/70 mt-2 px-1 leading-tight">
-                  Set a date to verify progress. Will appear in your daily dashboard reminders.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Additional Notes */}
-          <div>
-            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-              Additional Notes
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any other observations, concerns, or context..."
-              rows={2}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 resize-none"
-            />
-          </div>
-        </form>
-
-        {/* Footer */}
-        <div className="flex-shrink-0 p-5 border-t border-slate-800 bg-slate-900/30 flex justify-between items-center">
-          <p className="text-[9px] text-slate-600">
-            <span className="text-red-500">*</span> Required fields
-          </p>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] font-black uppercase rounded-xl transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-600/50 disabled:cursor-not-allowed text-white text-[10px] font-black uppercase rounded-xl transition-colors flex items-center gap-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  💾 Save Intervention
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest
