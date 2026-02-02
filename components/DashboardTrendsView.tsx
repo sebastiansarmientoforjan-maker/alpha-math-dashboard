@@ -94,42 +94,61 @@ export default function DashboardTrendsView() {
     return snapshots.slice(-range);
   }, [snapshots, range]);
 
-  // Prepare chart data
+  // Prepare chart data with safety checks
   const chartData = useMemo(() => {
     return filteredSnapshots.map(snap => {
       const dataSource = viewMode === 'global' 
         ? snap.global 
-        : snap.campuses[selectedCampus] || snap.global;
+        : (snap.campuses && snap.campuses[selectedCampus]) || snap.global;
+
+      // Safety check for undefined dataSource
+      if (!dataSource) {
+        return {
+          date: new Date(snap.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          fullDate: snap.date,
+          RSR: 0,
+          Velocity: 0,
+          KSI: 0,
+          Risk: 0,
+          RED: 0,
+          YELLOW: 0,
+          GREEN: 0,
+          Total: 0,
+        };
+      }
 
       return {
         date: new Date(snap.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         fullDate: snap.date,
-        RSR: dataSource.avgRSR,
-        Velocity: dataSource.avgVelocity,
-        KSI: dataSource.avgKSI,
-        Risk: dataSource.avgRiskScore,
-        RED: dataSource.tierDistribution.RED,
-        YELLOW: dataSource.tierDistribution.YELLOW,
-        GREEN: dataSource.tierDistribution.GREEN,
-        Total: dataSource.totalStudents,
+        RSR: dataSource.avgRSR || 0,
+        Velocity: dataSource.avgVelocity || 0,
+        KSI: dataSource.avgKSI || 0,
+        Risk: dataSource.avgRiskScore || 0,
+        RED: (dataSource.tierDistribution && dataSource.tierDistribution.RED) || 0,
+        YELLOW: (dataSource.tierDistribution && dataSource.tierDistribution.YELLOW) || 0,
+        GREEN: (dataSource.tierDistribution && dataSource.tierDistribution.GREEN) || 0,
+        Total: dataSource.totalStudents || 0,
       };
     });
   }, [filteredSnapshots, viewMode, selectedCampus]);
 
-  // Calculate deltas
+  // Calculate deltas with safety checks
   const deltas = useMemo(() => {
     if (chartData.length < 2) return null;
     const latest = chartData[chartData.length - 1];
     const previous = chartData[chartData.length - 2];
+    
+    // Safety check for undefined values
+    if (!latest || !previous) return null;
 
     return {
-      RSR: latest.RSR - previous.RSR,
-      Velocity: latest.Velocity - previous.Velocity,
-      KSI: latest.KSI - previous.KSI,
-      Risk: latest.Risk - previous.Risk,
-      RED: latest.RED - previous.RED,
-      YELLOW: latest.YELLOW - previous.YELLOW,
-      GREEN: latest.GREEN - previous.GREEN,
+      RSR: (latest.RSR || 0) - (previous.RSR || 0),
+      Velocity: (latest.Velocity || 0) - (previous.Velocity || 0),
+      KSI: (latest.KSI || 0) - (previous.KSI || 0),
+      Risk: (latest.Risk || 0) - (previous.Risk || 0),
+      RED: (latest.RED || 0) - (previous.RED || 0),
+      YELLOW: (latest.YELLOW || 0) - (previous.YELLOW || 0),
+      GREEN: (latest.GREEN || 0) - (previous.GREEN || 0),
     };
   }, [chartData]);
 
@@ -202,7 +221,7 @@ export default function DashboardTrendsView() {
           </div>
 
           {/* Campus Selector */}
-          {viewMode === 'campus' && (
+          {viewMode === 'campus' && availableCampuses.length > 0 && (
             <select
               value={selectedCampus}
               onChange={(e) => setSelectedCampus(e.target.value)}
@@ -247,7 +266,7 @@ export default function DashboardTrendsView() {
               <div className={`text-2xl font-black ${
                 metric.positive ? 'text-emerald-400' : 'text-red-400'
               }`}>
-                {metric.value > 0 ? '+' : ''}{metric.value}{metric.suffix}
+                {metric.value > 0 ? '+' : ''}{Math.round(metric.value)}{metric.suffix}
               </div>
               <div className="text-xs text-slate-600 mt-1">vs last week</div>
             </div>
@@ -274,9 +293,9 @@ export default function DashboardTrendsView() {
                 }}
               />
               <Legend wrapperStyle={{ fontSize: '12px' }} />
-              <Line type="monotone" dataKey="RSR" stroke="#6366f1" strokeWidth={2} />
-              <Line type="monotone" dataKey="Velocity" stroke="#8b5cf6" strokeWidth={2} />
-              <Line type="monotone" dataKey="KSI" stroke="#06b6d4" strokeWidth={2} />
+              <Line type="monotone" dataKey="RSR" stroke="#6366f1" strokeWidth={2} name="RSR %" />
+              <Line type="monotone" dataKey="Velocity" stroke="#8b5cf6" strokeWidth={2} name="Velocity %" />
+              <Line type="monotone" dataKey="KSI" stroke="#06b6d4" strokeWidth={2} name="KSI %" />
             </LineChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -303,6 +322,7 @@ export default function DashboardTrendsView() {
                 stroke="#ef4444" 
                 strokeWidth={3}
                 dot={{ r: 4, fill: '#ef4444' }}
+                name="Risk Score"
               />
             </LineChart>
           </ResponsiveContainer>
@@ -324,9 +344,9 @@ export default function DashboardTrendsView() {
                 }}
               />
               <Legend wrapperStyle={{ fontSize: '12px' }} />
-              <Bar dataKey="RED" stackId="a" fill="#ef4444" />
-              <Bar dataKey="YELLOW" stackId="a" fill="#f59e0b" />
-              <Bar dataKey="GREEN" stackId="a" fill="#10b981" />
+              <Bar dataKey="RED" stackId="a" fill="#ef4444" name="🔴 RED" />
+              <Bar dataKey="YELLOW" stackId="a" fill="#f59e0b" name="🟡 YELLOW" />
+              <Bar dataKey="GREEN" stackId="a" fill="#10b981" name="🟢 GREEN" />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -352,6 +372,7 @@ export default function DashboardTrendsView() {
                 stroke="#10b981" 
                 strokeWidth={3}
                 dot={{ r: 4, fill: '#10b981' }}
+                name="Total Students"
               />
             </LineChart>
           </ResponsiveContainer>
@@ -382,15 +403,15 @@ export default function DashboardTrendsView() {
               {chartData.map((week, index) => (
                 <tr key={week.fullDate} className="border-b border-slate-800 hover:bg-slate-900/50">
                   <td className="p-3 font-bold text-white">{week.date}</td>
-                  <td className="text-center p-3 text-slate-300">{week.RSR}%</td>
-                  <td className="text-center p-3 text-slate-300">{week.Velocity}%</td>
-                  <td className="text-center p-3 text-slate-300">{week.KSI}%</td>
+                  <td className="text-center p-3 text-slate-300">{Math.round(week.RSR)}%</td>
+                  <td className="text-center p-3 text-slate-300">{Math.round(week.Velocity)}%</td>
+                  <td className="text-center p-3 text-slate-300">{Math.round(week.KSI)}%</td>
                   <td className="text-center p-3">
                     <span className={`font-bold ${
                       week.Risk >= 60 ? 'text-red-400' :
                       week.Risk >= 35 ? 'text-amber-400' :
                       'text-emerald-400'
-                    }`}>{week.Risk}</span>
+                    }`}>{Math.round(week.Risk)}</span>
                   </td>
                   <td className="text-center p-3 text-red-400 font-bold">{week.RED}</td>
                   <td className="text-center p-3 text-amber-400 font-bold">{week.YELLOW}</td>
