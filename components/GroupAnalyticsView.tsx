@@ -46,7 +46,6 @@ export default function GroupAnalyticsView({
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [drillDownTier, setDrillDownTier] = useState<'RED' | 'YELLOW' | 'GREEN' | null>(null);
 
-  // Handle ESC key to close drill-down modal
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && selectedGroup) {
@@ -58,96 +57,87 @@ export default function GroupAnalyticsView({
     return () => window.removeEventListener('keydown', handleEscape);
   }, [selectedGroup]);
 
-  // Agrupar estudiantes por dimensión seleccionada
-  const groupedData = useMemo(() => {
-    const grouped = groupStudentsByDimension(students, selectedDimension);
-    console.log('🔍 Grouped Data:', {
-      dimension: selectedDimension,
-      groups: Object.keys(grouped),
-      counts: Object.entries(grouped).map(([k, v]) => `${k}: ${v.length}`),
+  const statsData = useMemo(() => {
+    return groupStudentsByDimension(students, selectedDimension);
+  }, [students, selectedDimension]);
+
+  const groupedData: Record<string, Student[]> = useMemo(() => {
+    const grouped: Record<string, Student[]> = {};
+    
+    students.forEach(student => {
+      let groupKey: string;
+
+      switch (selectedDimension) {
+        case 'campus':
+          groupKey = student.dimensions?.campusDisplayName || 'Online (No Campus)';
+          break;
+        case 'grade':
+          groupKey = student.dimensions?.grade 
+            ? `Grade ${student.dimensions.grade}` 
+            : 'Unassigned';
+          break;
+        case 'guide':
+          groupKey = student.dimensions?.guide || 'No guide';
+          break;
+        default:
+          groupKey = 'Unknown';
+      }
+
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = [];
+      }
+      grouped[groupKey].push(student);
     });
+
     return grouped;
   }, [students, selectedDimension]);
 
-  // Calcular estadísticas para cada grupo
-  const statsData = useMemo(() => {
-    const stats = Object.entries(groupedData).map(([group, groupStudents]) =>
-      calculateGroupStats(groupStudents, group)
-    );
-    // Ordenar por count descendente
-    const sorted = stats.sort((a, b) => b.count - a.count);
-    console.log('📊 Stats Data:', sorted.map(s => ({
-      group: s.group,
-      count: s.count,
-      avgRSR: s.avgRSR,
-      redCount: s.redCount,
-    })));
-    return sorted;
-  }, [groupedData]);
-
-  // Datos para gráficos
   const tierDistributionData = useMemo(() => {
-    const data = statsData.map((stat) => ({
+    return statsData.map((stat) => ({
       name: stat.group,
       Red: stat.redCount,
       Yellow: stat.yellowCount,
       Green: stat.greenCount,
     }));
-    console.log('📊 Tier Distribution Data:', data);
-    return data;
   }, [statsData]);
 
   const pieData = useMemo(() => {
-    const data = statsData.map((stat) => ({
+    return statsData.map((stat) => ({
       name: stat.group,
       value: stat.count,
     }));
-    console.log('🥧 Pie Data:', data);
-    return data;
   }, [statsData]);
 
   const radarData = useMemo(() => {
-    // Top 5 grupos por tamaño
-    const data = statsData.slice(0, 5).map((stat) => ({
+    return statsData.slice(0, 5).map((stat) => ({
       group: stat.group.length > 15 ? stat.group.substring(0, 12) + '...' : stat.group,
       RSR: Math.round(stat.avgRSR || 0),
       Velocity: Math.round(stat.avgVelocity || 0),
       KSI: Math.round(stat.avgKSI || 0),
       'Risk Score': Math.round(stat.avgRiskScore || 0),
     }));
-    console.log('🎯 Radar Data:', data);
-    return data;
   }, [statsData]);
 
   const dimensionConfig = GROUP_DIMENSIONS.find(
     (d) => d.value === selectedDimension
   )!;
 
-  // Debug: verificar si hay datos
-  console.log('👥 Total Students:', students.length);
-  console.log('📦 Grouped Data Keys:', Object.keys(groupedData));
-  console.log('📈 Stats Data Length:', statsData.length);
-
-  // Handlers para interactividad
   const handleBarClick = (data: any) => {
     if (data && data.activePayload && data.activePayload[0]) {
       const groupName = data.activePayload[0].payload.name;
       setSelectedGroup(groupName);
-      console.log('📊 Selected group:', groupName);
     }
   };
 
   const handlePieClick = (data: any) => {
     if (data && data.name) {
       setSelectedGroup(data.name);
-      console.log('🥧 Selected group from pie:', data.name);
     }
   };
 
   const handleTierClick = (tier: 'RED' | 'YELLOW' | 'GREEN', groupName: string) => {
     setSelectedGroup(groupName);
     setDrillDownTier(tier);
-    console.log('🎯 Drill down:', { group: groupName, tier });
   };
 
   const closeDrillDown = () => {
@@ -155,8 +145,7 @@ export default function GroupAnalyticsView({
     setDrillDownTier(null);
   };
 
-  // Obtener estudiantes del grupo seleccionado
-  const drillDownStudents: Student[] = selectedGroup ? groupedData[selectedGroup] || [] : [];
+  const drillDownStudents: Student[] = selectedGroup && groupedData[selectedGroup] ? groupedData[selectedGroup] : [];
   const filteredDrillDownStudents = drillDownTier
     ? drillDownStudents.filter(s => s.dri?.driTier === drillDownTier)
     : drillDownStudents;
@@ -176,7 +165,6 @@ export default function GroupAnalyticsView({
       <div className="h-full flex items-center justify-center bg-slate-950 border border-slate-800 rounded-3xl p-8">
         <div className="text-center">
           <p className="text-slate-500 text-lg">No groups found for dimension: {selectedDimension}</p>
-          <p className="text-slate-600 text-sm mt-2">Check console for details</p>
         </div>
       </div>
     );
@@ -184,7 +172,6 @@ export default function GroupAnalyticsView({
 
   return (
     <div className="h-full bg-slate-950 border border-slate-800 rounded-3xl p-8 overflow-auto">
-      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-black text-white flex items-center gap-2">
@@ -197,7 +184,6 @@ export default function GroupAnalyticsView({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Dimension Selector */}
           <select
             value={selectedDimension}
             onChange={(e) =>
@@ -212,7 +198,6 @@ export default function GroupAnalyticsView({
             ))}
           </select>
 
-          {/* Export PDF Button */}
           <button
             onClick={async () => {
               try {
@@ -236,7 +221,6 @@ export default function GroupAnalyticsView({
         </div>
       </div>
 
-      {/* Summary Stats */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">Total Students</div>
@@ -270,9 +254,7 @@ export default function GroupAnalyticsView({
         </div>
       </div>
 
-      {/* Charts Grid - ALTURA FIJA */}
       <div className="grid grid-cols-2 gap-6 h-[600px]">
-        {/* Bar Chart: Tier Distribution */}
         <ChartCard title="Distribution by Tier">
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={tierDistributionData} onClick={handleBarClick}>
@@ -304,7 +286,6 @@ export default function GroupAnalyticsView({
           <p className="text-[10px] text-slate-600 italic mt-2">Click on a bar to view students</p>
         </ChartCard>
 
-        {/* Pie Chart: Student Distribution */}
         <ChartCard title="Student Distribution">
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
@@ -340,7 +321,6 @@ export default function GroupAnalyticsView({
           <p className="text-[10px] text-slate-600 italic mt-2">Click on a segment to view students</p>
         </ChartCard>
 
-        {/* Radar Chart: Metrics Comparison */}
         <ChartCard title="Metrics Comparison (Top 5 Groups)">
           <ResponsiveContainer width="100%" height={250}>
             <RadarChart data={radarData}>
@@ -373,7 +353,6 @@ export default function GroupAnalyticsView({
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Table: Summary Statistics */}
         <ChartCard title="Summary Statistics">
           <div className="h-[250px] overflow-y-auto custom-scrollbar">
             <table className="w-full text-xs">
@@ -388,7 +367,7 @@ export default function GroupAnalyticsView({
                 </tr>
               </thead>
               <tbody>
-                {statsData.map((stat, index) => (
+                {statsData.map((stat) => (
                   <tr
                     key={stat.group}
                     className={`border-b border-slate-800 hover:bg-slate-900/50 transition-colors ${
@@ -449,7 +428,6 @@ export default function GroupAnalyticsView({
         </ChartCard>
       </div>
 
-      {/* Drill-Down Modal */}
       {selectedGroup && (
         <div 
           className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-8"
@@ -459,7 +437,6 @@ export default function GroupAnalyticsView({
             className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="text-xl font-black text-white flex items-center gap-2">
@@ -487,7 +464,6 @@ export default function GroupAnalyticsView({
               </button>
             </div>
 
-            {/* Students List */}
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-slate-900 z-10">
@@ -552,7 +528,6 @@ export default function GroupAnalyticsView({
               )}
             </div>
 
-            {/* Modal Footer */}
             <div className="mt-4 pt-4 border-t border-slate-800 flex justify-between items-center">
               <div className="text-xs text-slate-500">
                 Press ESC or click outside to close
@@ -571,7 +546,6 @@ export default function GroupAnalyticsView({
   );
 }
 
-// Chart Card Component
 function ChartCard({
   title,
   children,
