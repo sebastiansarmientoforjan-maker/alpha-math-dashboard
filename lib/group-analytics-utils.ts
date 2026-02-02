@@ -103,7 +103,7 @@ export function calculateGroupStats(
   const avgRiskScore = average(
     validStudents
       .filter((s) => s.dri && typeof s.dri.riskScore === 'number')
-      .map((s) => s.dri.riskScore)
+      .map((s) => s.dri.riskScore!)
   );
   
   const avgAccuracy = average(
