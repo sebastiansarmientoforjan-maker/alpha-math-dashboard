@@ -72,7 +72,7 @@ export default function GroupAnalyticsView({
   // Calcular estadísticas para cada grupo
   const statsData = useMemo(() => {
     const stats = Object.entries(groupedData).map(([group, groupStudents]) =>
-      calculateGroupStats(group, groupStudents)
+      calculateGroupStats(groupStudents, group)
     );
     // Ordenar por count descendente
     const sorted = stats.sort((a, b) => b.count - a.count);
