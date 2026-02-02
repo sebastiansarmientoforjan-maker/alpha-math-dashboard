@@ -156,7 +156,7 @@ export default function GroupAnalyticsView({
   };
 
   // Obtener estudiantes del grupo seleccionado
-  const drillDownStudents = selectedGroup ? groupedData[selectedGroup] || [] : [];
+  const drillDownStudents: Student[] = selectedGroup ? groupedData[selectedGroup] || [] : [];
   const filteredDrillDownStudents = drillDownTier
     ? drillDownStudents.filter(s => s.dri?.driTier === drillDownTier)
     : drillDownStudents;
