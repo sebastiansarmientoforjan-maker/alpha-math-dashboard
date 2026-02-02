@@ -9,7 +9,7 @@ import HelpModal from '@/components/HelpModal';
 import BulkActionsBar from '@/components/BulkActionsBar';
 import Tooltip from '@/components/Tooltip';
 import AlertsDropdown from '@/components/AlertsDropdown';
-import FollowUpReminders from '@/components/FollowUpReminders'; // NUEVO IMPORT
+import FollowUpReminders from '@/components/FollowUpReminders';
 import LogViewWithTabs from '@/components/LogViewWithTabs';
 import GroupAnalyticsView from '@/components/GroupAnalyticsView';
 import DashboardTrendsView from '@/components/DashboardTrendsView';
@@ -35,7 +35,7 @@ const METRIC_TOOLTIPS = {
 interface MetricCardProps {
   title: string;
   value: string | number;
-  color: 'red' | 'amber' | 'emerald' | 'blue' | 'purple';
+  color: 'red' | 'amber' | 'emerald' | 'blue' | 'purple' | 'gold';
   subtitle?: string;
   tooltip?: string;
   trend?: number;
@@ -49,12 +49,15 @@ function MetricCard({ title, value, color, subtitle, tooltip, trend }: MetricCar
     amber: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
     emerald: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
     blue: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
-    purple: 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+    purple: 'bg-purple-500/10 border-purple-500/30 text-purple-400',
+    gold: 'bg-alpha-gold-dim border-alpha-gold/30 text-alpha-gold'
   };
+
+  const activeClass = colorClasses[color] || colorClasses['blue'];
 
   return (
     <div 
-      className={`relative border p-4 rounded-xl ${colorClasses[color]} transition-all hover:scale-[1.02] ${tooltip ? 'cursor-help' : ''}`}
+      className={`relative border p-4 rounded-xl ${activeClass} transition-all hover:scale-[1.02] ${tooltip ? 'cursor-help' : ''}`}
       onMouseEnter={() => tooltip && setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
     >
@@ -96,7 +99,7 @@ const StudentCard = memo(({ student, onClick, borderColor, isSelected, onSelect,
   return (
     <div 
       onClick={onClick}
-      className={`p-4 bg-slate-900/80 rounded-2xl border-l-4 ${borderColor} cursor-pointer hover:scale-[1.02] transition-all group shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isSelected ? 'ring-2 ring-indigo-500 bg-indigo-900/20' : ''}`}
+      className={`p-4 bg-slate-900/80 rounded-2xl border-l-4 ${borderColor} cursor-pointer hover:scale-[1.02] transition-all group shadow-lg focus:outline-none focus:ring-2 focus:ring-alpha-gold ${isSelected ? 'ring-2 ring-alpha-gold bg-alpha-gold-dim' : ''}`}
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick()}
     >
@@ -107,14 +110,14 @@ const StudentCard = memo(({ student, onClick, borderColor, isSelected, onSelect,
               onClick={handleCheckboxClick}
               className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all cursor-pointer ${
                 isSelected 
-                  ? 'bg-indigo-500 border-indigo-500 text-white' 
-                  : 'border-slate-600 hover:border-indigo-400'
+                  ? 'bg-alpha-gold border-alpha-gold text-black' 
+                  : 'border-slate-600 hover:border-alpha-gold'
               }`}
             >
-              {isSelected && <span className="text-xs">✓</span>}
+              {isSelected && <span className="text-xs font-black">✓</span>}
             </div>
           )}
-          <h3 className="font-black text-white text-sm uppercase italic truncate w-36 group-hover:text-indigo-400">
+          <h3 className="font-black text-white text-sm uppercase italic truncate w-36 group-hover:text-alpha-gold transition-colors">
             {student.firstName} {student.lastName}
           </h3>
         </div>
@@ -124,7 +127,7 @@ const StudentCard = memo(({ student, onClick, borderColor, isSelected, onSelect,
           </span>
         </Tooltip>
       </div>
-      <p className="text-[9px] text-indigo-400/70 font-bold uppercase mb-3 truncate italic">
+      <p className="text-[9px] text-slate-400 font-bold uppercase mb-3 truncate italic">
         {student.currentCourse.name}
       </p>
       <div className="flex justify-between items-center text-[8px] font-black uppercase font-mono">
@@ -250,7 +253,7 @@ function ActiveFiltersIndicator({
     <div className="flex items-center gap-2 text-[9px] bg-slate-900/40 px-3 py-2 rounded-xl border border-slate-800 flex-wrap">
       <span className="text-slate-500">Active filters:</span>
       {search && (
-        <span className="px-2 py-0.5 bg-indigo-500/20 border border-indigo-500/30 rounded-full text-indigo-300 flex items-center gap-1">
+        <span className="px-2 py-0.5 bg-alpha-navy border border-alpha-navy-light rounded-full text-blue-200 flex items-center gap-1">
           🔎 "{search.length > 15 ? search.substring(0, 15) + '...' : search}"
           <button onClick={onClearSearch} className="hover:text-white ml-1 text-[8px]">✕</button>
         </span>
@@ -576,17 +579,19 @@ export default function HomePage() {
 
   const selectedStudentsData = useMemo(() => students.filter(s => selectedIds.has(s.id)), [students, selectedIds]);
 
-  if (loading) return <div className="p-10 bg-black min-h-screen text-emerald-500 font-mono italic animate-pulse text-center uppercase tracking-widest">DRI COMMAND CENTER INITIALIZING...</div>;
+  if (loading) return <div className="p-10 bg-alpha-navy-bg min-h-screen text-alpha-gold font-mono italic animate-pulse text-center uppercase tracking-widest">DRI COMMAND CENTER INITIALIZING...</div>;
 
   return (
-    <div className="flex flex-col h-screen bg-[#050505] text-slate-300 font-sans overflow-hidden">
+    <div className="flex flex-col h-screen bg-alpha-navy-bg text-slate-300 font-sans overflow-hidden">
       <div className={`flex-shrink-0 p-6 pb-0 space-y-4 transition-all duration-300 ${compactHeader ? 'space-y-2' : ''}`}>
         {syncError && <ErrorBanner message={syncError} onRetry={handleRetrySync} onDismiss={() => setSyncError(null)} />}
         <div className={`flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-4 gap-4 ${compactHeader ? 'pb-2' : ''}`}>
           <div className="flex items-center gap-4">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className={`font-black uppercase italic text-white tracking-tighter transition-all ${compactHeader ? 'text-xl' : 'text-3xl'}`}>DRI COMMAND CENTER</h1>
+                <h1 className={`font-black uppercase italic text-white tracking-tighter transition-all ${compactHeader ? 'text-xl' : 'text-3xl'}`}>
+                  DRI COMMAND <span className="text-alpha-gold">CENTER</span>
+                </h1>
                 
                 {/* ALERTAS */}
                 <AlertsDropdown onStudentClick={(studentId) => {
@@ -600,16 +605,16 @@ export default function HomePage() {
                   if (student) { setSelectedStudentIndex(filteredForNavigation.findIndex(s => s.id === studentId)); setSelectedStudent(student); }
                 }} />
 
-                <button onClick={() => setShowHelp(true)} className="w-7 h-7 rounded-full border border-slate-700 text-slate-500 hover:text-white hover:border-indigo-500 transition-all flex items-center justify-center text-xs font-bold" title="Help & Keyboard Shortcuts (?)">?</button>
+                <button onClick={() => setShowHelp(true)} className="w-7 h-7 rounded-full border border-slate-700 text-slate-500 hover:text-white hover:border-alpha-gold transition-all flex items-center justify-center text-xs font-bold" title="Help & Keyboard Shortcuts (?)">?</button>
                 <CompactHeader isCompact={compactHeader} onToggle={() => setCompactHeader(!compactHeader)} />
               </div>
               {!compactHeader && (
                 <>
-                  <p className="text-xs text-indigo-400 font-bold tracking-[0.3em] uppercase">V5.5 Alpha • {students.length} Students • {filtered.length} Filtered</p>
+                  <p className="text-xs text-alpha-gold font-bold tracking-[0.3em] uppercase">V5.5 Alpha • {students.length} Students • {filtered.length} Filtered</p>
                   <div className="flex gap-3 mt-1 text-[9px] text-slate-600 font-mono flex-wrap">
                     <Tooltip content={METRIC_TOOLTIPS.rsr}><span className="cursor-help">RSR: <span className="text-emerald-500 font-bold">{stats.avgRSR}%</span></span></Tooltip>
                     <span className="text-slate-700">•</span>
-                    <span>Std: <span className="text-indigo-500 font-bold">{DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP/wk</span></span>
+                    <span>Std: <span className="text-alpha-gold font-bold">{DRI_CONFIG.ALPHA_WEEKLY_STANDARD} XP/wk</span></span>
                   </div>
                 </>
               )}
@@ -619,8 +624,8 @@ export default function HomePage() {
           <div className="flex flex-col items-end gap-2">
             <div className={`flex bg-slate-900/50 p-1 rounded-xl border border-slate-800 font-black uppercase ${compactHeader ? 'text-[8px]' : 'text-[10px]'}`}>
               {(['TRIAGE', 'MATRIX', 'HEATMAP', 'LOG', 'GROUP', 'TRENDS'] as const).map((m, i) => (
-                <button key={m} onClick={() => setViewMode(m)} className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${viewMode === m ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>
-                  {m}<kbd className={`text-[7px] px-1 rounded ${viewMode === m ? 'bg-indigo-500' : 'bg-slate-800'}`}>{i + 1}</kbd>
+                <button key={m} onClick={() => setViewMode(m)} className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${viewMode === m ? 'bg-alpha-gold text-black shadow-lg shadow-alpha-gold/20' : 'text-slate-500 hover:text-slate-300'}`}>
+                  {m}<kbd className={`text-[7px] px-1 rounded ${viewMode === m ? 'bg-black/20 text-black' : 'bg-slate-800'}`}>{i + 1}</kbd>
                 </button>
               ))}
             </div>
@@ -628,7 +633,7 @@ export default function HomePage() {
               {autoSync && <div className="absolute bottom-0 left-0 h-0.5 bg-emerald-500 transition-all duration-700" style={{ width: `${progress}%` }} />}
               <div className="text-[9px] font-mono">
                 <span className="text-white font-bold">{students.length}</span><span className="text-slate-600">/1613</span>
-                {autoSync && <span className="ml-2 text-slate-500">B{batchStatus.current}/{batchStatus.total}{eta && <span className="text-indigo-400 ml-1">~{Math.floor(eta / 60)}m</span>}</span>}
+                {autoSync && <span className="ml-2 text-slate-500">B{batchStatus.current}/{batchStatus.total}{eta && <span className="text-alpha-gold ml-1">~{Math.floor(eta / 60)}m</span>}</span>}
               </div>
               <div className="flex gap-1">
                 {autoSync && <button onClick={() => setIsPaused(!isPaused)} className="px-2 py-1 rounded text-[8px] bg-slate-800 text-slate-400 hover:bg-slate-700">{isPaused ? '▶' : '⏸'}</button>}
@@ -642,18 +647,18 @@ export default function HomePage() {
             <MetricCard title="🔴 Critical" value={stats.atRisk} color="red" subtitle={`${((stats.atRisk/Math.max(stats.total, 1))*100).toFixed(1)}%`} tooltip="Risk Score ≥ 60, DER > 20%, or RSR < 60%" trend={trends.atRisk} />
             <MetricCard title="🟡 Watch" value={stats.attention} color="amber" subtitle={`${((stats.attention/Math.max(stats.total, 1))*100).toFixed(1)}%`} tooltip="Risk Score 35-59, or PDI > 1.5" trend={trends.attention} />
             <MetricCard title="🟢 Optimal" value={stats.onTrack} color="emerald" subtitle={`${((stats.onTrack/Math.max(stats.total, 1))*100).toFixed(1)}%`} tooltip="Risk Score < 35 with stable metrics" trend={trends.onTrack} />
-            <MetricCard title="Avg Velocity" value={`${stats.avgVelocity}%`} color="purple" subtitle={`${Math.round((stats.avgVelocity / 100) * DRI_CONFIG.ALPHA_WEEKLY_STANDARD)} XP/wk`} tooltip={METRIC_TOOLTIPS.velocity} trend={trends.avgVelocity} />
+            <MetricCard title="Avg Velocity" value={`${stats.avgVelocity}%`} color="gold" subtitle={`${Math.round((stats.avgVelocity / 100) * DRI_CONFIG.ALPHA_WEEKLY_STANDARD)} XP/wk`} tooltip={METRIC_TOOLTIPS.velocity} trend={trends.avgVelocity} />
           </div>
         )}
         
         <div className="flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-[280px]">
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔎 SEARCH STUDENT..." className={`w-full bg-slate-900/40 border border-slate-800 rounded-xl px-4 text-sm focus:border-indigo-500 outline-none font-mono transition-all ${compactHeader ? 'py-2' : 'py-3'}`} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔎 SEARCH STUDENT..." className={`w-full bg-slate-900/40 border border-slate-800 rounded-xl px-4 text-sm focus:border-alpha-gold outline-none font-mono transition-all ${compactHeader ? 'py-2' : 'py-3'}`} />
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded">/</kbd>
           </div>
           
           {viewMode === 'TRIAGE' && (
-            <button onClick={() => { setSelectionMode(!selectionMode); if (selectionMode) setSelectedIds(new Set()); }} className={`px-3 py-2 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all ${selectionMode ? 'bg-indigo-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-500 hover:text-white hover:border-indigo-500'}`}>{selectionMode ? '✓ Selecting' : '☐ Select'}</button>
+            <button onClick={() => { setSelectionMode(!selectionMode); if (selectionMode) setSelectedIds(new Set()); }} className={`px-3 py-2 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all ${selectionMode ? 'bg-alpha-gold text-black' : 'bg-slate-900 border border-slate-800 text-slate-500 hover:text-white hover:border-alpha-gold'}`}>{selectionMode ? '✓ Selecting' : '☐ Select'}</button>
           )}
           
           <select value={selectedCampus} onChange={(e) => setSelectedCampus(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none hover:border-slate-600 transition-colors">
@@ -710,14 +715,14 @@ export default function HomePage() {
                   <div className="flex-shrink-0 p-3 bg-slate-900/40 border-b border-slate-800 font-black text-xs uppercase tracking-widest flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       {selectionMode && (
-                        <button onClick={() => handleSelectAll(col.tier)} className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${allSelected ? 'bg-indigo-500 border-indigo-500 text-white' : someSelected ? 'bg-indigo-500/50 border-indigo-500 text-white' : 'border-slate-600 hover:border-indigo-400'}`}>
+                        <button onClick={() => handleSelectAll(col.tier)} className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${allSelected ? 'bg-alpha-gold border-alpha-gold text-black' : someSelected ? 'bg-alpha-gold/50 border-alpha-gold text-black' : 'border-slate-600 hover:border-alpha-gold'}`}>
                           {(allSelected || someSelected) && <span className="text-[8px]">✓</span>}
                         </button>
                       )}
                       <span className="text-slate-300">{col.label}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {isRefreshing && <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />}
+                      {isRefreshing && <div className="w-3 h-3 border-2 border-alpha-gold border-t-transparent rounded-full animate-spin" />}
                       <span className="bg-slate-800 text-slate-500 px-2 py-0.5 rounded text-[9px] font-mono">{col.data.length}</span>
                     </div>
                   </div>
