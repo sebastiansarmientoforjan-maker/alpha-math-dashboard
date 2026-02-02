@@ -9,7 +9,8 @@
 export type GroupDimension = 
   | 'campus'    // 7 grupos (6 físicos + 1 online)
   | 'grade'     // 5 grupos (8-12)
-  | 'guide';    // 7 grupos (6 guides + unassigned)
+  | 'guide'     // 7 grupos (6 guides + unassigned)
+  | 'course';   // NUEVO: Agregado para soportar el filtro por curso
 
 // Estructura de dimensiones de un estudiante
 export interface StudentDimensions {
@@ -65,6 +66,14 @@ export const GROUP_DIMENSIONS: DimensionConfig[] = [
     groups: 7,
     priority: 3,
     description: 'Compare effectiveness across different guides/mentors',
+  },
+  {
+    value: 'course',
+    label: 'By Course',
+    icon: '📚',
+    groups: 15,
+    priority: 4,
+    description: 'Compare performance across specific math courses',
   },
 ];
 
