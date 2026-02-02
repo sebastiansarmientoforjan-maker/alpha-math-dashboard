@@ -23,7 +23,7 @@ const METRIC_INFO = {
   velocity: { name: 'Velocity', desc: 'Weekly XP progress toward goal' },
   accuracy: { name: 'Accuracy', desc: 'Overall accuracy across all tasks' },
   focus: { name: 'Focus Integrity', desc: 'Measure of sustained attention' },
-  risk: { name: 'Risk Score', desc: 'Composite score from multiple factors' },
+  risk: { name: 'Risk Score', desc: 'Composite score from multiple risk factors' },
 };
 
 // ==========================================
@@ -45,16 +45,16 @@ function CollapsibleSection({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border border-slate-800 rounded-2xl overflow-hidden">
+    <div className="border border-alpha-navy-light/30 bg-alpha-navy/20 rounded-2xl overflow-hidden">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full p-4 bg-slate-900/40 flex items-center justify-between hover:bg-slate-900/60 transition-colors"
+        className="w-full p-4 flex items-center justify-between hover:bg-alpha-navy/40 transition-colors"
       >
         <div className="flex items-center gap-2">
           <span>{icon}</span>
           <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{title}</span>
           {badge !== undefined && (
-            <span className="px-2 py-0.5 bg-indigo-500/20 border border-indigo-500/30 rounded text-[9px] text-indigo-300 font-bold">
+            <span className="px-2 py-0.5 bg-alpha-gold/20 border border-alpha-gold/30 rounded text-[9px] text-alpha-gold font-bold">
               {badge}
             </span>
           )}
@@ -232,12 +232,12 @@ export default function StudentModal({
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 animate-in fade-in duration-200">
         <div className="absolute inset-0" onClick={onClose} />
-        <div className="bg-[#080808] border border-slate-800 w-full max-w-6xl h-[85vh] rounded-[2.5rem] relative z-10 flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="bg-alpha-navy-bg border border-alpha-navy-light/50 w-full max-w-6xl h-[85vh] rounded-[2.5rem] relative z-10 flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
           
           {/* ========================================== */}
-          {/* HEADER - SIMPLIFIED */}
+          {/* HEADER - BRANDED */}
           {/* ========================================== */}
-          <div className="p-5 border-b border-slate-800 flex justify-between items-start bg-gradient-to-b from-slate-900/50 to-transparent">
+          <div className="p-5 border-b border-alpha-navy-light/30 flex justify-between items-start bg-gradient-to-b from-alpha-navy/50 to-transparent">
             <div className="flex gap-4 items-center flex-1">
               {/* Velocity Badge */}
               <Tooltip content={METRIC_INFO.velocity.desc}>
@@ -260,14 +260,14 @@ export default function StudentModal({
                   <span className={`px-2 py-1 rounded-full border border-current ${student.dri.driColor}`}>
                     {student.dri.driSignal}
                   </span>
-                  <span className="px-2 py-1 rounded-full border border-indigo-500/30 text-indigo-400 bg-indigo-500/10">
+                  <span className="px-2 py-1 rounded-full border border-alpha-gold/30 text-alpha-gold bg-alpha-gold/10">
                     {student.currentCourse?.name}
                   </span>
                   {student.dri.riskScore !== undefined && (
                     <Tooltip content={METRIC_INFO.risk.desc}>
                       <span className={`px-2 py-1 rounded-full border cursor-help ${
-                        student.dri.riskScore >= 60 ? 'border-red-500 text-red-400 bg-red-500/10' :
-                        student.dri.riskScore >= 35 ? 'border-amber-500 text-amber-400 bg-amber-500/10' :
+                        student.dri.riskScore >= 60 ? 'border-red-500 text-red-400 bg-red-500/10' : 
+                        student.dri.riskScore >= 35 ? 'border-amber-500 text-amber-400 bg-amber-500/10' : 
                         'border-emerald-500 text-emerald-400 bg-emerald-500/10'
                       }`}>
                         Risk: {student.dri.riskScore}
@@ -288,7 +288,7 @@ export default function StudentModal({
                   {studentInterventions.length > 0 && (
                     <>
                       <span>•</span>
-                      <span className="text-indigo-400">{studentInterventions.length} interventions</span>
+                      <span className="text-alpha-gold">{studentInterventions.length} interventions</span>
                     </>
                   )}
                 </div>
@@ -300,14 +300,14 @@ export default function StudentModal({
               {/* Action Buttons */}
               <button
                 onClick={() => setShowInterventionModal(true)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase rounded-xl transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-alpha-gold hover:bg-yellow-400 text-black text-[10px] font-black uppercase rounded-xl transition-colors flex items-center gap-2 shadow-lg shadow-alpha-gold/20"
                 title="Log Intervention (Ctrl+I)"
               >
                 📝 Log Intervention
               </button>
               <button
                 onClick={() => setShowTrackImpact(true)}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black uppercase rounded-xl transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-alpha-navy hover:bg-alpha-navy-light text-white border border-alpha-navy-light text-[10px] font-black uppercase rounded-xl transition-colors flex items-center gap-2"
                 title="Track Impact"
               >
                 📈 Track Impact
@@ -315,7 +315,7 @@ export default function StudentModal({
               <button
                 onClick={handleExportPDF}
                 disabled={exportingPDF}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500 text-white text-[10px] font-black uppercase rounded-xl transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 disabled:text-slate-600 text-white text-[10px] font-black uppercase rounded-xl transition-colors flex items-center gap-2"
                 title="Export Student Report PDF"
               >
                 {exportingPDF ? (
@@ -329,10 +329,10 @@ export default function StudentModal({
               </button>
               
               {onNavigate && totalStudents > 1 && (
-                <div className="flex items-center gap-1 ml-2">
+                <div className="flex items-center gap-1 ml-2 border-l border-slate-800 pl-2">
                   <button 
                     onClick={() => onNavigate('prev')}
-                    className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center justify-center text-sm"
+                    className="w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors flex items-center justify-center text-sm"
                   >
                     ←
                   </button>
@@ -341,7 +341,7 @@ export default function StudentModal({
                   </span>
                   <button 
                     onClick={() => onNavigate('next')}
-                    className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center justify-center text-sm"
+                    className="w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors flex items-center justify-center text-sm"
                   >
                     →
                   </button>
@@ -357,14 +357,14 @@ export default function StudentModal({
           </div>
 
           {/* ========================================== */}
-          {/* TAB NAVIGATION */}
+          {/* TAB NAVIGATION - BRANDED */}
           {/* ========================================== */}
-          <div className="px-5 pt-3 border-b border-slate-800/50 flex gap-2">
+          <div className="px-5 pt-3 border-b border-alpha-navy-light/30 flex gap-2">
             <button
               onClick={() => setActiveTab('overview')}
               className={`px-4 py-2 rounded-t-lg font-black text-[10px] uppercase tracking-widest transition-all ${
                 activeTab === 'overview'
-                  ? 'bg-slate-800 text-white border-t border-x border-slate-700'
+                  ? 'bg-alpha-navy border-t border-x border-alpha-navy-light/50 text-alpha-gold'
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
@@ -374,7 +374,7 @@ export default function StudentModal({
               onClick={() => setActiveTab('history')}
               className={`px-4 py-2 rounded-t-lg font-black text-[10px] uppercase tracking-widest transition-all ${
                 activeTab === 'history'
-                  ? 'bg-slate-800 text-white border-t border-x border-slate-700'
+                  ? 'bg-alpha-navy border-t border-x border-alpha-navy-light/50 text-alpha-gold'
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
@@ -384,14 +384,14 @@ export default function StudentModal({
               onClick={() => setActiveTab('interventions')}
               className={`px-4 py-2 rounded-t-lg font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 ${
                 activeTab === 'interventions'
-                  ? 'bg-slate-800 text-white border-t border-x border-slate-700'
+                  ? 'bg-alpha-navy border-t border-x border-alpha-navy-light/50 text-alpha-gold'
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
               📝 Interventions
               {studentInterventions.length > 0 && (
                 <span className={`px-1.5 py-0.5 rounded text-[8px] ${
-                  activeTab === 'interventions' ? 'bg-indigo-500' : 'bg-slate-700'
+                  activeTab === 'interventions' ? 'bg-alpha-gold text-black' : 'bg-slate-700'
                 }`}>
                   {studentInterventions.length}
                 </span>
@@ -401,7 +401,7 @@ export default function StudentModal({
               onClick={() => setActiveTab('trends')}
               className={`px-4 py-2 rounded-t-lg font-black text-[10px] uppercase tracking-widest transition-all ${
                 activeTab === 'trends'
-                  ? 'bg-slate-800 text-white border-t border-x border-slate-700'
+                  ? 'bg-alpha-navy border-t border-x border-alpha-navy-light/50 text-alpha-gold'
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
@@ -432,7 +432,7 @@ export default function StudentModal({
                           </p>
                         </Tooltip>
                         <p className="text-4xl font-black text-white italic">{rsrDisplay}</p>
-                        <p className="text-[8px] text-indigo-400 mt-1 font-bold uppercase italic">
+                        <p className="text-[8px] text-alpha-gold mt-1 font-bold uppercase italic">
                           {student.metrics.stallStatus || 'Optimal'}
                         </p>
                       </div>
@@ -536,12 +536,12 @@ export default function StudentModal({
                   >
                     <div className="space-y-3">
                       {/* Ready to Accelerate */}
-                      <div className="bg-indigo-950/20 border border-indigo-500/30 p-3 rounded-xl">
-                        <h4 className="text-[8px] font-black text-indigo-400 uppercase mb-2">⚡ Ready to Accelerate</h4>
+                      <div className="bg-alpha-navy/30 border border-alpha-navy-light/30 p-3 rounded-xl">
+                        <h4 className="text-[8px] font-black text-alpha-gold uppercase mb-2">⚡ Ready to Accelerate</h4>
                         {readyToAccelerate.length > 0 ? readyToAccelerate.map((topic: string, idx: number) => (
-                          <div key={idx} className="flex items-center gap-2 p-1.5 bg-indigo-900/20 rounded mb-1">
-                            <div className="w-1 h-1 bg-indigo-500 rounded-full" />
-                            <span className="text-[9px] font-bold text-indigo-200 uppercase truncate">{topic}</span>
+                          <div key={idx} className="flex items-center gap-2 p-1.5 bg-alpha-navy rounded mb-1">
+                            <div className="w-1 h-1 bg-alpha-gold rounded-full" />
+                            <span className="text-[9px] font-bold text-slate-200 uppercase truncate">{topic}</span>
                           </div>
                         )) : (
                           <p className="text-[9px] text-slate-600 italic text-center py-2">Consolidating...</p>
@@ -590,9 +590,9 @@ export default function StudentModal({
                         <Line 
                           type="monotone" 
                           dataKey="acc" 
-                          stroke="#6366f1" 
+                          stroke="#D4AF37" 
                           strokeWidth={2} 
-                          dot={{ r: 3, fill: '#6366f1' }} 
+                          dot={{ r: 3, fill: '#D4AF37' }} 
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -609,11 +609,11 @@ export default function StudentModal({
                           contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '10px', fontSize: '10px' }}
                           formatter={(value: any) => [`${value} XP`, 'Earned']}
                         />
-                        <Bar dataKey="xp" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="xp" fill="#0C2D48" stroke="#D4AF37" strokeWidth={1} radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                     <div className="mt-2 flex justify-between text-[8px] text-slate-600">
-                      <span>Total: <span className="text-indigo-400 font-bold">{weeklyPattern.reduce((sum, d) => sum + d.xp, 0)} XP</span></span>
+                      <span>Total: <span className="text-alpha-gold font-bold">{weeklyPattern.reduce((sum, d) => sum + d.xp, 0)} XP</span></span>
                       <span>Active days: <span className="text-emerald-400 font-bold">{weeklyPattern.filter(d => d.tasks > 0).length}/7</span></span>
                     </div>
                   </CollapsibleSection>
@@ -630,7 +630,7 @@ export default function StudentModal({
                         {studentInterventions.slice(0, 3).map((intervention: any) => (
                           <div key={intervention.id} className="p-3 bg-slate-900/40 rounded-xl border border-slate-800">
                             <div className="flex justify-between items-start mb-1">
-                              <span className="text-[10px] font-bold text-indigo-400">{intervention.objective}</span>
+                              <span className="text-[10px] font-bold text-alpha-gold">{intervention.objective}</span>
                               <span className="text-[8px] text-slate-600 font-mono">
                                 {intervention.interventionDate?.toDate?.().toLocaleDateString() || 
                                  new Date(intervention.interventionDate).toLocaleDateString()}
@@ -645,7 +645,7 @@ export default function StudentModal({
                         {studentInterventions.length > 3 && (
                           <button 
                             onClick={() => setActiveTab('interventions')}
-                            className="w-full text-center text-[9px] text-indigo-400 hover:text-indigo-300 py-2"
+                            className="w-full text-center text-[9px] text-alpha-gold hover:text-yellow-400 py-2"
                           >
                             View all {studentInterventions.length} interventions →
                           </button>
@@ -716,7 +716,7 @@ export default function StudentModal({
                   </div>
                   <button
                     onClick={() => setShowInterventionModal(true)}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase rounded-xl transition-colors flex items-center gap-2"
+                    className="px-4 py-2 bg-alpha-gold text-black hover:bg-yellow-400 text-[10px] font-black uppercase rounded-xl transition-colors flex items-center gap-2"
                   >
                     + Log New Intervention
                   </button>
@@ -730,7 +730,7 @@ export default function StudentModal({
                     <p className="text-[10px] text-slate-600 mt-1">Start by logging your first coaching session</p>
                     <button
                       onClick={() => setShowInterventionModal(true)}
-                      className="mt-4 px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase rounded-xl transition-colors"
+                      className="mt-4 px-6 py-2 bg-alpha-gold text-black hover:bg-yellow-400 text-[10px] font-black uppercase rounded-xl transition-colors"
                     >
                       Log Intervention
                     </button>
@@ -742,7 +742,7 @@ export default function StudentModal({
                         {/* Header */}
                         <div className="flex justify-between items-start mb-4">
                           <div>
-                            <h4 className="text-sm font-black text-indigo-400 uppercase">{intervention.objective}</h4>
+                            <h4 className="text-sm font-black text-alpha-gold uppercase">{intervention.objective}</h4>
                             <p className="text-[10px] text-slate-500 mt-1">
                               Coach: <span className="text-white font-bold">{intervention.coachName}</span>
                               <span className="mx-2">•</span>
