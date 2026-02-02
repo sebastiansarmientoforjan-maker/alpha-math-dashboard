@@ -9,6 +9,7 @@ import HelpModal from '@/components/HelpModal';
 import BulkActionsBar from '@/components/BulkActionsBar';
 import Tooltip from '@/components/Tooltip';
 import AlertsDropdown from '@/components/AlertsDropdown';
+import FollowUpReminders from '@/components/FollowUpReminders'; // NUEVO IMPORT
 import LogViewWithTabs from '@/components/LogViewWithTabs';
 import GroupAnalyticsView from '@/components/GroupAnalyticsView';
 import DashboardTrendsView from '@/components/DashboardTrendsView';
@@ -586,10 +587,19 @@ export default function HomePage() {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className={`font-black uppercase italic text-white tracking-tighter transition-all ${compactHeader ? 'text-xl' : 'text-3xl'}`}>DRI COMMAND CENTER</h1>
+                
+                {/* ALERTAS */}
                 <AlertsDropdown onStudentClick={(studentId) => {
                   const student = students.find(s => s.id === studentId);
                   if (student) { setSelectedStudentIndex(filteredForNavigation.findIndex(s => s.id === studentId)); setSelectedStudent(student); }
                 }} />
+                
+                {/* NUEVO: FOLLOW-UP REMINDERS */}
+                <FollowUpReminders onStudentClick={(studentId) => {
+                  const student = students.find(s => s.id === studentId);
+                  if (student) { setSelectedStudentIndex(filteredForNavigation.findIndex(s => s.id === studentId)); setSelectedStudent(student); }
+                }} />
+
                 <button onClick={() => setShowHelp(true)} className="w-7 h-7 rounded-full border border-slate-700 text-slate-500 hover:text-white hover:border-indigo-500 transition-all flex items-center justify-center text-xs font-bold" title="Help & Keyboard Shortcuts (?)">?</button>
                 <CompactHeader isCompact={compactHeader} onToggle={() => setCompactHeader(!compactHeader)} />
               </div>
