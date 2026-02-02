@@ -110,10 +110,10 @@ export default function GroupAnalyticsView({
     // Top 5 grupos por tamaño
     const data = statsData.slice(0, 5).map((stat) => ({
       group: stat.group.length > 15 ? stat.group.substring(0, 12) + '...' : stat.group,
-      RSR: Math.round(stat.avgRSR),
-      Velocity: Math.round(stat.avgVelocity),
-      KSI: Math.round(stat.avgKSI),
-      'Risk Score': Math.round(stat.avgRiskScore),
+      RSR: Math.round(stat.avgRSR || 0),
+      Velocity: Math.round(stat.avgVelocity || 0),
+      KSI: Math.round(stat.avgKSI || 0),
+      'Risk Score': Math.round(stat.avgRiskScore || 0),
     }));
     console.log('🎯 Radar Data:', data);
     return data;
@@ -405,13 +405,13 @@ export default function GroupAnalyticsView({
                       {stat.count}
                     </td>
                     <td className="text-center p-2 text-slate-300">
-                      {stat.avgRSR.toFixed(0)}%
+                      {(stat.avgRSR || 0).toFixed(0)}%
                     </td>
                     <td className="text-center p-2 text-slate-300">
-                      {stat.avgVelocity.toFixed(0)}%
+                      {(stat.avgVelocity || 0).toFixed(0)}%
                     </td>
                     <td className="text-center p-2 text-slate-300">
-                      {stat.avgRiskScore.toFixed(0)}
+                      {(stat.avgRiskScore || 0).toFixed(0)}
                     </td>
                     <td className="text-center p-2">
                       <div className="flex gap-1 justify-center">
