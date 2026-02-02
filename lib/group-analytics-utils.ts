@@ -139,6 +139,13 @@ export function groupStudentsByDimension(
 }
 
 /**
+ * Ordena grupos por cantidad de estudiantes (descendente)
+ */
+export function sortGroupsByCount(groups: GroupStats[]): GroupStats[] {
+  return [...groups].sort((a, b) => b.count - a.count);
+}
+
+/**
  * Genera un resumen textual de las estadísticas de un grupo
  */
 export function generateGroupSummary(stats: GroupStats): string {
