@@ -9,10 +9,23 @@ module.exports = {
     extend: {
       colors: {
         alpha: {
-          gold: '#d4af37',
-          blue: '#2d4a5a',
-          'blue-light': '#3d5a6a',
+          // Alpha Gold Palette (Marca Principal)
+          gold: '#D4AF37',       // Oro oficial
+          'gold-light': '#F3D250',
+          'gold-dim': 'rgba(212, 175, 55, 0.15)', // Fondos sutiles
+          
+          // Alpha Navy/Dark Palette (Fondos)
+          navy: '#0C2D48',       // Azul marino profundo
+          'navy-light': '#144a75',
+          'navy-bg': '#050b14',  // Fondo principal (reemplaza el negro)
+          
+          // Semantic Colors (Botones)
+          action: '#D4AF37',     
+          'action-hover': '#B5952F'
         }
+      },
+      backgroundImage: {
+        'alpha-gradient': 'linear-gradient(135deg, #0C2D48 0%, #050b14 100%)',
       }
     },
   },
