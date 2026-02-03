@@ -121,7 +121,7 @@ export default function TowerPage() {
 
   const greenZone = useMemo(() => 
     students.filter(s => !redZone.some(r => r.id === s.id) && !yellowZone.some(y => y.id === s.id))
-      .sort((a, b) => (a.metrics.lmp - b.metrics.lmp)) // Lowest RSR first for monitoring
+      .sort((a, b) => (a.metrics.lmp - b.metrics.lmp))
   , [students, redZone, yellowZone]);
 
   const stats = useMemo(() => ({
@@ -200,7 +200,7 @@ export default function TowerPage() {
         </div>
       </header>
 
-      {/* Matrix Section - REAL COMPONENT */}
+      {/* Matrix Section */}
       <section className="mb-12">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-black text-white uppercase">
@@ -215,7 +215,7 @@ export default function TowerPage() {
         </div>
       </section>
 
-      {/* Triage Stack - REAL DATA */}
+      {/* Triage Stack */}
       <section>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-black text-white uppercase">
@@ -228,7 +228,7 @@ export default function TowerPage() {
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Red Zone - CRITICAL */}
+          {/* Red Zone */}
           <div className="glass-card rounded-2xl overflow-hidden border-l-4 border-risk-red">
             <div className="p-4 bg-risk-red/10 border-b border-risk-red/30">
               <div className="flex justify-between items-center">
@@ -261,7 +261,7 @@ export default function TowerPage() {
             </div>
           </div>
 
-          {/* Amber Zone - WATCH */}
+          {/* Amber Zone */}
           <div className="glass-card rounded-2xl overflow-hidden border-l-4 border-risk-amber">
             <div className="p-4 bg-risk-amber/10 border-b border-risk-amber/30">
               <div className="flex justify-between items-center">
@@ -294,7 +294,7 @@ export default function TowerPage() {
             </div>
           </div>
 
-          {/* Green Zone - OPTIMAL */}
+          {/* Green Zone */}
           <div className="glass-card rounded-2xl overflow-hidden border-l-4 border-risk-emerald">
             <div className="p-4 bg-risk-emerald/10 border-b border-risk-emerald/30">
               <div className="flex justify-between items-center">
@@ -316,7 +316,7 @@ export default function TowerPage() {
                   <p className="text-slate-600 text-xs italic">No optimal students</p>
                 </div>
               ) : (
-                greenZone.slice(0, 50).map(student => ( // Show top 50 to avoid performance issues
+                greenZone.slice(0, 50).map(student => (
                   <StudentCard 
                     key={student.id} 
                     student={student} 
@@ -422,6 +422,9 @@ export default function TowerPage() {
         <CoachInterventionModal
           student={selectedStudent}
           onClose={() => {
+            setShowInterventionModal(false);
+          }}
+          onSuccess={() => {
             setShowInterventionModal(false);
           }}
         />
