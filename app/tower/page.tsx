@@ -7,6 +7,7 @@ import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
 import { Student } from '@/types';
 import Tooltip from '@/components/Tooltip';
+import KeenKTMatrix from '@/components/KeenKTMatrix';
 
 const METRIC_TOOLTIPS = {
   rsr: 'Recent Success Rate: Proportion of recent tasks with >80% accuracy',
@@ -197,22 +198,18 @@ export default function TowerPage() {
         </div>
       </header>
 
-      {/* Matrix Section (Placeholder for now) */}
+      {/* Matrix Section - REAL COMPONENT */}
       <section className="mb-12">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-black text-white uppercase">
             MASTERY VS. CONSISTENCY
           </h2>
           <div className="text-[9px] text-slate-600 uppercase tracking-widest">
-            Matrix visualization • {students.length} students plotted
+            Interactive scatter plot • {students.length} students plotted
           </div>
         </div>
-        <div className="glass-card rounded-3xl p-8 h-[600px] flex items-center justify-center">
-          <div className="text-center">
-            <div className="text-6xl mb-4">📊</div>
-            <p className="text-slate-500 font-bold uppercase tracking-wider">Matrix Component</p>
-            <p className="text-[10px] text-slate-600 mt-2">KeenKTMatrix integration in Phase 3.2</p>
-          </div>
+        <div className="glass-card rounded-3xl p-4 h-[700px] overflow-hidden">
+          <KeenKTMatrix students={students} onStudentClick={(student) => setSelectedStudent(student)} />
         </div>
       </section>
 
