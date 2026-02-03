@@ -8,6 +8,7 @@ import { calculateDRIMetrics } from '@/lib/dri-calculus';
 import { Student } from '@/types';
 import Tooltip from '@/components/Tooltip';
 import KeenKTMatrix from '@/components/KeenKTMatrix';
+import CoachInterventionModal from '@/components/CoachInterventionModal';
 
 const METRIC_TOOLTIPS = {
   rsr: 'Recent Success Rate: Proportion of recent tasks with >80% accuracy',
@@ -89,6 +90,7 @@ export default function TowerPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [showInterventionModal, setShowInterventionModal] = useState(false);
 
   // Firebase real-time connection
   useEffect(() => {
@@ -335,7 +337,7 @@ export default function TowerPage() {
         </div>
       </section>
 
-      {/* Simple Student Modal (placeholder) */}
+      {/* Student Modal with Intervention Option */}
       {selectedStudent && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="glass-card rounded-3xl p-8 max-w-2xl w-full">
@@ -356,7 +358,7 @@ export default function TowerPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="glass-card p-4 rounded-xl">
                 <div className="text-[9px] text-slate-500 uppercase font-bold mb-2">RSR</div>
                 <div className="text-3xl font-black text-white">{(selectedStudent.metrics.lmp * 100).toFixed(0)}%</div>
@@ -381,13 +383,48 @@ export default function TowerPage() {
               </div>
             </div>
 
-            <div className="mt-6 pt-6 border-t border-slate-800">
-              <p className="text-[9px] text-slate-600 text-center">
-                Full StudentModal integration in Phase 3.3
-              </p>
+            {/* DRI Signal */}
+            <div className="glass-card p-4 rounded-xl mb-6">
+              <div className="text-[9px] text-slate-500 uppercase font-bold mb-2">DRI Signal</div>
+              <div className="flex items-center gap-3">
+                <span className={`text-2xl font-black ${selectedStudent.dri.driColor}`}>
+                  {selectedStudent.dri.driSignal}
+                </span>
+                <span className="text-slate-600 text-sm">
+                  Tier: {selectedStudent.dri.driTier}
+                </span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setSelectedStudent(null)}
+                className="flex-1 px-4 py-3 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white font-black text-[10px] uppercase rounded-lg transition-all"
+              >
+                Close
+              </button>
+              <button 
+                onClick={() => {
+                  setShowInterventionModal(true);
+                }}
+                className="flex-1 px-4 py-3 bg-alpha-gold hover:bg-alpha-gold/90 text-black font-black text-[10px] uppercase rounded-lg hover:shadow-[0_0_15px_rgba(212,175,53,0.4)] transition-all"
+              >
+                Log Intervention
+              </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Coach Intervention Modal */}
+      {showInterventionModal && selectedStudent && (
+        <CoachInterventionModal
+          student={selectedStudent}
+          onClose={() => {
+            setShowInterventionModal(false);
+          }}
+        />
       )}
 
     </div>
