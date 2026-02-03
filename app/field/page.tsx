@@ -282,6 +282,9 @@ export default function FieldPage() {
           onClose={() => {
             setShowInterventionModal(false);
           }}
+          onSuccess={() => {
+            setShowInterventionModal(false);
+          }}
         />
       )}
 
