@@ -8,6 +8,8 @@ import { calculateDRIMetrics } from '@/lib/dri-calculus';
 import { Student } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import CoachInterventionModal from '@/components/CoachInterventionModal';
+import AlertsDropdown from '@/components/AlertsDropdown';
+import FollowUpReminders from '@/components/FollowUpReminders';
 
 interface Mission {
   student: Student;
@@ -23,6 +25,10 @@ export default function FieldPage() {
   const [loading, setLoading] = useState(true);
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
   const [showInterventionModal, setShowInterventionModal] = useState(false);
+  
+  // Filter states
+  const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'RED' | 'AMBER' | 'GREEN'>('ALL');
+  const [dateRange, setDateRange] = useState<'TODAY' | '48H' | 'WEEK' | 'ALL'>('ALL');
 
   // Firebase real-time connection
   useEffect(() => {
@@ -41,55 +47,82 @@ export default function FieldPage() {
   }, []);
 
   // Generate missions from student data
-  const missions = useMemo(() => {
+  const allMissions = useMemo(() => {
     const missionList: Mission[] = [];
     const now = new Date();
 
     students.forEach(student => {
       const rsr = student.metrics.lmp * 100;
       const riskScore = student.dri.riskScore || 0;
-      const ksi = student.metrics.ksi;
+      const ksi = student.metrics.ksi || 0;
+      const velocity = student.metrics.velocityScore || 0;
 
-      // RED MISSIONS: Critical interventions
+      // RED MISSIONS: Critical intervention needed
       if (riskScore >= 60 || rsr < 50) {
         missionList.push({
           student,
           priority: 'RED',
-          reason: riskScore >= 60 ? 'CRITICAL RISK LEVEL' : 'RSR BELOW THRESHOLD',
+          reason: riskScore >= 60 ? 'CRITICAL RISK LEVEL' : 'LOW MASTERY RATE',
           metric: riskScore >= 60 ? `Risk: ${riskScore}/100` : `RSR: ${rsr.toFixed(0)}%`,
           urgency: riskScore,
-          triggeredAt: new Date(now.getTime() - Math.random() * 3600000 * 24), // Random within 24h
+          triggeredAt: now,
         });
       }
-      // AMBER MISSIONS: Watch list
-      else if (riskScore >= 35 || (ksi !== null && ksi < 60)) {
+      // AMBER MISSIONS: Elevated risk or instability
+      else if (riskScore >= 35 || ksi < 60) {
         missionList.push({
           student,
           priority: 'AMBER',
           reason: riskScore >= 35 ? 'ELEVATED RISK' : 'KNOWLEDGE INSTABILITY',
           metric: riskScore >= 35 ? `Risk: ${riskScore}/100` : `KSI: ${ksi}%`,
           urgency: riskScore,
-          triggeredAt: new Date(now.getTime() - Math.random() * 3600000 * 48), // Random within 48h
+          triggeredAt: now,
         });
       }
-      // GREEN MISSIONS: Scheduled check-ins for top performers
-      else if (rsr >= 85 && student.metrics.velocityScore >= 80) {
+      // GREEN MISSIONS: Scheduled check-ins for high performers
+      else if (rsr >= 85 && velocity >= 80) {
         missionList.push({
           student,
           priority: 'GREEN',
           reason: 'SCHEDULED CHECK-IN',
-          metric: `RSR: ${rsr.toFixed(0)}% • V: ${student.metrics.velocityScore}%`,
+          metric: `RSR: ${rsr.toFixed(0)}% • V: ${velocity}%`,
           urgency: 0,
-          triggeredAt: new Date(now.getTime() - Math.random() * 3600000 * 72), // Random within 72h
+          triggeredAt: now,
         });
       }
     });
 
-    // Sort by urgency (highest first)
     return missionList.sort((a, b) => b.urgency - a.urgency);
   }, [students]);
 
-  // Group missions by priority
+  // Apply filters
+  const missions = useMemo(() => {
+    let filtered = allMissions;
+
+    // Priority filter
+    if (priorityFilter !== 'ALL') {
+      filtered = filtered.filter(m => m.priority === priorityFilter);
+    }
+
+    // Date range filter (simulated - in production you'd check actual triggeredAt timestamps)
+    if (dateRange !== 'ALL') {
+      const now = new Date();
+      const cutoff = new Date();
+      
+      if (dateRange === 'TODAY') {
+        cutoff.setHours(0, 0, 0, 0);
+      } else if (dateRange === '48H') {
+        cutoff.setHours(cutoff.getHours() - 48);
+      } else if (dateRange === 'WEEK') {
+        cutoff.setDate(cutoff.getDate() - 7);
+      }
+      
+      filtered = filtered.filter(m => m.triggeredAt >= cutoff);
+    }
+
+    return filtered;
+  }, [allMissions, priorityFilter, dateRange]);
+
   const redMissions = useMemo(() => missions.filter(m => m.priority === 'RED').slice(0, 10), [missions]);
   const amberMissions = useMemo(() => missions.filter(m => m.priority === 'AMBER').slice(0, 10), [missions]);
   const greenMissions = useMemo(() => missions.filter(m => m.priority === 'GREEN').slice(0, 5), [missions]);
@@ -100,7 +133,7 @@ export default function FieldPage() {
         <div className="text-center">
           <div className="text-6xl mb-4 animate-pulse">⚔️</div>
           <p className="text-alpha-gold font-bold uppercase tracking-widest">
-            Loading Tactical Operations...
+            Loading Field Operations...
           </p>
         </div>
       </div>
@@ -108,25 +141,35 @@ export default function FieldPage() {
   }
 
   return (
-    <div className="min-h-screen bg-alpha-navy-bg">
+    <div className="min-h-screen bg-alpha-navy-bg p-6 lg:p-12">
       
       {/* Header */}
-      <header className="border-b border-white/10 p-6">
-        <div className="flex items-center justify-between max-w-6xl mx-auto">
+      <header className="mb-8 border-b border-white/10 pb-6">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-black text-white uppercase tracking-ultra">
+            <h1 className="text-3xl font-black text-white uppercase tracking-ultra">
               THE FIELD
             </h1>
-            <p className="text-alpha-gold text-[9px] font-bold tracking-widest uppercase mt-1">
-              Tactical Intervention Center • {missions.length} Active Missions
+            <p className="text-alpha-gold text-[10px] font-bold tracking-widest uppercase mt-1">
+              Agent Mode • Tactical Intervention Center
             </p>
           </div>
           <div className="flex items-center gap-4">
+            <AlertsDropdown onStudentClick={(studentId) => {
+              const mission = missions.find(m => m.student.id === studentId);
+              if (mission) setSelectedMission(mission);
+            }} />
+            
+            <FollowUpReminders onStudentClick={(studentId) => {
+              const mission = missions.find(m => m.student.id === studentId);
+              if (mission) setSelectedMission(mission);
+            }} />
+            
             <a 
               href="/tower"
               className="px-4 py-2 bg-alpha-navy-light hover:bg-alpha-navy-surface border border-alpha-navy-light text-slate-400 hover:text-alpha-gold text-[10px] font-black uppercase rounded-lg transition-all"
             >
-              ← The Tower
+              → The Tower
             </a>
             <a 
               href="/"
@@ -136,115 +179,277 @@ export default function FieldPage() {
             </a>
           </div>
         </div>
-      </header>
 
-      {/* Stats Bar */}
-      <div className="border-b border-white/10 p-4 bg-slate-900/20">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-6 text-[10px] font-mono">
-            <div>
-              <span className="text-slate-600">RED MISSIONS:</span>
-              <span className="text-risk-red font-black ml-2">{redMissions.length}</span>
-            </div>
-            <div>
-              <span className="text-slate-600">AMBER MISSIONS:</span>
-              <span className="text-risk-amber font-black ml-2">{amberMissions.length}</span>
-            </div>
-            <div>
-              <span className="text-slate-600">GREEN CHECK-INS:</span>
-              <span className="text-risk-emerald font-black ml-2">{greenMissions.length}</span>
-            </div>
+        {/* Stats Bar */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="glass-card p-4 rounded-xl border-l-4 border-risk-red">
+            <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">Red Missions</div>
+            <div className="text-3xl font-black text-risk-red">{redMissions.length}</div>
+            <div className="text-[8px] text-slate-600 mt-1">Critical intervention required</div>
           </div>
-          <div className="text-[9px] text-slate-600 uppercase tracking-widest">
-            {new Date().toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
+          <div className="glass-card p-4 rounded-xl border-l-4 border-risk-amber">
+            <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">Amber Missions</div>
+            <div className="text-3xl font-black text-risk-amber">{amberMissions.length}</div>
+            <div className="text-[8px] text-slate-600 mt-1">Elevated risk monitoring</div>
+          </div>
+          <div className="glass-card p-4 rounded-xl border-l-4 border-risk-emerald">
+            <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">Green Check-ins</div>
+            <div className="text-3xl font-black text-risk-emerald">{greenMissions.length}</div>
+            <div className="text-[8px] text-slate-600 mt-1">Scheduled touchpoints</div>
           </div>
         </div>
-      </div>
 
-      {/* Mission Queue */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
+        {/* Filters */}
+        <div className="flex gap-4 items-center flex-wrap">
+          {/* Priority Filter Tabs */}
+          <div className="flex bg-slate-900/40 rounded-xl p-1 border border-slate-800">
+            <button
+              onClick={() => setPriorityFilter('ALL')}
+              className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${
+                priorityFilter === 'ALL' 
+                  ? 'bg-alpha-gold text-black' 
+                  : 'text-slate-500 hover:text-white'
+              }`}
+            >
+              All Missions
+            </button>
+            <button
+              onClick={() => setPriorityFilter('RED')}
+              className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${
+                priorityFilter === 'RED' 
+                  ? 'bg-risk-red text-white' 
+                  : 'text-slate-500 hover:text-risk-red'
+              }`}
+            >
+              🚨 Red Only
+            </button>
+            <button
+              onClick={() => setPriorityFilter('AMBER')}
+              className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${
+                priorityFilter === 'AMBER' 
+                  ? 'bg-risk-amber text-white' 
+                  : 'text-slate-500 hover:text-risk-amber'
+              }`}
+            >
+              ⚠️ Amber Only
+            </button>
+            <button
+              onClick={() => setPriorityFilter('GREEN')}
+              className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${
+                priorityFilter === 'GREEN' 
+                  ? 'bg-risk-emerald text-white' 
+                  : 'text-slate-500 hover:text-risk-emerald'
+              }`}
+            >
+              ⚡ Green Only
+            </button>
+          </div>
+
+          {/* Date Range Filter */}
+          <select 
+            value={dateRange} 
+            onChange={(e) => setDateRange(e.target.value as any)}
+            className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-[10px] font-black uppercase text-slate-400 outline-none hover:border-slate-600 transition-colors"
+          >
+            <option value="ALL">📅 All Time</option>
+            <option value="TODAY">📅 Today</option>
+            <option value="48H">📅 Last 48 Hours</option>
+            <option value="WEEK">📅 This Week</option>
+          </select>
+
+          {/* Active Filter Indicator */}
+          {(priorityFilter !== 'ALL' || dateRange !== 'ALL') && (
+            <div className="flex items-center gap-2 text-[9px] bg-slate-900/40 px-3 py-2 rounded-xl border border-slate-800">
+              <span className="text-slate-500">Showing:</span>
+              <span className="text-alpha-gold font-bold">
+                {missions.length} of {allMissions.length} missions
+              </span>
+              <button 
+                onClick={() => {
+                  setPriorityFilter('ALL');
+                  setDateRange('ALL');
+                }}
+                className="text-slate-500 hover:text-white ml-2"
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Mission Boards */}
+      <div className="space-y-8">
         
-        {/* Red Missions */}
-        {redMissions.length > 0 && (
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-4">
-              <h2 className="text-xl font-black text-risk-red uppercase tracking-wider">
+        {/* RED MISSIONS */}
+        {(priorityFilter === 'ALL' || priorityFilter === 'RED') && redMissions.length > 0 && (
+          <section>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-black text-risk-red uppercase flex items-center gap-2">
                 🚨 CRITICAL MISSIONS
               </h2>
-              <span className="px-2 py-1 bg-risk-red/20 text-risk-red text-[9px] font-black rounded">
-                {redMissions.length} URGENT
+              <span className="text-[9px] text-slate-600 uppercase">
+                {redMissions.length} active
               </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {redMissions.map((mission, idx) => (
-                <MissionCard 
-                  key={`red-${mission.student.id}-${idx}`} 
-                  mission={mission} 
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {redMissions.map(mission => (
+                <div 
+                  key={mission.student.id}
+                  className="glass-card rounded-xl p-4 border-l-4 border-risk-red hover:scale-[1.02] transition-all cursor-pointer group"
                   onClick={() => setSelectedMission(mission)}
-                  onLogIntervention={() => {
-                    setSelectedMission(mission);
-                    setShowInterventionModal(true);
-                  }}
-                />
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="font-black text-white uppercase text-sm group-hover:text-risk-red transition-colors">
+                        {mission.student.firstName} {mission.student.lastName}
+                      </h3>
+                      <p className="text-[8px] text-slate-500 uppercase mt-1">
+                        {mission.student.currentCourse?.name || 'No Course'}
+                      </p>
+                    </div>
+                    <span className="text-risk-red text-2xl">!</span>
+                  </div>
+                  
+                  <div className="space-y-2 mb-4">
+                    <div className="text-[9px] text-risk-red font-bold uppercase">
+                      {mission.reason}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono">
+                      {mission.metric}
+                    </div>
+                    <div className="text-[8px] text-slate-600">
+                      Triggered {formatDistanceToNow(mission.triggeredAt, { addSuffix: true })}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedMission(mission);
+                      setShowInterventionModal(true);
+                    }}
+                    className="w-full px-3 py-2 bg-risk-red hover:bg-risk-red/90 text-white font-black text-[9px] uppercase rounded-lg transition-all"
+                  >
+                    Log Intervention
+                  </button>
+                </div>
               ))}
             </div>
           </section>
         )}
 
-        {/* Amber Missions */}
-        {amberMissions.length > 0 && (
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-4">
-              <h2 className="text-xl font-black text-risk-amber uppercase tracking-wider">
+        {/* AMBER MISSIONS */}
+        {(priorityFilter === 'ALL' || priorityFilter === 'AMBER') && amberMissions.length > 0 && (
+          <section>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-black text-risk-amber uppercase flex items-center gap-2">
                 ⚠️ WATCH MISSIONS
               </h2>
-              <span className="px-2 py-1 bg-risk-amber/20 text-risk-amber text-[9px] font-black rounded">
-                {amberMissions.length} MONITORING
+              <span className="text-[9px] text-slate-600 uppercase">
+                {amberMissions.length} active
               </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {amberMissions.map((mission, idx) => (
-                <MissionCard 
-                  key={`amber-${mission.student.id}-${idx}`} 
-                  mission={mission} 
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {amberMissions.map(mission => (
+                <div 
+                  key={mission.student.id}
+                  className="glass-card rounded-xl p-4 border-l-4 border-risk-amber hover:scale-[1.02] transition-all cursor-pointer group"
                   onClick={() => setSelectedMission(mission)}
-                  onLogIntervention={() => {
-                    setSelectedMission(mission);
-                    setShowInterventionModal(true);
-                  }}
-                />
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="font-black text-white uppercase text-sm group-hover:text-risk-amber transition-colors">
+                        {mission.student.firstName} {mission.student.lastName}
+                      </h3>
+                      <p className="text-[8px] text-slate-500 uppercase mt-1">
+                        {mission.student.currentCourse?.name || 'No Course'}
+                      </p>
+                    </div>
+                    <span className="text-risk-amber text-2xl">⚠</span>
+                  </div>
+                  
+                  <div className="space-y-2 mb-4">
+                    <div className="text-[9px] text-risk-amber font-bold uppercase">
+                      {mission.reason}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono">
+                      {mission.metric}
+                    </div>
+                    <div className="text-[8px] text-slate-600">
+                      Triggered {formatDistanceToNow(mission.triggeredAt, { addSuffix: true })}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedMission(mission);
+                      setShowInterventionModal(true);
+                    }}
+                    className="w-full px-3 py-2 bg-risk-amber hover:bg-risk-amber/90 text-white font-black text-[9px] uppercase rounded-lg transition-all"
+                  >
+                    Log Intervention
+                  </button>
+                </div>
               ))}
             </div>
           </section>
         )}
 
-        {/* Green Missions */}
-        {greenMissions.length > 0 && (
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-4">
-              <h2 className="text-xl font-black text-risk-emerald uppercase tracking-wider">
+        {/* GREEN CHECK-INS */}
+        {(priorityFilter === 'ALL' || priorityFilter === 'GREEN') && greenMissions.length > 0 && (
+          <section>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-black text-risk-emerald uppercase flex items-center gap-2">
                 ⚡ SCHEDULED CHECK-INS
               </h2>
-              <span className="px-2 py-1 bg-risk-emerald/20 text-risk-emerald text-[9px] font-black rounded">
-                {greenMissions.length} STABLE
+              <span className="text-[9px] text-slate-600 uppercase">
+                {greenMissions.length} scheduled
               </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {greenMissions.map((mission, idx) => (
-                <MissionCard 
-                  key={`green-${mission.student.id}-${idx}`} 
-                  mission={mission} 
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {greenMissions.map(mission => (
+                <div 
+                  key={mission.student.id}
+                  className="glass-card rounded-xl p-4 border-l-4 border-risk-emerald hover:scale-[1.02] transition-all cursor-pointer group"
                   onClick={() => setSelectedMission(mission)}
-                  onLogIntervention={() => {
-                    setSelectedMission(mission);
-                    setShowInterventionModal(true);
-                  }}
-                />
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="font-black text-white uppercase text-sm group-hover:text-risk-emerald transition-colors">
+                        {mission.student.firstName} {mission.student.lastName}
+                      </h3>
+                      <p className="text-[8px] text-slate-500 uppercase mt-1">
+                        {mission.student.currentCourse?.name || 'No Course'}
+                      </p>
+                    </div>
+                    <span className="text-risk-emerald text-2xl">⚡</span>
+                  </div>
+                  
+                  <div className="space-y-2 mb-4">
+                    <div className="text-[9px] text-risk-emerald font-bold uppercase">
+                      {mission.reason}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono">
+                      {mission.metric}
+                    </div>
+                    <div className="text-[8px] text-slate-600">
+                      High performer check-in
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedMission(mission);
+                      setShowInterventionModal(true);
+                    }}
+                    className="w-full px-3 py-2 bg-risk-emerald hover:bg-risk-emerald/90 text-white font-black text-[9px] uppercase rounded-lg transition-all"
+                  >
+                    Log Check-in
+                  </button>
+                </div>
               ))}
             </div>
           </section>
@@ -252,27 +457,98 @@ export default function FieldPage() {
 
         {/* Empty State */}
         {missions.length === 0 && (
-          <div className="text-center py-20">
+          <div className="glass-card rounded-3xl p-12 text-center">
             <div className="text-6xl mb-4">✓</div>
-            <h3 className="text-2xl font-black text-white uppercase mb-2">All Clear</h3>
-            <p className="text-slate-500">No active missions at this time.</p>
+            <h3 className="text-2xl font-black text-white mb-2">NO ACTIVE MISSIONS</h3>
+            <p className="text-slate-500">All students are performing optimally with no interventions needed.</p>
           </div>
         )}
 
-      </main>
+      </div>
 
-      {/* Mission Modal */}
-      {selectedMission && (
-        <MissionModal 
-          mission={selectedMission} 
-          onClose={() => {
-            setSelectedMission(null);
-            setShowInterventionModal(false);
-          }}
-          onLogIntervention={() => {
-            setShowInterventionModal(true);
-          }}
-        />
+      {/* Mission Detail Modal */}
+      {selectedMission && !showInterventionModal && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-card rounded-3xl p-8 max-w-2xl w-full">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h2 className="text-2xl font-black text-white uppercase">
+                  {selectedMission.student.firstName} {selectedMission.student.lastName}
+                </h2>
+                <p className="text-alpha-gold text-sm uppercase tracking-widest mt-1">
+                  {selectedMission.student.currentCourse?.name || 'No Course'}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedMission(null)}
+                className="text-slate-500 hover:text-white text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className={`p-4 rounded-xl mb-6 border-l-4 ${
+              selectedMission.priority === 'RED' ? 'bg-risk-red/10 border-risk-red' :
+              selectedMission.priority === 'AMBER' ? 'bg-risk-amber/10 border-risk-amber' :
+              'bg-risk-emerald/10 border-risk-emerald'
+            }`}>
+              <div className={`text-sm font-black uppercase mb-2 ${
+                selectedMission.priority === 'RED' ? 'text-risk-red' :
+                selectedMission.priority === 'AMBER' ? 'text-risk-amber' :
+                'text-risk-emerald'
+              }`}>
+                {selectedMission.reason}
+              </div>
+              <div className="text-slate-400 text-xs">{selectedMission.metric}</div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="glass-card p-4 rounded-xl">
+                <div className="text-[9px] text-slate-500 uppercase font-bold mb-2">RSR</div>
+                <div className="text-3xl font-black text-white">
+                  {(selectedMission.student.metrics.lmp * 100).toFixed(0)}%
+                </div>
+              </div>
+              <div className="glass-card p-4 rounded-xl">
+                <div className="text-[9px] text-slate-500 uppercase font-bold mb-2">Risk Score</div>
+                <div className={`text-3xl font-black ${
+                  (selectedMission.student.dri.riskScore || 0) >= 60 ? 'text-risk-red' : 
+                  (selectedMission.student.dri.riskScore || 0) >= 35 ? 'text-risk-amber' : 
+                  'text-risk-emerald'
+                }`}>
+                  {selectedMission.student.dri.riskScore || 'N/A'}
+                </div>
+              </div>
+              <div className="glass-card p-4 rounded-xl">
+                <div className="text-[9px] text-slate-500 uppercase font-bold mb-2">Velocity</div>
+                <div className="text-3xl font-black text-white">
+                  {selectedMission.student.metrics.velocityScore}%
+                </div>
+              </div>
+              <div className="glass-card p-4 rounded-xl">
+                <div className="text-[9px] text-slate-500 uppercase font-bold mb-2">KSI</div>
+                <div className="text-3xl font-black text-white">
+                  {selectedMission.student.metrics.ksi !== null ? `${selectedMission.student.metrics.ksi}%` : 'N/A'}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setSelectedMission(null)}
+                className="flex-1 px-4 py-3 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white font-black text-[10px] uppercase rounded-lg transition-all"
+              >
+                Close
+              </button>
+              <button 
+                onClick={() => setShowInterventionModal(true)}
+                className="flex-1 px-4 py-3 bg-alpha-gold hover:bg-alpha-gold/90 text-black font-black text-[10px] uppercase rounded-lg hover:shadow-[0_0_15px_rgba(212,175,53,0.4)] transition-all"
+              >
+                Log Intervention
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Coach Intervention Modal */}
@@ -288,167 +564,6 @@ export default function FieldPage() {
         />
       )}
 
-    </div>
-  );
-}
-
-// Mission Card Component
-interface MissionCardProps {
-  mission: Mission;
-  onClick: () => void;
-  onLogIntervention: () => void;
-}
-
-function MissionCard({ mission, onClick, onLogIntervention }: MissionCardProps) {
-  const { student, priority, reason, metric, triggeredAt } = mission;
-  
-  const colorClasses = {
-    RED: 'border-risk-red bg-risk-red/5 hover:bg-risk-red/10',
-    AMBER: 'border-risk-amber bg-risk-amber/5 hover:bg-risk-amber/10',
-    GREEN: 'border-risk-emerald bg-risk-emerald/5 hover:bg-risk-emerald/10',
-  };
-
-  const iconClasses = {
-    RED: 'bg-risk-red/20 text-risk-red',
-    AMBER: 'bg-risk-amber/20 text-risk-amber',
-    GREEN: 'bg-risk-emerald/20 text-risk-emerald',
-  };
-
-  const handleLogClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onLogIntervention();
-  };
-
-  return (
-    <div 
-      onClick={onClick}
-      className={`glass-card border-l-4 ${colorClasses[priority]} rounded-2xl p-5 cursor-pointer hover:translate-x-1 transition-all group`}
-    >
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <div className={`w-8 h-8 rounded-full ${iconClasses[priority]} flex items-center justify-center text-xs font-black`}>
-              {priority === 'RED' ? '!' : priority === 'AMBER' ? '⚠' : '✓'}
-            </div>
-            <div>
-              <h3 className="text-white text-base font-black uppercase group-hover:text-alpha-gold transition-colors">
-                {student.firstName} {student.lastName}
-              </h3>
-              <p className="text-[9px] text-slate-500 uppercase font-bold">
-                {student.currentCourse?.name || 'No Course'}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className={`px-2 py-1 rounded text-[9px] font-black ${iconClasses[priority]}`}>
-          {metric}
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
-          {reason}
-        </p>
-        <p className="text-[9px] text-slate-600">
-          Triggered {formatDistanceToNow(triggeredAt, { addSuffix: true })}
-        </p>
-      </div>
-
-      <button 
-        onClick={handleLogClick}
-        className="w-full bg-alpha-gold hover:bg-alpha-gold/90 text-black py-2 rounded-lg font-black text-[10px] uppercase hover:shadow-[0_0_15px_rgba(212,175,53,0.4)] transition-all"
-      >
-        Log Intervention
-      </button>
-    </div>
-  );
-}
-
-// Mission Modal Component
-interface MissionModalProps {
-  mission: Mission;
-  onClose: () => void;
-  onLogIntervention: () => void;
-}
-
-function MissionModal({ mission, onClose, onLogIntervention }: MissionModalProps) {
-  const { student, priority, reason, metric } = mission;
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="glass-card rounded-3xl p-8 max-w-2xl w-full">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h2 className="text-2xl font-black text-white uppercase">
-              {student.firstName} {student.lastName}
-            </h2>
-            <p className="text-alpha-gold text-sm uppercase tracking-widest mt-1">
-              {student.currentCourse?.name || 'No Course'}
-            </p>
-          </div>
-          <button 
-            onClick={onClose}
-            className="text-slate-500 hover:text-white text-2xl transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Mission Details */}
-        <div className="mb-6 p-4 glass-card rounded-xl border-l-4 border-alpha-gold">
-          <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">Mission Type</div>
-          <div className="text-alpha-gold font-black text-sm uppercase">{reason}</div>
-          <div className="text-[9px] text-slate-600 mt-1">{metric}</div>
-        </div>
-
-        {/* Student Metrics */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="glass-card p-4 rounded-xl">
-            <div className="text-[9px] text-slate-500 uppercase font-bold mb-2">RSR</div>
-            <div className="text-3xl font-black text-white">{(student.metrics.lmp * 100).toFixed(0)}%</div>
-          </div>
-          <div className="glass-card p-4 rounded-xl">
-            <div className="text-[9px] text-slate-500 uppercase font-bold mb-2">Risk Score</div>
-            <div className={`text-3xl font-black ${
-              (student.dri.riskScore || 0) >= 60 ? 'text-risk-red' : 
-              (student.dri.riskScore || 0) >= 35 ? 'text-risk-amber' : 
-              'text-risk-emerald'
-            }`}>{student.dri.riskScore || 'N/A'}</div>
-          </div>
-          <div className="glass-card p-4 rounded-xl">
-            <div className="text-[9px] text-slate-500 uppercase font-bold mb-2">Velocity</div>
-            <div className="text-3xl font-black text-white">{student.metrics.velocityScore}%</div>
-          </div>
-          <div className="glass-card p-4 rounded-xl">
-            <div className="text-[9px] text-slate-500 uppercase font-bold mb-2">KSI</div>
-            <div className="text-3xl font-black text-white">
-              {student.metrics.ksi !== null ? `${student.metrics.ksi}%` : 'N/A'}
-            </div>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-3">
-          <button 
-            onClick={onClose}
-            className="flex-1 px-4 py-3 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white font-black text-[10px] uppercase rounded-lg transition-all"
-          >
-            Close
-          </button>
-          <button 
-            onClick={onLogIntervention}
-            className="flex-1 px-4 py-3 bg-alpha-gold hover:bg-alpha-gold/90 text-black font-black text-[10px] uppercase rounded-lg hover:shadow-[0_0_15px_rgba(212,175,53,0.4)] transition-all"
-          >
-            Log Intervention
-          </button>
-        </div>
-
-        <div className="mt-4 pt-4 border-t border-slate-800">
-          <p className="text-[9px] text-slate-600 text-center">
-            Intervention will be logged to Firebase and tracked
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
