@@ -316,9 +316,19 @@ export default function HomePage() {
   const [selectedGrade, setSelectedGrade] = useState('ALL');
   const [selectedGuide, setSelectedGuide] = useState('ALL');
 
+  // 🆕 v6.0: Mode Selector
+  const [showModeSelector, setShowModeSelector] = useState(false);
+
   useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      // 🆕 v6.0: Atajo para Mode Selector
+      if (e.key === 'm' && !selectedStudent) {
+        e.preventDefault();
+        setShowModeSelector(true);
+      }
+      
       if (e.key === '1' && !selectedStudent) setViewMode('TRIAGE');
       if (e.key === '2' && !selectedStudent) setViewMode('MATRIX');
       if (e.key === '3' && !selectedStudent) setViewMode('HEATMAP');
@@ -328,6 +338,7 @@ export default function HomePage() {
       if (e.key === 'Escape') {
         if (selectedStudent) { setSelectedStudent(null); setSelectedStudentIndex(-1); }
         else if (selectionMode) { setSelectionMode(false); setSelectedIds(new Set()); }
+        else if (showModeSelector) { setShowModeSelector(false); }
       }
       if (e.key === '/' && !selectedStudent) { e.preventDefault(); (document.querySelector('input[placeholder*="SEARCH"]') as HTMLInputElement)?.focus(); }
       if (e.key === '?' && !selectedStudent) { e.preventDefault(); setShowHelp(true); }
@@ -353,7 +364,7 @@ export default function HomePage() {
     };
     window.addEventListener('keydown', handleKeyboard);
     return () => window.removeEventListener('keydown', handleKeyboard);
-  }, [selectedStudent, selectedStudentIndex, selectionMode, viewMode, search, selectedCourse, selectedCampus, selectedGrade, selectedGuide]);
+  }, [selectedStudent, selectedStudentIndex, selectionMode, viewMode, search, selectedCourse, selectedCampus, selectedGrade, selectedGuide, showModeSelector]);
 
   useEffect(() => {
     const unsubStudents = onSnapshot(query(collection(db, 'students')), (snapshot) => {
@@ -593,24 +604,32 @@ export default function HomePage() {
                   DRI COMMAND <span className="text-alpha-gold">CENTER</span>
                 </h1>
                 
-                {/* ALERTAS */}
                 <AlertsDropdown onStudentClick={(studentId) => {
                   const student = students.find(s => s.id === studentId);
                   if (student) { setSelectedStudentIndex(filteredForNavigation.findIndex(s => s.id === studentId)); setSelectedStudent(student); }
                 }} />
                 
-                {/* NUEVO: FOLLOW-UP REMINDERS */}
                 <FollowUpReminders onStudentClick={(studentId) => {
                   const student = students.find(s => s.id === studentId);
                   if (student) { setSelectedStudentIndex(filteredForNavigation.findIndex(s => s.id === studentId)); setSelectedStudent(student); }
                 }} />
+
+                {/* 🆕 v6.0: Mode Selector Button */}
+                <button 
+                  onClick={() => setShowModeSelector(true)}
+                  className="px-3 py-1.5 bg-alpha-navy-light hover:bg-alpha-navy-surface border border-alpha-navy-light text-slate-400 hover:text-alpha-gold rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-2"
+                  title="Switch Mode (m)"
+                >
+                  <span>⚡</span>
+                  <span className="hidden md:inline">MODE</span>
+                </button>
 
                 <button onClick={() => setShowHelp(true)} className="w-7 h-7 rounded-full border border-slate-700 text-slate-500 hover:text-white hover:border-alpha-gold transition-all flex items-center justify-center text-xs font-bold" title="Help & Keyboard Shortcuts (?)">?</button>
                 <CompactHeader isCompact={compactHeader} onToggle={() => setCompactHeader(!compactHeader)} />
               </div>
               {!compactHeader && (
                 <>
-                  <p className="text-xs text-alpha-gold font-bold tracking-[0.3em] uppercase">V5.5 Alpha • {students.length} Students • {filtered.length} Filtered</p>
+                  <p className="text-xs text-alpha-gold font-bold tracking-[0.3em] uppercase">V6.0 Alpha • {students.length} Students • {filtered.length} Filtered</p>
                   <div className="flex gap-3 mt-1 text-[9px] text-slate-600 font-mono flex-wrap">
                     <Tooltip content={METRIC_TOOLTIPS.rsr}><span className="cursor-help">RSR: <span className="text-emerald-500 font-bold">{stats.avgRSR}%</span></span></Tooltip>
                     <span className="text-slate-700">•</span>
@@ -794,6 +813,101 @@ export default function HomePage() {
 
         {viewMode === 'TRENDS' && <DashboardTrendsView />}
       </div>
+
+      {/* ========================================
+          🆕 v6.0: MODE SELECTOR MODAL
+          ======================================== */}
+      {showModeSelector && (
+        <div className="fixed inset-0 z-[60] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="absolute inset-0" onClick={() => setShowModeSelector(false)} />
+          <div className="relative z-10 max-w-2xl w-full glass-card rounded-3xl p-8 animate-in zoom-in-95 duration-300">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h2 className="text-2xl font-black text-white uppercase tracking-tight">SELECT MODE</h2>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Choose your operational view</p>
+              </div>
+              <button 
+                onClick={() => setShowModeSelector(false)}
+                className="text-slate-500 hover:text-white text-2xl transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* The Tower Card */}
+              <a 
+                href="/tower"
+                className="group p-6 glass-card rounded-2xl border border-alpha-navy-light hover:border-alpha-gold transition-all cursor-pointer"
+              >
+                <div className="text-4xl mb-3">🏰</div>
+                <h3 className="text-xl font-black text-white uppercase mb-2 group-hover:text-alpha-gold transition-colors">
+                  The Tower
+                </h3>
+                <p className="text-[10px] text-alpha-gold uppercase tracking-widest font-bold mb-3">
+                  Observer Mode
+                </p>
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  Strategic analytics dashboard. View 1,613 students, matrix scatter plots, and triage stacks.
+                </p>
+                <div className="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between text-[9px] text-slate-600">
+                  <span>Master Analytics</span>
+                  <span className="group-hover:text-alpha-gold transition-colors">→</span>
+                </div>
+              </a>
+
+              {/* The Field Card */}
+              <a 
+                href="/field"
+                className="group p-6 glass-card rounded-2xl border border-alpha-navy-light hover:border-alpha-gold transition-all cursor-pointer"
+              >
+                <div className="text-4xl mb-3">⚔️</div>
+                <h3 className="text-xl font-black text-white uppercase mb-2 group-hover:text-alpha-gold transition-colors">
+                  The Field
+                </h3>
+                <p className="text-[10px] text-alpha-gold uppercase tracking-widest font-bold mb-3">
+                  Agent Mode
+                </p>
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  Tactical intervention system. Prioritized mission cards for immediate action on critical students.
+                </p>
+                <div className="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between text-[9px] text-slate-600">
+                  <span>Tactical Operations</span>
+                  <span className="group-hover:text-alpha-gold transition-colors">→</span>
+                </div>
+              </a>
+
+              {/* Current Mode Card */}
+              <div className="p-6 bg-slate-900/40 rounded-2xl border border-slate-800">
+                <div className="text-4xl mb-3">📊</div>
+                <h3 className="text-xl font-black text-white uppercase mb-2">
+                  Current Mode
+                </h3>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-3">
+                  Legacy Dashboard
+                </p>
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  You're currently in the classic DRI Command Center with full feature access.
+                </p>
+                <div className="mt-4 pt-4 border-t border-slate-800">
+                  <button 
+                    onClick={() => setShowModeSelector(false)}
+                    className="w-full px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] font-black uppercase rounded-lg transition-colors"
+                  >
+                    Stay Here
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-800 text-center">
+              <p className="text-[9px] text-slate-600">
+                Press <kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-[8px]">ESC</kbd> or click outside to close
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedStudent && <StudentModal student={selectedStudent} onClose={() => { setSelectedStudent(null); setSelectedStudentIndex(-1); }} onNavigate={navigateStudent} currentIndex={selectedStudentIndex} totalStudents={filteredForNavigation.length} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
