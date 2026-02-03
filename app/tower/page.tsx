@@ -9,6 +9,8 @@ import { Student } from '@/types';
 import Tooltip from '@/components/Tooltip';
 import KeenKTMatrix from '@/components/KeenKTMatrix';
 import CoachInterventionModal from '@/components/CoachInterventionModal';
+import AlertsDropdown from '@/components/AlertsDropdown';
+import FollowUpReminders from '@/components/FollowUpReminders';
 
 const METRIC_TOOLTIPS = {
   rsr: 'Recent Success Rate: Proportion of recent tasks with >80% accuracy',
@@ -86,11 +88,86 @@ function ColumnSkeleton() {
   );
 }
 
+// Active Filters Indicator Component
+function ActiveFiltersIndicator({ 
+  search, 
+  course,
+  campus,
+  grade,
+  guide,
+  onClearSearch, 
+  onClearCourse,
+  onClearCampus,
+  onClearGrade,
+  onClearGuide,
+  onClearAll 
+}: { 
+  search: string; 
+  course: string;
+  campus: string;
+  grade: string;
+  guide: string;
+  onClearSearch: () => void; 
+  onClearCourse: () => void;
+  onClearCampus: () => void;
+  onClearGrade: () => void;
+  onClearGuide: () => void;
+  onClearAll: () => void; 
+}) {
+  const hasFilters = search || course !== 'ALL' || campus !== 'ALL' || grade !== 'ALL' || guide !== 'ALL';
+  
+  if (!hasFilters) return null;
+  
+  return (
+    <div className="flex items-center gap-2 text-[9px] bg-slate-900/40 px-3 py-2 rounded-xl border border-slate-800 flex-wrap">
+      <span className="text-slate-500">Active filters:</span>
+      {search && (
+        <span className="px-2 py-0.5 bg-alpha-navy border border-alpha-navy-light rounded-full text-blue-200 flex items-center gap-1">
+          🔎 "{search.length > 15 ? search.substring(0, 15) + '...' : search}"
+          <button onClick={onClearSearch} className="hover:text-white ml-1 text-[8px]">✕</button>
+        </span>
+      )}
+      {course !== 'ALL' && (
+        <span className="px-2 py-0.5 bg-purple-500/20 border border-purple-500/30 rounded-full text-purple-300 flex items-center gap-1">
+          📚 {course}
+          <button onClick={onClearCourse} className="hover:text-white ml-1 text-[8px]">✕</button>
+        </span>
+      )}
+      {campus !== 'ALL' && (
+        <span className="px-2 py-0.5 bg-blue-500/20 border border-blue-500/30 rounded-full text-blue-300 flex items-center gap-1">
+          📍 {campus}
+          <button onClick={onClearCampus} className="hover:text-white ml-1 text-[8px]">✕</button>
+        </span>
+      )}
+      {grade !== 'ALL' && (
+        <span className="px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-emerald-300 flex items-center gap-1">
+          🎓 {grade}
+          <button onClick={onClearGrade} className="hover:text-white ml-1 text-[8px]">✕</button>
+        </span>
+      )}
+      {guide !== 'ALL' && (
+        <span className="px-2 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded-full text-amber-300 flex items-center gap-1">
+          👤 {guide}
+          <button onClick={onClearGuide} className="hover:text-white ml-1 text-[8px]">✕</button>
+        </span>
+      )}
+      <button onClick={onClearAll} className="text-slate-500 hover:text-slate-300 ml-2" title="Clear all filters">Clear all</button>
+    </div>
+  );
+}
+
 export default function TowerPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showInterventionModal, setShowInterventionModal] = useState(false);
+  
+  // Filter states
+  const [search, setSearch] = useState('');
+  const [selectedCourse, setSelectedCourse] = useState('ALL');
+  const [selectedCampus, setSelectedCampus] = useState('ALL');
+  const [selectedGrade, setSelectedGrade] = useState('ALL');
+  const [selectedGuide, setSelectedGuide] = useState('ALL');
 
   // Firebase real-time connection
   useEffect(() => {
@@ -108,29 +185,108 @@ export default function TowerPage() {
     return () => unsubscribe();
   }, []);
 
-  // Triage Stack: Separate students by risk tier
-  const redZone = useMemo(() => 
-    students.filter(s => s.dri.driTier === 'RED')
-      .sort((a, b) => (b.dri.riskScore || 0) - (a.dri.riskScore || 0))
+  // Get unique values for dropdowns
+  const uniqueCourses = useMemo(() => 
+    Array.from(new Set(students.map(s => s.currentCourse?.name).filter(Boolean))).sort()
   , [students]);
+  
+  const uniqueCampuses = useMemo(() => {
+    const campuses = new Set<string>();
+    students.forEach(s => {
+      if (s.dimensions?.campusDisplayName) {
+        campuses.add(s.dimensions.campusDisplayName);
+      } else {
+        campuses.add('Online (No Campus)');
+      }
+    });
+    return Array.from(campuses).sort();
+  }, [students]);
+
+  const uniqueGrades = useMemo(() => {
+    const grades = new Set<string>();
+    students.forEach(s => {
+      if (s.dimensions?.grade) {
+        grades.add(`Grade ${s.dimensions.grade}`);
+      }
+    });
+    return Array.from(grades).sort();
+  }, [students]);
+
+  const uniqueGuides = useMemo(() => {
+    const guides = new Set<string>();
+    students.forEach(s => {
+      if (s.dimensions?.guide) {
+        guides.add(s.dimensions.guide);
+      } else if (s.dimensions) {
+        guides.add('No Guide');
+      }
+    });
+    return Array.from(guides).sort();
+  }, [students]);
+
+  // Filtered students
+  const filtered = useMemo(() => students.filter(s => {
+    const nameMatch = `${s.firstName} ${s.lastName} ${s.id}`.toLowerCase().includes(search.toLowerCase());
+    const courseMatch = selectedCourse === 'ALL' || s.currentCourse?.name === selectedCourse;
+    
+    let campusMatch = selectedCampus === 'ALL';
+    if (!campusMatch) {
+      if (selectedCampus === 'Online (No Campus)') {
+        campusMatch = !s.dimensions?.campusDisplayName;
+      } else {
+        campusMatch = s.dimensions?.campusDisplayName === selectedCampus;
+      }
+    }
+    
+    let gradeMatch = selectedGrade === 'ALL';
+    if (!gradeMatch) {
+      const gradeNum = parseInt(selectedGrade.replace('Grade ', ''));
+      gradeMatch = s.dimensions?.grade === gradeNum;
+    }
+    
+    let guideMatch = selectedGuide === 'ALL';
+    if (!guideMatch) {
+      if (selectedGuide === 'No Guide') {
+        guideMatch = !s.dimensions?.guide;
+      } else {
+        guideMatch = s.dimensions?.guide === selectedGuide;
+      }
+    }
+    
+    return nameMatch && courseMatch && campusMatch && gradeMatch && guideMatch;
+  }), [students, search, selectedCourse, selectedCampus, selectedGrade, selectedGuide]);
+
+  // Triage Stack: Separate by risk tier from FILTERED students
+  const redZone = useMemo(() => 
+    filtered.filter(s => s.dri.driTier === 'RED')
+      .sort((a, b) => (b.dri.riskScore || 0) - (a.dri.riskScore || 0))
+  , [filtered]);
 
   const yellowZone = useMemo(() => 
-    students.filter(s => s.dri.driTier === 'YELLOW')
+    filtered.filter(s => s.dri.driTier === 'YELLOW')
       .sort((a, b) => (b.dri.riskScore || 0) - (a.dri.riskScore || 0))
-  , [students]);
+  , [filtered]);
 
   const greenZone = useMemo(() => 
-    students.filter(s => !redZone.some(r => r.id === s.id) && !yellowZone.some(y => y.id === s.id))
+    filtered.filter(s => !redZone.some(r => r.id === s.id) && !yellowZone.some(y => y.id === s.id))
       .sort((a, b) => (a.metrics.lmp - b.metrics.lmp))
-  , [students, redZone, yellowZone]);
+  , [filtered, redZone, yellowZone]);
 
   const stats = useMemo(() => ({
-    total: students.length,
+    total: filtered.length,
     critical: redZone.length,
     watch: yellowZone.length,
     optimal: greenZone.length,
-    avgRiskScore: Math.round(students.reduce((sum, s) => sum + (s.dri.riskScore || 0), 0) / Math.max(students.length, 1)),
-  }), [students, redZone, yellowZone, greenZone]);
+    avgRiskScore: Math.round(filtered.reduce((sum, s) => sum + (s.dri.riskScore || 0), 0) / Math.max(filtered.length, 1)),
+  }), [filtered, redZone, yellowZone, greenZone]);
+
+  const clearFilters = () => {
+    setSearch('');
+    setSelectedCourse('ALL');
+    setSelectedCampus('ALL');
+    setSelectedGrade('ALL');
+    setSelectedGuide('ALL');
+  };
 
   if (loading) {
     return (
@@ -150,16 +306,26 @@ export default function TowerPage() {
       
       {/* Header */}
       <header className="mb-8 border-b border-white/10 pb-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-black text-white uppercase tracking-ultra">
               THE TOWER
             </h1>
             <p className="text-alpha-gold text-[10px] font-bold tracking-widest uppercase mt-1">
-              Strategic Analytics • {students.length} Students
+              Strategic Analytics • {students.length} Students • {filtered.length} Filtered
             </p>
           </div>
           <div className="flex items-center gap-4">
+            <AlertsDropdown onStudentClick={(studentId) => {
+              const student = students.find(s => s.id === studentId);
+              if (student) setSelectedStudent(student);
+            }} />
+            
+            <FollowUpReminders onStudentClick={(studentId) => {
+              const student = students.find(s => s.id === studentId);
+              if (student) setSelectedStudent(student);
+            }} />
+            
             <a 
               href="/field"
               className="px-4 py-2 bg-alpha-navy-light hover:bg-alpha-navy-surface border border-alpha-navy-light text-slate-400 hover:text-alpha-gold text-[10px] font-black uppercase rounded-lg transition-all"
@@ -176,7 +342,7 @@ export default function TowerPage() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           <div className="glass-card p-3 rounded-xl border-l-4 border-risk-red">
             <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">Critical</div>
             <div className="text-2xl font-black text-risk-red">{stats.critical}</div>
@@ -198,6 +364,53 @@ export default function TowerPage() {
             <div className="text-[8px] text-slate-600 mt-1">of 100</div>
           </div>
         </div>
+
+        {/* Filters Row */}
+        <div className="flex flex-wrap gap-3 items-center mb-4">
+          <div className="relative flex-1 min-w-[280px]">
+            <input 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              placeholder="🔎 SEARCH STUDENT..." 
+              className="w-full bg-slate-900/40 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-alpha-gold outline-none font-mono transition-all"
+            />
+          </div>
+          
+          <select value={selectedCampus} onChange={(e) => setSelectedCampus(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none hover:border-slate-600 transition-colors">
+            <option value="ALL">📍 ALL CAMPUSES</option>
+            {uniqueCampuses.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          
+          <select value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none hover:border-slate-600 transition-colors">
+            <option value="ALL">🎓 ALL GRADES</option>
+            {uniqueGrades.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+          
+          <select value={selectedGuide} onChange={(e) => setSelectedGuide(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none hover:border-slate-600 transition-colors">
+            <option value="ALL">👤 ALL GUIDES</option>
+            {uniqueGuides.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+          
+          <select value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none hover:border-slate-600 transition-colors">
+            <option value="ALL">📚 ALL COURSES</option>
+            {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+
+        {/* Active Filters Indicator */}
+        <ActiveFiltersIndicator 
+          search={search} 
+          course={selectedCourse}
+          campus={selectedCampus}
+          grade={selectedGrade}
+          guide={selectedGuide}
+          onClearSearch={() => setSearch('')} 
+          onClearCourse={() => setSelectedCourse('ALL')}
+          onClearCampus={() => setSelectedCampus('ALL')}
+          onClearGrade={() => setSelectedGrade('ALL')}
+          onClearGuide={() => setSelectedGuide('ALL')}
+          onClearAll={clearFilters} 
+        />
       </header>
 
       {/* Matrix Section */}
@@ -207,11 +420,11 @@ export default function TowerPage() {
             MASTERY VS. CONSISTENCY
           </h2>
           <div className="text-[9px] text-slate-600 uppercase tracking-widest">
-            Interactive scatter plot • {students.length} students plotted
+            Interactive scatter plot • {filtered.length} students plotted
           </div>
         </div>
         <div className="glass-card rounded-3xl p-4 h-[700px] overflow-hidden">
-          <KeenKTMatrix students={students} onStudentClick={(student) => setSelectedStudent(student)} />
+          <KeenKTMatrix students={filtered} onStudentClick={(student) => setSelectedStudent(student)} />
         </div>
       </section>
 
@@ -337,7 +550,7 @@ export default function TowerPage() {
         </div>
       </section>
 
-      {/* Student Modal with Intervention Option */}
+      {/* Student Modal */}
       {selectedStudent && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="glass-card rounded-3xl p-8 max-w-2xl w-full">
