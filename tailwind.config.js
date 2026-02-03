@@ -1,33 +1,28 @@
-/** @type {import('tailwindcss').Config} */
-module.exports = {
+import type { Config } from "tailwindcss";
+
+const config: Config = {
   content: [
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        alpha: {
-          // Alpha Gold Palette (Marca Principal)
-          gold: '#D4AF37',       // Oro oficial
-          'gold-light': '#F3D250',
-          'gold-dim': 'rgba(212, 175, 55, 0.15)', // Fondos sutiles
-          
-          // Alpha Navy/Dark Palette (Fondos)
-          navy: '#0C2D48',       // Azul marino profundo
-          'navy-light': '#144a75',
-          'navy-bg': '#050b14',  // Fondo principal (reemplaza el negro)
-          
-          // Semantic Colors (Botones)
-          action: '#D4AF37',     
-          'action-hover': '#B5952F'
-        }
+        "primary": "#d4af35", // Alpha Gold
+        "background-light": "#f8f7f6",
+        "background-dark": "#020617", // Deep Navy
+        "risk-red": "#fa4238",
+        "risk-amber": "#f59e0b",
+        "risk-emerald": "#10b981",
       },
-      backgroundImage: {
-        'alpha-gradient': 'linear-gradient(135deg, #0C2D48 0%, #050b14 100%)',
-      }
+      fontFamily: {
+        sans: ["Space Grotesk", "sans-serif"],
+        display: ["Space Grotesk", "sans-serif"],
+      },
     },
   },
   plugins: [],
-}
+};
+export default config;
