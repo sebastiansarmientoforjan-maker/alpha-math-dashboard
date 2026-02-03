@@ -7,6 +7,7 @@ import { calculateTier1Metrics } from '@/lib/metrics';
 import { calculateDRIMetrics } from '@/lib/dri-calculus';
 import { Student } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
+import CoachInterventionModal from '@/components/CoachInterventionModal';
 
 interface Mission {
   student: Student;
@@ -21,6 +22,7 @@ export default function FieldPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
+  const [showInterventionModal, setShowInterventionModal] = useState(false);
 
   // Firebase real-time connection
   useEffect(() => {
@@ -184,6 +186,10 @@ export default function FieldPage() {
                   key={`red-${mission.student.id}-${idx}`} 
                   mission={mission} 
                   onClick={() => setSelectedMission(mission)}
+                  onLogIntervention={() => {
+                    setSelectedMission(mission);
+                    setShowInterventionModal(true);
+                  }}
                 />
               ))}
             </div>
@@ -207,6 +213,10 @@ export default function FieldPage() {
                   key={`amber-${mission.student.id}-${idx}`} 
                   mission={mission} 
                   onClick={() => setSelectedMission(mission)}
+                  onLogIntervention={() => {
+                    setSelectedMission(mission);
+                    setShowInterventionModal(true);
+                  }}
                 />
               ))}
             </div>
@@ -230,6 +240,10 @@ export default function FieldPage() {
                   key={`green-${mission.student.id}-${idx}`} 
                   mission={mission} 
                   onClick={() => setSelectedMission(mission)}
+                  onLogIntervention={() => {
+                    setSelectedMission(mission);
+                    setShowInterventionModal(true);
+                  }}
                 />
               ))}
             </div>
@@ -251,7 +265,23 @@ export default function FieldPage() {
       {selectedMission && (
         <MissionModal 
           mission={selectedMission} 
-          onClose={() => setSelectedMission(null)} 
+          onClose={() => {
+            setSelectedMission(null);
+            setShowInterventionModal(false);
+          }}
+          onLogIntervention={() => {
+            setShowInterventionModal(true);
+          }}
+        />
+      )}
+
+      {/* Coach Intervention Modal */}
+      {showInterventionModal && selectedMission && (
+        <CoachInterventionModal
+          student={selectedMission.student}
+          onClose={() => {
+            setShowInterventionModal(false);
+          }}
         />
       )}
 
@@ -263,9 +293,10 @@ export default function FieldPage() {
 interface MissionCardProps {
   mission: Mission;
   onClick: () => void;
+  onLogIntervention: () => void;
 }
 
-function MissionCard({ mission, onClick }: MissionCardProps) {
+function MissionCard({ mission, onClick, onLogIntervention }: MissionCardProps) {
   const { student, priority, reason, metric, triggeredAt } = mission;
   
   const colorClasses = {
@@ -278,6 +309,11 @@ function MissionCard({ mission, onClick }: MissionCardProps) {
     RED: 'bg-risk-red/20 text-risk-red',
     AMBER: 'bg-risk-amber/20 text-risk-amber',
     GREEN: 'bg-risk-emerald/20 text-risk-emerald',
+  };
+
+  const handleLogClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onLogIntervention();
   };
 
   return (
@@ -315,7 +351,10 @@ function MissionCard({ mission, onClick }: MissionCardProps) {
         </p>
       </div>
 
-      <button className="w-full bg-alpha-gold hover:bg-alpha-gold/90 text-black py-2 rounded-lg font-black text-[10px] uppercase hover:shadow-[0_0_15px_rgba(212,175,53,0.4)] transition-all">
+      <button 
+        onClick={handleLogClick}
+        className="w-full bg-alpha-gold hover:bg-alpha-gold/90 text-black py-2 rounded-lg font-black text-[10px] uppercase hover:shadow-[0_0_15px_rgba(212,175,53,0.4)] transition-all"
+      >
         Log Intervention
       </button>
     </div>
@@ -326,9 +365,10 @@ function MissionCard({ mission, onClick }: MissionCardProps) {
 interface MissionModalProps {
   mission: Mission;
   onClose: () => void;
+  onLogIntervention: () => void;
 }
 
-function MissionModal({ mission, onClose }: MissionModalProps) {
+function MissionModal({ mission, onClose, onLogIntervention }: MissionModalProps) {
   const { student, priority, reason, metric } = mission;
 
   return (
@@ -392,14 +432,17 @@ function MissionModal({ mission, onClose }: MissionModalProps) {
           >
             Close
           </button>
-          <button className="flex-1 px-4 py-3 bg-alpha-gold hover:bg-alpha-gold/90 text-black font-black text-[10px] uppercase rounded-lg hover:shadow-[0_0_15px_rgba(212,175,53,0.4)] transition-all">
+          <button 
+            onClick={onLogIntervention}
+            className="flex-1 px-4 py-3 bg-alpha-gold hover:bg-alpha-gold/90 text-black font-black text-[10px] uppercase rounded-lg hover:shadow-[0_0_15px_rgba(212,175,53,0.4)] transition-all"
+          >
             Log Intervention
           </button>
         </div>
 
         <div className="mt-4 pt-4 border-t border-slate-800">
           <p className="text-[9px] text-slate-600 text-center">
-            Full intervention logging system in Phase 3.4
+            Intervention will be logged to Firebase and tracked
           </p>
         </div>
       </div>
