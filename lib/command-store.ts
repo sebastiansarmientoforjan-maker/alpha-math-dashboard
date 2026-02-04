@@ -42,16 +42,27 @@ interface CommandStoreState {
   error: string | null;
   lastUpdated: Date | null;
 
+  // Filters (The Oracle + Campus Switcher)
+  oracleQuery: string; // Search query from The Oracle input
+  campusFilter: string | null; // Campus filter (null = all campuses)
+  selectedStudentId: string | null; // For DeepDivePanel
+
   // Actions
   loadData: () => Promise<void>;
   refreshMetrics: () => void;
   clearData: () => void;
+
+  // Filter actions
+  setOracleQuery: (query: string) => void;
+  setCampusFilter: (campus: string | null) => void;
+  setSelectedStudent: (studentId: string | null) => void;
 
   // Computed/Derived state helpers
   getStudentById: (id: string) => EnrichedStudent | undefined;
   getStudentsByCampus: (campus: string) => EnrichedStudent[];
   getCriticalStudents: () => EnrichedStudent[];
   getStudentsByUrgency: (minScore: number) => EnrichedStudent[];
+  getFilteredStudents: () => EnrichedStudent[]; // Apply all filters
 }
 
 // ============================================
@@ -68,6 +79,11 @@ export const useCommandStore = create<CommandStoreState>((set, get) => ({
   loading: false,
   error: null,
   lastUpdated: null,
+
+  // Filters
+  oracleQuery: '',
+  campusFilter: null,
+  selectedStudentId: null,
 
   /**
    * Load students from API and compute all Phase 1 metrics
@@ -253,6 +269,73 @@ export const useCommandStore = create<CommandStoreState>((set, get) => ({
   getStudentsByUrgency: (minScore: number) => {
     return get().students.filter(s => s.urgencyScore >= minScore);
   },
+
+  /**
+   * Set Oracle search query
+   * Supports: "Critical" → urgencyScore >= 60, or name search
+   */
+  setOracleQuery: (query: string) => {
+    set({ oracleQuery: query });
+  },
+
+  /**
+   * Set campus filter
+   * null = show all campuses
+   */
+  setCampusFilter: (campus: string | null) => {
+    set({ campusFilter: campus });
+  },
+
+  /**
+   * Set selected student for DeepDivePanel
+   */
+  setSelectedStudent: (studentId: string | null) => {
+    set({ selectedStudentId: studentId });
+  },
+
+  /**
+   * Get filtered students based on Oracle query and campus filter
+   * STRICT MODE: "Critical" → urgencyScore >= 60
+   */
+  getFilteredStudents: () => {
+    const { students, oracleQuery, campusFilter } = get();
+    let filtered = students;
+
+    // Apply campus filter
+    if (campusFilter) {
+      filtered = filtered.filter(s => s.campus === campusFilter);
+    }
+
+    // Apply Oracle query
+    if (oracleQuery.trim()) {
+      const query = oracleQuery.toLowerCase().trim();
+
+      // Special keyword: "Critical" → urgencyScore >= 60
+      if (query === 'critical') {
+        filtered = filtered.filter(s => s.urgencyScore >= 60);
+      }
+      // Special keyword: "blocked" → BLOCKED mastery
+      else if (query === 'blocked') {
+        filtered = filtered.filter(s =>
+          Object.values(s.masteryLatencies).some(m => m.status === 'BLOCKED')
+        );
+      }
+      // Special keyword: "red shift" → RED_SHIFT velocity
+      else if (query === 'red shift' || query === 'redshift') {
+        filtered = filtered.filter(s => s.velocity.status === 'RED_SHIFT');
+      }
+      // Name search (firstName or lastName)
+      else {
+        filtered = filtered.filter(s =>
+          s.firstName.toLowerCase().includes(query) ||
+          s.lastName.toLowerCase().includes(query) ||
+          `${s.firstName} ${s.lastName}`.toLowerCase().includes(query)
+        );
+      }
+    }
+
+    return filtered;
+  },
 }));
 
 // ============================================
@@ -333,4 +416,12 @@ export function useCommandStatistics() {
       lastUpdated: state.lastUpdated,
     };
   });
+}
+
+/**
+ * Hook: Get filtered students (applies Oracle query + campus filter)
+ * MEMOIZED for performance
+ */
+export function useFilteredStudents(): EnrichedStudent[] {
+  return useCommandStore(state => state.getFilteredStudents());
 }
