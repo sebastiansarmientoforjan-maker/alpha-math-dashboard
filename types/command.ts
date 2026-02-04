@@ -5,6 +5,9 @@
 // Based on ALPHA_MATH_COMMAND_V7_FINAL_PROMPT.md
 // Part 3.1: Data Integration Architecture
 
+// Import InterventionRecord from main types
+import { InterventionRecord } from './index';
+
 /**
  * Activity log entry from MathAcademy platform
  * Captures granular student interaction with topics
@@ -25,6 +28,10 @@ export interface ActivityLog {
  */
 export interface MathAcademyStudent {
   id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  campus: string; // Austin, SF, Miami, Online
   currentCourse: string;
   progress: number; // % completion (0-100)
   activity: ActivityLog[];
@@ -34,6 +41,9 @@ export interface MathAcademyStudent {
     velocity: number; // XP per week
     dailyXP: number;
   };
+  riskScore: number; // 0-100 composite risk score
+  interventionHistory: InterventionRecord[]; // Track all DRI interventions
+  lastUpdated: string;
 }
 
 /**
