@@ -10,6 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 import CoachInterventionModal from '@/components/CoachInterventionModal';
 import AlertsDropdown from '@/components/AlertsDropdown';
 import FollowUpReminders from '@/components/FollowUpReminders';
+import HelpModal from '@/components/HelpModal';
 
 interface Mission {
   student: Student;
@@ -25,7 +26,8 @@ export default function FieldPage() {
   const [loading, setLoading] = useState(true);
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
   const [showInterventionModal, setShowInterventionModal] = useState(false);
-  
+  const [showHelp, setShowHelp] = useState(false);
+
   // Filter states
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'RED' | 'AMBER' | 'GREEN'>('ALL');
   const [dateRange, setDateRange] = useState<'TODAY' | '48H' | 'WEEK' | 'ALL'>('ALL');
@@ -126,6 +128,45 @@ export default function FieldPage() {
   const redMissions = useMemo(() => missions.filter(m => m.priority === 'RED').slice(0, 10), [missions]);
   const amberMissions = useMemo(() => missions.filter(m => m.priority === 'AMBER').slice(0, 10), [missions]);
   const greenMissions = useMemo(() => missions.filter(m => m.priority === 'GREEN').slice(0, 5), [missions]);
+
+  // Clear all filters
+  const clearFilters = () => {
+    setPriorityFilter('ALL');
+    setDateRange('ALL');
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in input fields
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      // Clear filters
+      if (e.key === 'c' && !selectedMission && !e.ctrlKey && !e.metaKey) {
+        if (priorityFilter !== 'ALL' || dateRange !== 'ALL') {
+          clearFilters();
+        }
+      }
+
+      // Help modal
+      if (e.key === '?' && !selectedMission) {
+        e.preventDefault();
+        setShowHelp(true);
+      }
+
+      // Escape key
+      if (e.key === 'Escape') {
+        if (selectedMission) {
+          setSelectedMission(null);
+        } else if (showHelp) {
+          setShowHelp(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyboard);
+    return () => window.removeEventListener('keydown', handleKeyboard);
+  }, [selectedMission, priorityFilter, dateRange, showHelp]);
 
   if (loading) {
     return (
@@ -563,6 +604,9 @@ export default function FieldPage() {
           }}
         />
       )}
+
+      {/* Help Modal */}
+      {showHelp && <HelpModal mode="field" onClose={() => setShowHelp(false)} />}
 
     </div>
   );

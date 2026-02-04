@@ -4,9 +4,10 @@ import { useEffect } from 'react';
 
 interface HelpModalProps {
   onClose: () => void;
+  mode?: 'legacy' | 'tower' | 'field';
 }
 
-export default function HelpModal({ onClose }: HelpModalProps) {
+export default function HelpModal({ onClose, mode = 'legacy' }: HelpModalProps) {
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -18,16 +19,18 @@ export default function HelpModal({ onClose }: HelpModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="bg-[#0a0a0a] border border-slate-800 w-full max-w-2xl rounded-3xl relative z-10 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-alpha-navy border border-slate-800 w-full max-w-2xl rounded-3xl relative z-10 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* Header */}
         <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-gradient-to-b from-slate-900/50 to-transparent">
           <div>
             <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter">Help & Shortcuts</h2>
-            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mt-1">DRI Command Center V5.4</p>
+            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mt-1">
+              {mode === 'tower' ? 'The Tower • Strategic Analytics' : mode === 'field' ? 'The Field • Tactical Center' : 'DRI Command Center V5.4'}
+            </p>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="text-slate-600 hover:text-white text-2xl transition-colors p-2 hover:bg-slate-800 rounded-lg"
           >
             ✕
@@ -43,7 +46,37 @@ export default function HelpModal({ onClose }: HelpModalProps) {
               ⌨️ Keyboard Shortcuts
             </h3>
             <div className="grid grid-cols-2 gap-3">
-              {[
+              {mode === 'tower' && [
+                { key: '1', action: 'Switch to MATRIX view' },
+                { key: '2', action: 'Switch to TRIAGE view' },
+                { key: '3', action: 'Switch to HEATMAP view' },
+                { key: 's', action: 'Toggle selection mode' },
+                { key: 'c', action: 'Clear all filters' },
+                { key: '?', action: 'Open this help modal' },
+                { key: 'Esc', action: 'Close modal / Exit selection' },
+                { key: '← →', action: 'Navigate students in modal' },
+                { key: 'Ctrl+A', action: 'Select all visible students' },
+              ].map(({ key, action }) => (
+                <div key={key} className="flex items-center gap-3 p-3 bg-slate-900/40 rounded-xl border border-slate-800">
+                  <kbd className="bg-slate-800 text-indigo-400 px-2 py-1 rounded text-xs font-mono font-bold min-w-[50px] text-center">
+                    {key}
+                  </kbd>
+                  <span className="text-[11px] text-slate-400">{action}</span>
+                </div>
+              ))}
+              {mode === 'field' && [
+                { key: 'c', action: 'Clear all filters' },
+                { key: '?', action: 'Open this help modal' },
+                { key: 'Esc', action: 'Close modal' },
+              ].map(({ key, action }) => (
+                <div key={key} className="flex items-center gap-3 p-3 bg-slate-900/40 rounded-xl border border-slate-800">
+                  <kbd className="bg-slate-800 text-indigo-400 px-2 py-1 rounded text-xs font-mono font-bold min-w-[50px] text-center">
+                    {key}
+                  </kbd>
+                  <span className="text-[11px] text-slate-400">{action}</span>
+                </div>
+              ))}
+              {mode === 'legacy' && [
                 { key: '1', action: 'Switch to TRIAGE view' },
                 { key: '2', action: 'Switch to MATRIX view' },
                 { key: '3', action: 'Switch to HEATMAP view' },
@@ -66,6 +99,102 @@ export default function HelpModal({ onClose }: HelpModalProps) {
               ))}
             </div>
           </section>
+
+          {/* Tower View Modes */}
+          {mode === 'tower' && (
+            <section>
+              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                👁️ View Modes
+              </h3>
+              <div className="space-y-3">
+                <div className="p-4 bg-alpha-gold-dim border border-alpha-gold/30 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">📊</span>
+                    <span className="text-[11px] font-bold text-alpha-gold uppercase">Matrix View</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Interactive scatter plot showing Mastery (RSR) vs Consistency (KSI) for all students. Click any point to view student details.</p>
+                </div>
+                <div className="p-4 bg-red-950/20 border border-red-500/30 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">🏥</span>
+                    <span className="text-[11px] font-bold text-risk-red uppercase">Triage View</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Three-column layout sorting students by risk tier: Critical (Red), Watch (Amber), and Optimal (Green). Sorted by risk score within each tier.</p>
+                </div>
+                <div className="p-4 bg-orange-950/20 border border-orange-500/30 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">🔥</span>
+                    <span className="text-[11px] font-bold text-orange-400 uppercase">Heatmap View</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Shows top 15 critical knowledge components across all courses. Color-coded cells indicate average RSR: Red (&lt;40%), Amber (40-70%), Green (&gt;70%).</p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Tower Bulk Selection */}
+          {mode === 'tower' && (
+            <section>
+              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                ☐ Bulk Selection
+              </h3>
+              <div className="p-4 bg-indigo-950/20 border border-indigo-500/30 rounded-xl space-y-3">
+                <p className="text-[11px] text-indigo-200">
+                  Select multiple students in Triage view for batch operations and CSV export.
+                </p>
+                <div className="space-y-2 text-[10px] text-slate-400">
+                  <div className="flex items-start gap-2">
+                    <span className="text-indigo-400">1.</span>
+                    <span>Click "☐ Select" button or press <kbd className="bg-slate-800 px-1 rounded">s</kbd> to enable selection mode</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-indigo-400">2.</span>
+                    <span>Click checkboxes on student cards to select them</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-indigo-400">3.</span>
+                    <span>Press <kbd className="bg-slate-800 px-1 rounded">Ctrl+A</kbd> to select all visible students</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-indigo-400">4.</span>
+                    <span>Use the Bulk Actions Bar to export to CSV or view aggregate stats</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Field Mission System */}
+          {mode === 'field' && (
+            <section>
+              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                ⚔️ Mission System
+              </h3>
+              <div className="space-y-3">
+                <div className="p-4 bg-red-950/20 border border-red-500/30 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">🚨</span>
+                    <span className="text-[11px] font-bold text-risk-red uppercase">Red Missions</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Critical intervention required. Students with Risk Score ≥ 60 or RSR &lt; 50%. Immediate action needed.</p>
+                </div>
+                <div className="p-4 bg-amber-950/20 border border-amber-500/30 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">⚠️</span>
+                    <span className="text-[11px] font-bold text-risk-amber uppercase">Amber Missions</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Elevated risk monitoring. Students with Risk Score 35-59 or low KSI. Monitor closely.</p>
+                </div>
+                <div className="p-4 bg-emerald-950/20 border border-emerald-500/30 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">⚡</span>
+                    <span className="text-[11px] font-bold text-risk-emerald uppercase">Green Check-ins</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Scheduled touchpoints for high performers. Students with RSR ≥ 85% and Velocity ≥ 80%.</p>
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* New Feature: Coach Interventions */}
           <section>

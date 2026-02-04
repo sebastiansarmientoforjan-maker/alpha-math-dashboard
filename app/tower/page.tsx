@@ -11,6 +11,9 @@ import KeenKTMatrix from '@/components/KeenKTMatrix';
 import CoachInterventionModal from '@/components/CoachInterventionModal';
 import AlertsDropdown from '@/components/AlertsDropdown';
 import FollowUpReminders from '@/components/FollowUpReminders';
+import { TOPIC_GRADE_MAP } from '@/lib/grade-maps';
+import HelpModal from '@/components/HelpModal';
+import BulkActionsBar from '@/components/BulkActionsBar';
 
 const METRIC_TOOLTIPS = {
   rsr: 'Recent Success Rate: Proportion of recent tasks with >80% accuracy',
@@ -22,16 +25,42 @@ const METRIC_TOOLTIPS = {
 interface StudentCardProps {
   student: Student;
   onClick: () => void;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onSelect?: (studentId: string, selected: boolean) => void;
 }
 
-function StudentCard({ student, onClick }: StudentCardProps) {
+function StudentCard({ student, onClick, selectionMode = false, isSelected = false, onSelect }: StudentCardProps) {
+  const handleClick = () => {
+    if (selectionMode && onSelect) {
+      onSelect(student.id, !isSelected);
+    } else {
+      onClick();
+    }
+  };
+
   return (
-    <div 
-      onClick={onClick}
-      className="p-3 glass-card rounded-xl cursor-pointer hover:scale-[1.02] hover:border-alpha-gold transition-all group"
+    <div
+      onClick={handleClick}
+      className={`p-3 glass-card rounded-xl cursor-pointer hover:scale-[1.02] transition-all group relative ${
+        isSelected ? 'border-2 border-indigo-500 bg-indigo-500/10' : 'hover:border-alpha-gold'
+      }`}
     >
+      {selectionMode && (
+        <div className="absolute top-2 right-2 z-10">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => {
+              e.stopPropagation();
+              onSelect?.(student.id, e.target.checked);
+            }}
+            className="w-4 h-4 rounded border-2 border-slate-600 bg-slate-900 checked:bg-indigo-500 checked:border-indigo-500 cursor-pointer"
+          />
+        </div>
+      )}
       <div className="flex justify-between items-start mb-2">
-        <h3 className="font-black text-white text-sm uppercase italic truncate group-hover:text-alpha-gold transition-colors">
+        <h3 className="font-black text-white text-sm uppercase italic truncate group-hover:text-alpha-gold transition-colors pr-6">
           {student.firstName} {student.lastName}
         </h3>
         <Tooltip content={METRIC_TOOLTIPS.rsr}>
@@ -160,8 +189,17 @@ export default function TowerPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedStudentIndex, setSelectedStudentIndex] = useState(-1);
   const [showInterventionModal, setShowInterventionModal] = useState(false);
-  
+  const [showHelp, setShowHelp] = useState(false);
+
+  // View mode state
+  const [viewMode, setViewMode] = useState<'MATRIX' | 'TRIAGE' | 'HEATMAP'>('TRIAGE');
+
+  // Bulk selection state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   // Filter states
   const [search, setSearch] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('ALL');
@@ -224,6 +262,21 @@ export default function TowerPage() {
     return Array.from(guides).sort();
   }, [students]);
 
+  // Heatmap data calculation
+  const criticalTopics = Object.keys(TOPIC_GRADE_MAP);
+
+  const heatmapData = useMemo(() => {
+    const data = criticalTopics.map(topic => {
+      const courseStats = uniqueCourses.map(course => {
+        const relevant = students.filter(s => s.currentCourse?.name === course);
+        const avgLMP = relevant.reduce((acc, s) => acc + (s.metrics?.lmp || 0), 0) / Math.max(1, relevant.length);
+        return { course, avgLMP };
+      });
+      return { topic, courseStats, criticalCourses: courseStats.filter(c => c.avgLMP < 0.4).length };
+    });
+    return data.sort((a, b) => b.criticalCourses - a.criticalCourses).slice(0, 15);
+  }, [students, uniqueCourses, criticalTopics]);
+
   // Filtered students
   const filtered = useMemo(() => students.filter(s => {
     const nameMatch = `${s.firstName} ${s.lastName} ${s.id}`.toLowerCase().includes(search.toLowerCase());
@@ -267,10 +320,13 @@ export default function TowerPage() {
       .sort((a, b) => (b.dri.riskScore || 0) - (a.dri.riskScore || 0))
   , [filtered]);
 
-  const greenZone = useMemo(() => 
+  const greenZone = useMemo(() =>
     filtered.filter(s => !redZone.some(r => r.id === s.id) && !yellowZone.some(y => y.id === s.id))
       .sort((a, b) => (a.metrics.lmp - b.metrics.lmp))
   , [filtered, redZone, yellowZone]);
+
+  // For student navigation in modal
+  const filteredForNavigation = useMemo(() => [...redZone, ...yellowZone, ...greenZone], [redZone, yellowZone, greenZone]);
 
   const stats = useMemo(() => ({
     total: filtered.length,
@@ -287,6 +343,127 @@ export default function TowerPage() {
     setSelectedGrade('ALL');
     setSelectedGuide('ALL');
   };
+
+  // Selection handlers
+  const handleSelectStudent = (studentId: string, selected: boolean) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (selected) newSet.add(studentId);
+      else newSet.delete(studentId);
+      return newSet;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  };
+
+  // CSV export
+  const exportToCSV = () => {
+    const selectedStudentsData = students.filter(s => selectedIds.has(s.id));
+    const headers = ['ID', 'First Name', 'Last Name', 'Course', 'RSR', 'Risk Score', 'Velocity', 'KSI', 'DRI Tier', 'DRI Signal'];
+    const rows = selectedStudentsData.map(s => [
+      s.id,
+      s.firstName,
+      s.lastName,
+      s.currentCourse?.name || 'N/A',
+      (s.metrics.lmp * 100).toFixed(1) + '%',
+      s.dri.riskScore || 'N/A',
+      s.metrics.velocityScore + '%',
+      s.metrics.ksi !== null ? s.metrics.ksi + '%' : 'N/A',
+      s.dri.driTier,
+      s.dri.driSignal
+    ]);
+    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tower-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Navigate between students in modal
+  const navigateStudent = (direction: 'prev' | 'next') => {
+    if (filteredForNavigation.length === 0) return;
+    let newIndex = selectedStudentIndex;
+    if (direction === 'next') {
+      newIndex = selectedStudentIndex < filteredForNavigation.length - 1 ? selectedStudentIndex + 1 : 0;
+    } else {
+      newIndex = selectedStudentIndex > 0 ? selectedStudentIndex - 1 : filteredForNavigation.length - 1;
+    }
+    setSelectedStudentIndex(newIndex);
+    setSelectedStudent(filteredForNavigation[newIndex]);
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in input fields
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      // View mode shortcuts
+      if (e.key === '1' && !selectedStudent) setViewMode('MATRIX');
+      if (e.key === '2' && !selectedStudent) setViewMode('TRIAGE');
+      if (e.key === '3' && !selectedStudent) setViewMode('HEATMAP');
+
+      // Selection mode toggle
+      if (e.key === 's' && !selectedStudent && !e.ctrlKey && !e.metaKey) {
+        setSelectionMode(prev => !prev);
+        if (selectionMode) setSelectedIds(new Set());
+      }
+
+      // Select all in Triage view
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a' && viewMode === 'TRIAGE' && !selectedStudent) {
+        e.preventDefault();
+        if (!selectionMode) setSelectionMode(true);
+        setSelectedIds(new Set(filteredForNavigation.map(s => s.id)));
+      }
+
+      // Clear filters
+      if (e.key === 'c' && !selectedStudent && !e.ctrlKey && !e.metaKey) {
+        if (search || selectedCourse !== 'ALL' || selectedCampus !== 'ALL' || selectedGrade !== 'ALL' || selectedGuide !== 'ALL') {
+          clearFilters();
+        }
+      }
+
+      // Help modal
+      if (e.key === '?' && !selectedStudent) {
+        e.preventDefault();
+        setShowHelp(true);
+      }
+
+      // Escape key
+      if (e.key === 'Escape') {
+        if (selectedStudent) {
+          setSelectedStudent(null);
+          setSelectedStudentIndex(-1);
+        } else if (selectionMode) {
+          setSelectionMode(false);
+          setSelectedIds(new Set());
+        } else if (showHelp) {
+          setShowHelp(false);
+        }
+      }
+
+      // Student navigation in modal
+      if (selectedStudent && filteredForNavigation.length > 0) {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          navigateStudent('next');
+        }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          navigateStudent('prev');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyboard);
+    return () => window.removeEventListener('keydown', handleKeyboard);
+  }, [selectedStudent, selectedStudentIndex, viewMode, search, selectedCourse, selectedCampus, selectedGrade, selectedGuide, showHelp, selectionMode, filteredForNavigation]);
 
   if (loading) {
     return (
@@ -398,38 +575,102 @@ export default function TowerPage() {
         </div>
 
         {/* Active Filters Indicator */}
-        <ActiveFiltersIndicator 
-          search={search} 
+        <ActiveFiltersIndicator
+          search={search}
           course={selectedCourse}
           campus={selectedCampus}
           grade={selectedGrade}
           guide={selectedGuide}
-          onClearSearch={() => setSearch('')} 
+          onClearSearch={() => setSearch('')}
           onClearCourse={() => setSelectedCourse('ALL')}
           onClearCampus={() => setSelectedCampus('ALL')}
           onClearGrade={() => setSelectedGrade('ALL')}
           onClearGuide={() => setSelectedGuide('ALL')}
-          onClearAll={clearFilters} 
+          onClearAll={clearFilters}
         />
+
+        {/* View Mode Toggle */}
+        <div className="flex gap-2 mt-6 items-center">
+          {/* Selection Mode Toggle */}
+          <button
+            onClick={() => {
+              setSelectionMode(prev => !prev);
+              if (selectionMode) setSelectedIds(new Set());
+            }}
+            className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${
+              selectionMode
+                ? 'bg-indigo-600 text-white border-2 border-indigo-500'
+                : 'bg-slate-900 text-slate-500 hover:text-white border border-slate-800'
+            }`}
+          >
+            {selectionMode ? '✓ Selection Mode' : '☐ Select'}
+          </button>
+
+          <div className="w-px h-6 bg-slate-800" />
+
+          <button
+            onClick={() => setViewMode('MATRIX')}
+            className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${
+              viewMode === 'MATRIX'
+                ? 'bg-alpha-gold text-black'
+                : 'bg-slate-900 text-slate-500 hover:text-white border border-slate-800'
+            }`}
+          >
+            📊 Matrix
+          </button>
+          <button
+            onClick={() => setViewMode('TRIAGE')}
+            className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${
+              viewMode === 'TRIAGE'
+                ? 'bg-alpha-gold text-black'
+                : 'bg-slate-900 text-slate-500 hover:text-white border border-slate-800'
+            }`}
+          >
+            🏥 Triage
+          </button>
+          <button
+            onClick={() => setViewMode('HEATMAP')}
+            className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${
+              viewMode === 'HEATMAP'
+                ? 'bg-alpha-gold text-black'
+                : 'bg-slate-900 text-slate-500 hover:text-white border border-slate-800'
+            }`}
+          >
+            🔥 Heatmap
+          </button>
+        </div>
       </header>
 
+      {/* Bulk Actions Bar */}
+      {selectionMode && selectedIds.size > 0 && (
+        <BulkActionsBar
+          selectedCount={selectedIds.size}
+          selectedStudents={students.filter(s => selectedIds.has(s.id))}
+          onClear={clearSelection}
+          onExport={exportToCSV}
+        />
+      )}
+
       {/* Matrix Section */}
-      <section className="mb-12">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-black text-white uppercase">
-            MASTERY VS. CONSISTENCY
-          </h2>
-          <div className="text-[9px] text-slate-600 uppercase tracking-widest">
-            Interactive scatter plot • {filtered.length} students plotted
+      {viewMode === 'MATRIX' && (
+        <section className="mb-12">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-black text-white uppercase">
+              MASTERY VS. CONSISTENCY
+            </h2>
+            <div className="text-[9px] text-slate-600 uppercase tracking-widest">
+              Interactive scatter plot • {filtered.length} students plotted
+            </div>
           </div>
-        </div>
-        <div className="glass-card rounded-3xl p-4 h-[700px] overflow-hidden">
-          <KeenKTMatrix students={filtered} onStudentClick={(student) => setSelectedStudent(student)} />
-        </div>
-      </section>
+          <div className="glass-card rounded-3xl p-4 h-[700px] overflow-hidden">
+            <KeenKTMatrix students={filtered} onStudentClick={(student) => setSelectedStudent(student)} />
+          </div>
+        </section>
+      )}
 
       {/* Triage Stack */}
-      <section>
+      {viewMode === 'TRIAGE' && (
+        <section>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-black text-white uppercase">
             TRIAGE STACK
@@ -464,10 +705,16 @@ export default function TowerPage() {
                 </div>
               ) : (
                 redZone.map(student => (
-                  <StudentCard 
-                    key={student.id} 
-                    student={student} 
-                    onClick={() => setSelectedStudent(student)}
+                  <StudentCard
+                    key={student.id}
+                    student={student}
+                    onClick={() => {
+                      setSelectedStudentIndex(filteredForNavigation.findIndex(s => s.id === student.id));
+                      setSelectedStudent(student);
+                    }}
+                    selectionMode={selectionMode}
+                    isSelected={selectedIds.has(student.id)}
+                    onSelect={handleSelectStudent}
                   />
                 ))
               )}
@@ -497,10 +744,16 @@ export default function TowerPage() {
                 </div>
               ) : (
                 yellowZone.map(student => (
-                  <StudentCard 
-                    key={student.id} 
-                    student={student} 
-                    onClick={() => setSelectedStudent(student)}
+                  <StudentCard
+                    key={student.id}
+                    student={student}
+                    onClick={() => {
+                      setSelectedStudentIndex(filteredForNavigation.findIndex(s => s.id === student.id));
+                      setSelectedStudent(student);
+                    }}
+                    selectionMode={selectionMode}
+                    isSelected={selectedIds.has(student.id)}
+                    onSelect={handleSelectStudent}
                   />
                 ))
               )}
@@ -530,10 +783,16 @@ export default function TowerPage() {
                 </div>
               ) : (
                 greenZone.slice(0, 50).map(student => (
-                  <StudentCard 
-                    key={student.id} 
-                    student={student} 
-                    onClick={() => setSelectedStudent(student)}
+                  <StudentCard
+                    key={student.id}
+                    student={student}
+                    onClick={() => {
+                      setSelectedStudentIndex(filteredForNavigation.findIndex(s => s.id === student.id));
+                      setSelectedStudent(student);
+                    }}
+                    selectionMode={selectionMode}
+                    isSelected={selectedIds.has(student.id)}
+                    onSelect={handleSelectStudent}
                   />
                 ))
               )}
@@ -548,7 +807,98 @@ export default function TowerPage() {
           </div>
 
         </div>
-      </section>
+        </section>
+      )}
+
+      {/* Heatmap View */}
+      {viewMode === 'HEATMAP' && (
+        <section>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-black text-white uppercase">
+              KNOWLEDGE COMPONENT HEATMAP
+            </h2>
+            <div className="text-[9px] text-slate-600 uppercase tracking-widest">
+              Top 15 critical topics • Color-coded by avg RSR
+            </div>
+          </div>
+          <div className="glass-card rounded-3xl p-8 overflow-hidden flex flex-col h-[700px]">
+            <div className="flex-shrink-0 mb-6 flex justify-between items-end">
+              <div>
+                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  📊 Top 15 Critical Knowledge Components
+                  <span className="px-2 py-0.5 bg-red-900/30 border border-red-500/50 rounded text-[9px] text-red-400 font-black">PRIORITIZED</span>
+                </h3>
+                <p className="text-[10px] text-slate-600 font-mono mt-1">Sorted by courses with avg RSR &lt; 40%</p>
+              </div>
+              <div className="flex items-center gap-4 text-[9px] text-slate-600">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-1.5 rounded-full bg-gradient-to-r from-red-500 to-amber-500" />
+                  <span>High Risk</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-1.5 rounded-full bg-slate-700" />
+                  <span>Low Risk</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto custom-scrollbar">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="sticky top-0 left-0 z-20 bg-slate-950 p-3 text-[8px] font-black text-slate-600 uppercase text-left border-b border-slate-800 min-w-[200px]">Component</th>
+                    {uniqueCourses.map(course => (
+                      <th key={course} className="sticky top-0 z-10 bg-slate-950 p-3 text-[8px] font-black text-slate-500 uppercase border-b border-slate-800 min-w-[90px] font-mono">
+                        {course}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {heatmapData.map((row, rowIndex) => (
+                    <tr key={row.topic} className="hover:bg-slate-900/50 transition-colors group">
+                      <td className="sticky left-0 z-10 bg-slate-950 p-3 border-r border-slate-800">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-shrink-0 w-16 h-1.5 rounded-full bg-slate-800/50 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500"
+                              style={{ width: `${Math.min((row.criticalCourses / uniqueCourses.length) * 100, 100)}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-slate-300 uppercase italic truncate">{row.topic}</span>
+                            {rowIndex < 3 && (
+                              <span className="px-1.5 py-0.5 bg-red-900/40 border border-red-500/60 rounded text-[8px] font-black text-red-300">
+                                #{rowIndex + 1}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      {row.courseStats.map((cell, idx) => (
+                        <td key={idx} className="p-2 border border-slate-900">
+                          <Tooltip content={`${cell.course}: ${(cell.avgLMP * 100).toFixed(1)}% avg RSR`}>
+                            <div
+                              className="h-10 rounded-md flex items-center justify-center text-[10px] font-mono font-black transition-all hover:scale-105 cursor-help"
+                              style={{
+                                backgroundColor: cell.avgLMP < 0.4 ? 'rgba(239, 68, 68, 0.2)' : cell.avgLMP < 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.1)',
+                                border: `1px solid ${cell.avgLMP < 0.4 ? '#ef444433' : cell.avgLMP < 0.7 ? '#f59e0b33' : '#10b98133'}`
+                              }}
+                            >
+                              <span style={{ color: cell.avgLMP < 0.4 ? '#fca5a5' : cell.avgLMP < 0.7 ? '#fbbf24' : '#6ee7b7' }}>
+                                {(cell.avgLMP * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                          </Tooltip>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Student Modal */}
       {selectedStudent && (
@@ -642,6 +992,9 @@ export default function TowerPage() {
           }}
         />
       )}
+
+      {/* Help Modal */}
+      {showHelp && <HelpModal mode="tower" onClose={() => setShowHelp(false)} />}
 
     </div>
   );
