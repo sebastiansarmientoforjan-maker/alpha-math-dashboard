@@ -40,6 +40,7 @@ export default function ImpactAnalyticsPage() {
   ]);
   const [selectedCoach, setSelectedCoach] = useState<string>('ALL');
   const [selectedTier, setSelectedTier] = useState<string>('ALL');
+  const [selectedCampus, setSelectedCampus] = useState<string>('ALL');
 
   // Firebase real-time connections
   useEffect(() => {
@@ -69,10 +70,44 @@ export default function ImpactAnalyticsPage() {
     };
   }, []);
 
+  // Calculate unique campuses
+  const uniqueCampuses = useMemo(() => {
+    const campuses = new Set<string>();
+    students.forEach(s => {
+      if (s.dimensions?.campusDisplayName) {
+        campuses.add(s.dimensions.campusDisplayName);
+      } else {
+        campuses.add('Online (No Campus)');
+      }
+    });
+    return Array.from(campuses).sort();
+  }, [students]);
+
+  // Filter students by campus
+  const filteredStudents = useMemo(() => {
+    if (selectedCampus === 'ALL') return students;
+
+    return students.filter(s => {
+      if (selectedCampus === 'Online (No Campus)') {
+        return !s.dimensions?.campusDisplayName;
+      } else {
+        return s.dimensions?.campusDisplayName === selectedCampus;
+      }
+    });
+  }, [students, selectedCampus]);
+
+  // Filter interventions by campus (based on student's campus)
+  const filteredInterventions = useMemo(() => {
+    if (selectedCampus === 'ALL') return interventions;
+
+    const filteredStudentIds = new Set(filteredStudents.map(s => s.id));
+    return interventions.filter(i => filteredStudentIds.has(i.studentId));
+  }, [interventions, filteredStudents, selectedCampus]);
+
   // Generate mock snapshots for demo (in production, these would come from metrics_snapshots collection)
   const mockSnapshots = useMemo(() => {
     const snapshots: any[] = [];
-    students.forEach(student => {
+    filteredStudents.forEach(student => {
       for (let i = 0; i < 30; i++) {
         const date = new Date();
         date.setDate(date.getDate() - i);
@@ -88,40 +123,40 @@ export default function ImpactAnalyticsPage() {
       }
     });
     return snapshots;
-  }, [students]);
+  }, [filteredStudents]);
 
   // Calculate impacts
   const impacts = useMemo(() => {
-    return interventions.map(intervention =>
+    return filteredInterventions.map(intervention =>
       calculateInterventionImpact(
         intervention.studentId,
         intervention.timestamp,
         mockSnapshots
       )
     );
-  }, [interventions, mockSnapshots]);
+  }, [filteredInterventions, mockSnapshots]);
 
   // Calculate effectiveness by objective
   const effectiveness = useMemo(() =>
-    calculateInterventionEffectiveness(interventions, impacts),
-    [interventions, impacts]
+    calculateInterventionEffectiveness(filteredInterventions, impacts),
+    [filteredInterventions, impacts]
   );
 
   // Calculate coach performance
   const uniqueCoaches = useMemo(() =>
-    Array.from(new Set(interventions.map(i => i.coach))),
-    [interventions]
+    Array.from(new Set(filteredInterventions.map(i => i.coach))),
+    [filteredInterventions]
   );
 
   const coachPerformance = useMemo(() =>
-    calculateCoachPerformance(uniqueCoaches, interventions, impacts),
-    [uniqueCoaches, interventions, impacts]
+    calculateCoachPerformance(uniqueCoaches, filteredInterventions, impacts),
+    [uniqueCoaches, filteredInterventions, impacts]
   );
 
   // Calculate cohort comparison
   const cohortComparison = useMemo(() =>
-    compareCohorts(students, interventions),
-    [students, interventions]
+    compareCohorts(filteredStudents, filteredInterventions),
+    [filteredStudents, filteredInterventions]
   );
 
   // Summary metrics
@@ -132,11 +167,11 @@ export default function ImpactAnalyticsPage() {
       .reduce((sum, i) => sum + Math.abs(i.deltaWeek4!), 0) / Math.max(1, successful);
 
     return {
-      totalInterventions: interventions.length,
-      successRate: interventions.length > 0 ? (successful / interventions.length) * 100 : 0,
+      totalInterventions: filteredInterventions.length,
+      successRate: filteredInterventions.length > 0 ? (successful / filteredInterventions.length) * 100 : 0,
       avgRiskDecrease: Math.round(avgRiskDecrease),
     };
-  }, [interventions, impacts]);
+  }, [filteredInterventions, impacts]);
 
   // Risk trajectory data for chart
   const trajectoryData = useMemo(() => {
@@ -219,6 +254,17 @@ export default function ImpactAnalyticsPage() {
           </select>
 
           <select
+            value={selectedCampus}
+            onChange={(e) => setSelectedCampus(e.target.value)}
+            className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-[10px] font-black uppercase text-slate-400 outline-none hover:border-slate-600 transition-colors"
+          >
+            <option value="ALL">📍 ALL CAMPUSES</option>
+            {uniqueCampuses.map(campus => (
+              <option key={campus} value={campus}>{campus}</option>
+            ))}
+          </select>
+
+          <select
             value={selectedTier}
             onChange={(e) => setSelectedTier(e.target.value)}
             className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-[10px] font-black uppercase text-slate-400 outline-none hover:border-slate-600 transition-colors"
@@ -230,7 +276,7 @@ export default function ImpactAnalyticsPage() {
           </select>
 
           <div className="text-[9px] text-slate-500 uppercase tracking-widest">
-            Last 3 months • {interventions.length} interventions
+            Last 3 months • {filteredInterventions.length} interventions
           </div>
         </div>
       </header>
@@ -413,7 +459,7 @@ export default function ImpactAnalyticsPage() {
           <div className="glass-card p-4 rounded-xl border-l-4 border-purple-500">
             <div className="text-[10px] text-purple-400 font-bold uppercase mb-2">Intervention Coverage</div>
             <div className="text-lg font-black text-white mb-1">{cohortComparison.withInterventions.studentCount} students</div>
-            <div className="text-[9px] text-slate-500">{((cohortComparison.withInterventions.studentCount / Math.max(1, students.length)) * 100).toFixed(0)}% of total students</div>
+            <div className="text-[9px] text-slate-500">{((cohortComparison.withInterventions.studentCount / Math.max(1, filteredStudents.length)) * 100).toFixed(0)}% of total students</div>
           </div>
         </div>
       </section>

@@ -31,6 +31,7 @@ export default function FieldPage() {
   // Filter states
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'RED' | 'AMBER' | 'GREEN'>('ALL');
   const [dateRange, setDateRange] = useState<'TODAY' | '48H' | 'WEEK' | 'ALL'>('ALL');
+  const [selectedCampus, setSelectedCampus] = useState('ALL');
 
   // Firebase real-time connection
   useEffect(() => {
@@ -47,6 +48,19 @@ export default function FieldPage() {
 
     return () => unsubscribe();
   }, []);
+
+  // Get unique campuses for filter
+  const uniqueCampuses = useMemo(() => {
+    const campuses = new Set<string>();
+    students.forEach(s => {
+      if (s.dimensions?.campusDisplayName) {
+        campuses.add(s.dimensions.campusDisplayName);
+      } else {
+        campuses.add('Online (No Campus)');
+      }
+    });
+    return Array.from(campuses).sort();
+  }, [students]);
 
   // Generate missions from student data
   const allMissions = useMemo(() => {
@@ -106,11 +120,22 @@ export default function FieldPage() {
       filtered = filtered.filter(m => m.priority === priorityFilter);
     }
 
+    // Campus filter
+    if (selectedCampus !== 'ALL') {
+      filtered = filtered.filter(m => {
+        if (selectedCampus === 'Online (No Campus)') {
+          return !m.student.dimensions?.campusDisplayName;
+        } else {
+          return m.student.dimensions?.campusDisplayName === selectedCampus;
+        }
+      });
+    }
+
     // Date range filter (simulated - in production you'd check actual triggeredAt timestamps)
     if (dateRange !== 'ALL') {
       const now = new Date();
       const cutoff = new Date();
-      
+
       if (dateRange === 'TODAY') {
         cutoff.setHours(0, 0, 0, 0);
       } else if (dateRange === '48H') {
@@ -118,12 +143,12 @@ export default function FieldPage() {
       } else if (dateRange === 'WEEK') {
         cutoff.setDate(cutoff.getDate() - 7);
       }
-      
+
       filtered = filtered.filter(m => m.triggeredAt >= cutoff);
     }
 
     return filtered;
-  }, [allMissions, priorityFilter, dateRange]);
+  }, [allMissions, priorityFilter, selectedCampus, dateRange]);
 
   const redMissions = useMemo(() => missions.filter(m => m.priority === 'RED').slice(0, 10), [missions]);
   const amberMissions = useMemo(() => missions.filter(m => m.priority === 'AMBER').slice(0, 10), [missions]);
@@ -133,6 +158,7 @@ export default function FieldPage() {
   const clearFilters = () => {
     setPriorityFilter('ALL');
     setDateRange('ALL');
+    setSelectedCampus('ALL');
   };
 
   // Keyboard shortcuts
@@ -143,7 +169,7 @@ export default function FieldPage() {
 
       // Clear filters
       if (e.key === 'c' && !selectedMission && !e.ctrlKey && !e.metaKey) {
-        if (priorityFilter !== 'ALL' || dateRange !== 'ALL') {
+        if (priorityFilter !== 'ALL' || dateRange !== 'ALL' || selectedCampus !== 'ALL') {
           clearFilters();
         }
       }
@@ -166,7 +192,7 @@ export default function FieldPage() {
 
     window.addEventListener('keydown', handleKeyboard);
     return () => window.removeEventListener('keydown', handleKeyboard);
-  }, [selectedMission, priorityFilter, dateRange, showHelp]);
+  }, [selectedMission, priorityFilter, dateRange, selectedCampus, showHelp]);
 
   if (loading) {
     return (
@@ -286,9 +312,21 @@ export default function FieldPage() {
             </button>
           </div>
 
+          {/* Campus Filter */}
+          <select
+            value={selectedCampus}
+            onChange={(e) => setSelectedCampus(e.target.value)}
+            className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-[10px] font-black uppercase text-slate-400 outline-none hover:border-slate-600 transition-colors"
+          >
+            <option value="ALL">📍 ALL CAMPUSES</option>
+            {uniqueCampuses.map(campus => (
+              <option key={campus} value={campus}>{campus}</option>
+            ))}
+          </select>
+
           {/* Date Range Filter */}
-          <select 
-            value={dateRange} 
+          <select
+            value={dateRange}
             onChange={(e) => setDateRange(e.target.value as any)}
             className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-[10px] font-black uppercase text-slate-400 outline-none hover:border-slate-600 transition-colors"
           >
@@ -299,17 +337,14 @@ export default function FieldPage() {
           </select>
 
           {/* Active Filter Indicator */}
-          {(priorityFilter !== 'ALL' || dateRange !== 'ALL') && (
+          {(priorityFilter !== 'ALL' || dateRange !== 'ALL' || selectedCampus !== 'ALL') && (
             <div className="flex items-center gap-2 text-[9px] bg-slate-900/40 px-3 py-2 rounded-xl border border-slate-800">
               <span className="text-slate-500">Showing:</span>
               <span className="text-alpha-gold font-bold">
                 {missions.length} of {allMissions.length} missions
               </span>
-              <button 
-                onClick={() => {
-                  setPriorityFilter('ALL');
-                  setDateRange('ALL');
-                }}
+              <button
+                onClick={clearFilters}
                 className="text-slate-500 hover:text-white ml-2"
               >
                 Clear filters
