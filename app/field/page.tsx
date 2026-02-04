@@ -11,6 +11,7 @@ import CoachInterventionModal from '@/components/CoachInterventionModal';
 import AlertsDropdown from '@/components/AlertsDropdown';
 import FollowUpReminders from '@/components/FollowUpReminders';
 import HelpModal from '@/components/HelpModal';
+import SlackMessageGenerator from '@/components/SlackMessageGenerator';
 
 interface Mission {
   student: Student;
@@ -545,7 +546,7 @@ export default function FieldPage() {
       {/* Mission Detail Modal */}
       {selectedMission && !showInterventionModal && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-card rounded-3xl p-8 max-w-2xl w-full">
+          <div className="glass-card rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h2 className="text-2xl font-black text-white uppercase">
@@ -609,14 +610,19 @@ export default function FieldPage() {
               </div>
             </div>
 
+            {/* Slack Message Generator */}
+            <div className="mb-6">
+              <SlackMessageGenerator student={selectedMission.student} />
+            </div>
+
             <div className="flex gap-3">
-              <button 
+              <button
                 onClick={() => setSelectedMission(null)}
                 className="flex-1 px-4 py-3 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white font-black text-[10px] uppercase rounded-lg transition-all"
               >
                 Close
               </button>
-              <button 
+              <button
                 onClick={() => setShowInterventionModal(true)}
                 className="flex-1 px-4 py-3 bg-alpha-gold hover:bg-alpha-gold/90 text-black font-black text-[10px] uppercase rounded-lg hover:shadow-[0_0_15px_rgba(212,175,53,0.4)] transition-all"
               >

@@ -14,6 +14,7 @@ import FollowUpReminders from '@/components/FollowUpReminders';
 import { TOPIC_GRADE_MAP } from '@/lib/grade-maps';
 import HelpModal from '@/components/HelpModal';
 import BulkActionsBar from '@/components/BulkActionsBar';
+import SlackMessageGenerator from '@/components/SlackMessageGenerator';
 
 const METRIC_TOOLTIPS = {
   rsr: 'Recent Success Rate: Proportion of recent tasks with >80% accuracy',
@@ -903,7 +904,7 @@ export default function TowerPage() {
       {/* Student Modal */}
       {selectedStudent && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-card rounded-3xl p-8 max-w-2xl w-full">
+          <div className="glass-card rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h2 className="text-2xl font-black text-white uppercase">
@@ -959,15 +960,20 @@ export default function TowerPage() {
               </div>
             </div>
 
+            {/* Slack Message Generator */}
+            <div className="mb-6">
+              <SlackMessageGenerator student={selectedStudent} />
+            </div>
+
             {/* Action Buttons */}
             <div className="flex gap-3">
-              <button 
+              <button
                 onClick={() => setSelectedStudent(null)}
                 className="flex-1 px-4 py-3 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white font-black text-[10px] uppercase rounded-lg transition-all"
               >
                 Close
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setShowInterventionModal(true);
                 }}

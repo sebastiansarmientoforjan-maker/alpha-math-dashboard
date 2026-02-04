@@ -47,10 +47,22 @@ export default function SlackMessageGenerator({ student }: SlackMessageGenerator
 
       {message && (
         <>
-          <div className="glass-card rounded-xl p-4 bg-slate-900/40 border border-slate-800">
-            <pre className="text-[11px] text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">
-              {message}
-            </pre>
+          <div className="glass-card rounded-xl bg-slate-900/40 border border-slate-800 relative">
+            <div className="absolute top-2 right-2 z-10">
+              <button
+                onClick={handleCopy}
+                className={`px-3 py-1.5 ${
+                  copied ? 'bg-emerald-600' : 'bg-slate-700 hover:bg-slate-600'
+                } text-white font-black text-[9px] uppercase rounded-lg transition-all shadow-lg`}
+              >
+                {copied ? '✓ Copied!' : '📋 Copy'}
+              </button>
+            </div>
+            <div className="p-4 pr-20">
+              <pre className="text-[11px] text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">
+                {message}
+              </pre>
+            </div>
           </div>
 
           <div className="flex items-center justify-between">
@@ -68,19 +80,8 @@ export default function SlackMessageGenerator({ student }: SlackMessageGenerator
               )}
             </div>
             <button
-              onClick={handleCopy}
-              className={`px-4 py-2 ${
-                copied ? 'bg-emerald-600' : 'bg-slate-700 hover:bg-slate-600'
-              } text-white font-black text-[10px] uppercase rounded-lg transition-all`}
-            >
-              {copied ? '✓ Copied!' : 'Copy to Clipboard'}
-            </button>
-          </div>
-
-          <div className="flex gap-2">
-            <button
               onClick={handleGenerate}
-              className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-black text-[9px] uppercase rounded-lg transition-all"
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-black text-[9px] uppercase rounded-lg transition-all"
             >
               🔄 Generate Another
             </button>
