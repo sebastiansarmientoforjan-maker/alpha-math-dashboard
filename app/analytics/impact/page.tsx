@@ -118,7 +118,6 @@ export default function ImpactAnalyticsPage() {
           ksi: student.metrics.ksi || 70 + (Math.random() - 0.5) * 15,
           velocity: student.metrics.velocityScore + (Math.random() - 0.5) * 20,
           riskScore: (student.dri.riskScore || 50) + (Math.random() - 0.5) * 15,
-          dailyXP: student.metrics.dailyXP || 25 + (Math.random() - 0.5) * 10,
         });
       }
     });
