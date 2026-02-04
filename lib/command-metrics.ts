@@ -1,8 +1,8 @@
 // ============================================
 // ALPHA MATH COMMAND v7.0 - METRICS LIBRARY
 // ============================================
-// Pure calculation functions for Command & Control metrics
-// Based on ALPHA_MATH_COMMAND_V7_FINAL_PROMPT.md Part 1
+// STRICT MODE: Hardened logic matching ALPHA_MATH_COMMAND_V7_FINAL_PROMPT.md
+// Part 1: Core Philosophy & Metrics - "Physics of Learning"
 
 import {
   MasteryLatency,
@@ -13,20 +13,20 @@ import {
 } from '@/types/command';
 
 // ============================================
-// METRIC 1: MASTERY LATENCY
+// METRIC 1: MASTERY LATENCY (STRICT)
 // ============================================
 
 /**
- * Calculate time between first exposure and mastery achievement
+ * STRICT RULE: Calculate time between first exposure and mastery
+ *
+ * CRITICAL THRESHOLDS (EXACT):
+ * - LOW_LATENCY: < 30 minutes (flow state)
+ * - HIGH_FRICTION: 30-120 minutes (needs attention)
+ * - BLOCKED: > 120 minutes (RED ALERT - MUST TRIGGER)
  *
  * @param student - Student with activity logs
  * @param topic - Specific topic/concept to analyze
- * @returns MasteryLatency object with status
- *
- * Thresholds:
- * - LOW_LATENCY: < 30 mins (flow state)
- * - HIGH_FRICTION: 30-120 mins (needs attention)
- * - BLOCKED: > 120 mins (RED ALERT)
+ * @returns MasteryLatency with STRICT status enforcement
  */
 export function calculateMasteryLatency(
   student: MathAcademyStudent,
@@ -36,7 +36,7 @@ export function calculateMasteryLatency(
   const topicLogs = student.activity.filter(log => log.topic === topic);
 
   if (topicLogs.length === 0) {
-    // No activity on this topic yet
+    // No activity on this topic yet - return safe default
     return {
       studentId: student.id,
       concept: topic,
@@ -60,14 +60,19 @@ export function calculateMasteryLatency(
   if (!masteryLog) {
     // Still working on mastery - calculate time elapsed so far
     const now = new Date();
-    const deltaHours = (now.getTime() - firstExposure.getTime()) / (1000 * 60 * 60);
+    const deltaMinutes = (now.getTime() - firstExposure.getTime()) / (1000 * 60);
+    const deltaHours = deltaMinutes / 60;
 
+    // STRICT RULE 1: Apply EXACT thresholds in minutes
     let status: 'LOW_LATENCY' | 'HIGH_FRICTION' | 'BLOCKED';
-    if (deltaHours < 0.5) {
+    if (deltaMinutes < 30) {
+      // Flow state: < 30 minutes
       status = 'LOW_LATENCY';
-    } else if (deltaHours < 2) {
+    } else if (deltaMinutes <= 120) {
+      // Friction: 30-120 minutes
       status = 'HIGH_FRICTION';
     } else {
+      // CRITICAL: > 120 minutes = BLOCKED (MUST trigger)
       status = 'BLOCKED';
     }
 
@@ -83,15 +88,18 @@ export function calculateMasteryLatency(
 
   // Mastery achieved - calculate final latency
   const masteryAchieved = masteryLog.timestamp;
-  const deltaHours =
-    (masteryAchieved.getTime() - firstExposure.getTime()) / (1000 * 60 * 60);
+  const deltaMinutes =
+    (masteryAchieved.getTime() - firstExposure.getTime()) / (1000 * 60);
+  const deltaHours = deltaMinutes / 60;
 
+  // STRICT RULE 1: Apply EXACT thresholds even for completed mastery
   let status: 'LOW_LATENCY' | 'HIGH_FRICTION' | 'BLOCKED';
-  if (deltaHours < 0.5) {
+  if (deltaMinutes < 30) {
     status = 'LOW_LATENCY';
-  } else if (deltaHours < 2) {
+  } else if (deltaMinutes <= 120) {
     status = 'HIGH_FRICTION';
   } else {
+    // Even if mastered, took too long = BLOCKED
     status = 'BLOCKED';
   }
 
@@ -106,20 +114,20 @@ export function calculateMasteryLatency(
 }
 
 // ============================================
-// METRIC 2: VELOCITY (DOPPLER EFFECT)
+// METRIC 2: VELOCITY - DOPPLER EFFECT (STRICT)
 // ============================================
 
 /**
- * Calculate student velocity vs required rate (Doppler Effect)
+ * STRICT RULE: Calculate velocity using Doppler Effect analogy
+ *
+ * EXACT THRESHOLDS:
+ * - BLUE_SHIFT: currentRate > requiredRate * 1.2 (ahead of schedule)
+ * - ON_TRACK: requiredRate * 0.8 <= currentRate <= requiredRate * 1.2
+ * - RED_SHIFT: currentRate < requiredRate * 0.8 (MUST TRIGGER)
  *
  * @param student - Student with current progress
  * @param targetCompletionDate - When course should be finished
- * @returns Velocity object with RED_SHIFT/ON_TRACK/BLUE_SHIFT status
- *
- * Status:
- * - BLUE_SHIFT: ahead of schedule (> 120% required rate)
- * - ON_TRACK: within 20% of required rate
- * - RED_SHIFT: behind schedule (< 80% required rate)
+ * @returns Velocity with STRICT status enforcement
  */
 export function calculateVelocity(
   student: MathAcademyStudent,
@@ -139,18 +147,21 @@ export function calculateVelocity(
   // Required rate: % per week needed to finish on time
   const requiredRate = remainingProgress / weeksRemaining;
 
-  // Current rate from student metrics (velocity = XP per week)
-  // Convert to % per week based on current course
+  // Current rate from student metrics (velocity = % per week)
   const currentRate = student.metrics.velocity;
 
-  // Determine status using Doppler Effect analogy
+  // STRICT RULE 2: Apply EXACT Doppler thresholds
   let status: 'BLUE_SHIFT' | 'ON_TRACK' | 'RED_SHIFT';
+
   if (currentRate > requiredRate * 1.2) {
-    status = 'BLUE_SHIFT'; // Ahead of schedule
+    // Ahead of schedule by > 20%
+    status = 'BLUE_SHIFT';
   } else if (currentRate < requiredRate * 0.8) {
-    status = 'RED_SHIFT'; // Behind schedule
+    // CRITICAL: Behind schedule by > 20% = RED_SHIFT (MUST TRIGGER)
+    status = 'RED_SHIFT';
   } else {
-    status = 'ON_TRACK'; // Within tolerance
+    // Within ±20% tolerance
+    status = 'ON_TRACK';
   }
 
   // Predict completion date based on current velocity
@@ -176,22 +187,22 @@ export function calculateVelocity(
 }
 
 // ============================================
-// METRIC 3: SPIN DETECTION
+// METRIC 3: SPIN DETECTION (STRICT)
 // ============================================
 
 /**
- * Detect productive vs unproductive struggle (spin)
+ * STRICT RULE: Detect productive vs unproductive struggle
+ *
+ * CLASSIFICATION:
+ * - PRODUCTIVE: accuracyGradient > 0 OR resourceAccess > 0
+ * - UNPRODUCTIVE: accuracyGradient ≤ 0 AND resourceAccess === 0
+ *
+ * INTERVENTION TRIGGER:
+ * - Required if: UNPRODUCTIVE + attempts > 3
  *
  * @param student - Student with activity logs
  * @param topic - Topic to analyze for spin
- * @returns SpinDetection object with intervention flag
- *
- * Productive Spin:
- * - Attempts increase, accuracy gradient > 0, resources used
- *
- * Unproductive Spin:
- * - Attempts increase, accuracy gradient ≤ 0, no resources accessed
- * - Triggers intervention requirement
+ * @returns SpinDetection with STRICT intervention flag
  */
 export function detectSpin(
   student: MathAcademyStudent,
@@ -201,7 +212,7 @@ export function detectSpin(
   const topicLogs = student.activity.filter(log => log.topic === topic);
 
   if (topicLogs.length === 0) {
-    // No activity - no spin
+    // No activity - no spin detected
     return {
       studentId: student.id,
       concept: topic,
@@ -226,7 +237,7 @@ export function detectSpin(
   let accuracyGradient = 0;
 
   if (recentLogs.length >= 2) {
-    // Simple linear regression slope
+    // Simple linear regression slope: gradient = (n*ΣXY - ΣX*ΣY) / (n*ΣX² - (ΣX)²)
     const n = recentLogs.length;
     const sumX = recentLogs.reduce((sum, _, i) => sum + i, 0);
     const sumY = recentLogs.reduce((sum, log) => sum + log.accuracy, 0);
@@ -247,18 +258,19 @@ export function detectSpin(
     0
   );
 
-  // Determine spin type
+  // STRICT RULE 3: Classification based on gradient AND resource usage
   let spinType: 'PRODUCTIVE' | 'UNPRODUCTIVE';
   let interventionRequired = false;
 
   if (accuracyGradient > 0 || resourceAccess > 0) {
-    // Positive gradient or using resources = productive struggle
+    // Positive gradient OR using resources = productive struggle (good!)
     spinType = 'PRODUCTIVE';
     interventionRequired = false;
   } else {
-    // Flat/negative gradient with no resource access = unproductive spin
+    // Flat/negative gradient AND no resource access = unproductive spin (bad!)
     spinType = 'UNPRODUCTIVE';
-    // Require intervention if attempts > 3 and no progress
+
+    // STRICT TRIGGER: Require intervention if > 3 attempts with no progress
     interventionRequired = totalAttempts > 3;
   }
 
@@ -274,12 +286,18 @@ export function detectSpin(
 }
 
 // ============================================
-// HELPER FUNCTIONS
+// HELPER FUNCTIONS (STRICT)
 // ============================================
 
 /**
  * Calculate urgency score for triage queue sorting
  * Combines multiple risk factors into single 0-100 score
+ *
+ * WEIGHTING (STRICT):
+ * - BLOCKED: +40 points
+ * - HIGH_FRICTION: +20 points
+ * - RED_SHIFT: +30 points
+ * - UNPRODUCTIVE spin requiring intervention: +30 points
  *
  * @param masteryLatency - Current mastery latency
  * @param velocity - Current velocity status
@@ -295,26 +313,26 @@ export function computeUrgencyScore(
 
   // Mastery Latency contribution (0-40 points)
   if (masteryLatency.status === 'BLOCKED') {
-    score += 40;
+    score += 40; // Critical: > 120 minutes stuck
   } else if (masteryLatency.status === 'HIGH_FRICTION') {
-    score += 20;
+    score += 20; // Warning: 30-120 minutes
   }
+  // LOW_LATENCY adds 0 points
 
   // Velocity contribution (0-30 points)
   if (velocity.status === 'RED_SHIFT') {
-    score += 30;
-  } else if (velocity.status === 'ON_TRACK') {
-    score += 0;
-  } else {
-    score -= 10; // Bonus for being ahead
+    score += 30; // Critical: < 80% required rate
+  } else if (velocity.status === 'BLUE_SHIFT') {
+    score -= 10; // Bonus for being ahead (can go negative)
   }
+  // ON_TRACK adds 0 points
 
   // Spin contribution (0-30 points)
   if (spin.interventionRequired) {
-    score += 30;
+    score += 30; // Unproductive spin detected
   }
 
-  // Clamp to 0-100 range
+  // Clamp to 0-100 range (strict bounds)
   return Math.max(0, Math.min(100, score));
 }
 
@@ -328,7 +346,7 @@ export function predictCompletion(student: MathAcademyStudent): Date {
   const remainingProgress = 100 - student.progress;
   const currentRate = student.metrics.velocity;
 
-  // Avoid division by zero
+  // Avoid division by zero (minimum 0.1% per week)
   const weeksToCompletion = remainingProgress / Math.max(0.1, currentRate);
 
   const now = new Date();

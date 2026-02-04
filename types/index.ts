@@ -15,9 +15,13 @@ export interface Student {
   metrics: Metrics;
   dri: DRIMetrics;
   lastUpdated: string;
-  
+
   // ⭐ NUEVO: Dimensiones de agrupación (FASE 3 - Group Analytics)
   dimensions?: StudentDimensions | null;
+
+  // ⭐ COMMAND v7: Risk score and intervention tracking
+  riskScore: number; // 0-100 composite risk score (REQUIRED for v7)
+  interventionHistory: InterventionRecord[]; // Track all DRI interventions
 }
 
 export interface StudentActivity {
@@ -68,7 +72,29 @@ export interface DRIMetrics {
   driTier: 'RED' | 'YELLOW' | 'GREEN';
   driSignal: string;
   driColor: string;
-  riskScore?: number;
+  riskScore: number; // REQUIRED for Command v7 (no longer optional)
+}
+
+// ==========================================
+// COMMAND v7 INTERVENTION TRACKING
+// ==========================================
+
+/**
+ * Individual intervention record for Command v7
+ * Tracks DRI actions and their effectiveness
+ */
+export interface InterventionRecord {
+  id: string;
+  timestamp: Date;
+  dri: string; // DRI who performed intervention
+  level: 'LEVEL_1_HINT' | 'LEVEL_2_MESSAGE' | 'LEVEL_3_PEER' | 'LEVEL_4_RESCUE';
+  reason: string; // Why intervention was triggered
+  action: string; // What was done
+  topic?: string; // Specific topic if applicable
+  velocityBefore: number;
+  velocityAfter?: number; // Measured post-intervention
+  successful?: boolean; // Did it restore velocity?
+  notes?: string;
 }
 
 // ==========================================
