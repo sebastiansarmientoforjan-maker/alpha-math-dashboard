@@ -835,8 +835,32 @@ export default function HomePage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Command v7 Card - NEW */}
+              <a
+                href="/command"
+                className="group p-6 glass-card rounded-2xl border-2 border-cyan-500/50 hover:border-cyan-400 transition-all cursor-pointer relative overflow-hidden"
+              >
+                <div className="absolute top-2 right-2 px-2 py-0.5 bg-cyan-500/20 border border-cyan-500/50 rounded text-[8px] font-black text-cyan-400 uppercase">
+                  v7.0 New
+                </div>
+                <div className="text-4xl mb-3">🎯</div>
+                <h3 className="text-xl font-black text-white uppercase mb-2 group-hover:text-cyan-400 transition-colors">
+                  Command v7
+                </h3>
+                <p className="text-[10px] text-cyan-400 uppercase tracking-widest font-bold mb-3">
+                  Air Traffic Control
+                </p>
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  Next-gen command tower. The Radar, Triage Queue, Deep Dive Panel. Real-time intervention tracking.
+                </p>
+                <div className="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between text-[9px] text-slate-600">
+                  <span>Single Pane of Glass</span>
+                  <span className="group-hover:text-cyan-400 transition-colors">→</span>
+                </div>
+              </a>
+
               {/* The Tower Card */}
-              <a 
+              <a
                 href="/tower"
                 className="group p-6 glass-card rounded-2xl border border-alpha-navy-light hover:border-alpha-gold transition-all cursor-pointer"
               >
@@ -857,7 +881,7 @@ export default function HomePage() {
               </a>
 
               {/* The Field Card */}
-              <a 
+              <a
                 href="/field"
                 className="group p-6 glass-card rounded-2xl border border-alpha-navy-light hover:border-alpha-gold transition-all cursor-pointer"
               >
@@ -890,7 +914,7 @@ export default function HomePage() {
                   You're currently in the classic DRI Command Center with full feature access.
                 </p>
                 <div className="mt-4 pt-4 border-t border-slate-800">
-                  <button 
+                  <button
                     onClick={() => setShowModeSelector(false)}
                     className="w-full px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] font-black uppercase rounded-lg transition-colors"
                   >
